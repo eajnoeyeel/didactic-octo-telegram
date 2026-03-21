@@ -1,0 +1,135 @@
+<h2>파이프라인 아키텍처 — 3가지 접근법</h2>
+<p class="subtitle">전체 구조를 결정하는 핵심 선택입니다. 하나를 선택해주세요.</p>
+
+<style>
+.pipeline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 6px;
+}
+.pipe-box {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+.pipe-box.highlight {
+  background: #1e3a5f;
+  border-color: #3b82f6;
+  color: #93c5fd;
+}
+.pipe-box.key {
+  background: #1a3a2a;
+  border-color: #22c55e;
+  color: #86efac;
+}
+.arrow { color: #475569; font-size: 14px; }
+.branch { display: flex; flex-direction: column; gap: 4px; }
+.branch-item { display: flex; align-items: center; gap: 6px; }
+.tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.tag-blue { background: #1e3a5f; color: #93c5fd; }
+.tag-green { background: #1a3a2a; color: #86efac; }
+.tag-yellow { background: #3a2a00; color: #fde68a; }
+</style>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Sequential 2-Layer</h3>
+      <p class="subtitle" style="margin-bottom:8px">서버 찾기 → 그 서버 안에서 Tool 찾기</p>
+      <div class="pipeline">
+        <div class="pipe-box highlight">쿼리</div>
+        <span class="arrow">→</span>
+        <div class="pipe-box">서버 인덱스 검색<br><small>Top-3 servers</small></div>
+        <span class="arrow">→</span>
+        <div class="pipe-box highlight">1순위 서버 선택</div>
+        <span class="arrow">→</span>
+        <div class="pipe-box">Tool 인덱스 검색<br><small>(해당 서버 내)</small></div>
+        <span class="arrow">→</span>
+        <div class="pipe-box key">Confidence 분기<br><small>Top-1 or Top-3</small></div>
+      </div>
+      <div style="margin-top:10px">
+        <span class="tag tag-green">구현 단순</span>&nbsp;
+        <span class="tag tag-green">흐름 직관적</span>&nbsp;
+        <span class="tag tag-yellow">서버 선택 실수 시 Tool도 틀림</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Parallel Dual-Index</h3>
+      <p class="subtitle" style="margin-bottom:8px">서버/Tool 인덱스 동시 검색 → 통합 재랭킹</p>
+      <div class="pipeline">
+        <div class="pipe-box highlight">쿼리</div>
+        <span class="arrow">→</span>
+        <div class="branch">
+          <div class="branch-item">
+            <div class="pipe-box">서버 인덱스 검색</div>
+          </div>
+          <div class="branch-item">
+            <div class="pipe-box">Tool 인덱스 검색</div>
+          </div>
+        </div>
+        <span class="arrow">→</span>
+        <div class="pipe-box highlight">통합 Reranker<br><small>서버+Tool 점수 병합</small></div>
+        <span class="arrow">→</span>
+        <div class="pipe-box key">Confidence 분기</div>
+      </div>
+      <div style="margin-top:10px">
+        <span class="tag tag-green">빠름 (병렬)</span>&nbsp;
+        <span class="tag tag-green">서버 미등록 Tool도 발견 가능</span>&nbsp;
+        <span class="tag tag-yellow">점수 병합 로직 복잡</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Taxonomy-gated Pipeline</h3>
+      <p class="subtitle" style="margin-bottom:8px">의도 분류 먼저 → 해당 카테고리 내 검색 (JSPLIT 방식)</p>
+      <div class="pipeline">
+        <div class="pipe-box highlight">쿼리</div>
+        <span class="arrow">→</span>
+        <div class="pipe-box key">인텐트 분류<br><small>web / data / code / ...</small></div>
+        <span class="arrow">→</span>
+        <div class="pipe-box">카테고리 필터<br><small>검색 공간 1/k</small></div>
+        <span class="arrow">→</span>
+        <div class="pipe-box">서버→Tool<br><small>Sequential</small></div>
+        <span class="arrow">→</span>
+        <div class="pipe-box key">Confidence 분기</div>
+      </div>
+      <div style="margin-top:10px">
+        <span class="tag tag-green">정밀도 높음</span>&nbsp;
+        <span class="tag tag-green">논문 근거 있음 (JSPLIT)</span>&nbsp;
+        <span class="tag tag-yellow">taxonomy 설계 필요</span>&nbsp;
+        <span class="tag tag-yellow">경계 모호 쿼리 취약</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:20px; padding:14px; background:#0f172a; border-radius:8px; border:1px solid #1e293b;">
+  <p style="margin:0; font-size:13px; color:#64748b;">
+    <strong style="color:#94a3b8">권고:</strong>
+    현재 규모(~1,000 tools)에서는 <strong style="color:#93c5fd">A (Sequential)</strong>이 가장 실용적입니다.
+    C는 논문을 더 읽고 taxonomy 설계를 마친 뒤 Phase 2에서 추가할 수 있습니다.
+    B는 Provider 분석(어떤 서버의 어떤 tool이 경쟁하는지)에 유리하지만 구현 복잡도가 높습니다.
+  </p>
+</div>
