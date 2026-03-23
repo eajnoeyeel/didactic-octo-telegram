@@ -34,7 +34,7 @@ await client.create_collection(
 ```python
 points = [
     PointStruct(
-        id=abs(hash(tool.tool_id)) % (2**63),
+        id=str(uuid.uuid5(MCP_DISCOVERY_NAMESPACE, tool.tool_id)),
         vector=vector.tolist(),
         payload={
             "tool_id": tool.tool_id,
@@ -48,7 +48,7 @@ points = [
 await client.upsert(collection_name=collection, points=points)
 ```
 
-- **ID**: `abs(hash(tool_id)) % (2**63)` — deterministic, upsert-safe
+- **ID**: `uuid.uuid5(MCP_DISCOVERY_NAMESPACE, tool_id)` — 결정적, upsert-safe. (Python `hash()`는 프로세스 간 비결정적이므로 사용 금지)
 - **Payload**: 검색 결과 재구성에 필요한 필드만 저장
 
 ## Search Pattern
