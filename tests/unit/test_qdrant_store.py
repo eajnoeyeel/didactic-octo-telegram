@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 
-from models import MCPTool, TOOL_ID_SEPARATOR
+from models import MCPTool
 from retrieval.qdrant_store import MCP_DISCOVERY_NAMESPACE, QdrantStore
 
 

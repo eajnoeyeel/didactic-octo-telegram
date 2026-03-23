@@ -1,6 +1,6 @@
 """Tests for ToolIndexer — embed + upsert orchestrator."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import numpy as np
 import pytest

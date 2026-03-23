@@ -1,6 +1,6 @@
 """Direct MCP connector — interface only for Phase 1. Full implementation in Phase 4+."""
 
-from models import MCPTool, TOOL_ID_SEPARATOR
+from models import TOOL_ID_SEPARATOR, MCPTool
 
 
 class MCPDirectConnector:

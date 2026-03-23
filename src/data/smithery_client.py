@@ -6,7 +6,7 @@ import time
 import httpx
 from loguru import logger
 
-from models import MCPServer, MCPServerSummary, MCPTool, TOOL_ID_SEPARATOR
+from models import TOOL_ID_SEPARATOR, MCPServer, MCPServerSummary, MCPTool
 
 
 class SmitheryClient:
@@ -55,7 +55,8 @@ class SmitheryClient:
                 response.raise_for_status()
                 return response
             except httpx.HTTPStatusError as e:
-                if e.response.status_code in (429, 500, 502, 503, 504) and attempt < max_retries - 1:
+                retryable = e.response.status_code in (429, 500, 502, 503, 504)
+                if retryable and attempt < max_retries - 1:
                     delay = (2**attempt) * 1.0
                     logger.warning(
                         f"Retry {attempt + 1}/{max_retries} after {delay}s: "

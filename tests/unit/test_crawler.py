@@ -1,6 +1,5 @@
 """Tests for SmitheryCrawler — orchestrates the crawling pipeline."""
 
-from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
