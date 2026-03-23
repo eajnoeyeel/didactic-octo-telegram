@@ -27,15 +27,23 @@ class QdrantStore:
         self.collection_name = collection_name
 
     async def ensure_collection(self, dimension: int) -> None:
-        collections = await self.client.get_collections()
+        try:
+            collections = await self.client.get_collections()
+        except Exception as e:
+            logger.error(f"Qdrant get_collections failed: {e}")
+            raise
         existing = [c.name for c in collections.collections]
         if self.collection_name in existing:
             logger.info(f"Collection '{self.collection_name}' already exists")
             return
-        await self.client.create_collection(
-            collection_name=self.collection_name,
-            vectors_config=VectorParams(size=dimension, distance=Distance.COSINE),
-        )
+        try:
+            await self.client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=VectorParams(size=dimension, distance=Distance.COSINE),
+            )
+        except Exception as e:
+            logger.error(f"Qdrant create_collection failed: {e}")
+            raise
         logger.info(f"Created collection '{self.collection_name}' (dim={dimension})")
 
     async def upsert_tools(self, tools: list[MCPTool], vectors: list[np.ndarray]) -> None:
@@ -47,7 +55,11 @@ class QdrantStore:
             )
             for tool, vector in zip(tools, vectors)
         ]
-        await self.client.upsert(collection_name=self.collection_name, points=points)
+        try:
+            await self.client.upsert(collection_name=self.collection_name, points=points)
+        except Exception as e:
+            logger.error(f"Qdrant upsert failed ({len(points)} points): {e}")
+            raise
         logger.info(f"Upserted {len(points)} points to '{self.collection_name}'")
 
     async def search(
@@ -61,12 +73,16 @@ class QdrantStore:
             query_filter = Filter(
                 must=[FieldCondition(key="server_id", match=MatchValue(value=server_id_filter))]
             )
-        results = await self.client.search(
-            collection_name=self.collection_name,
-            query_vector=query_vector.tolist(),
-            limit=top_k,
-            query_filter=query_filter,
-        )
+        try:
+            results = await self.client.search(
+                collection_name=self.collection_name,
+                query_vector=query_vector.tolist(),
+                limit=top_k,
+                query_filter=query_filter,
+            )
+        except Exception as e:
+            logger.error(f"Qdrant search failed: {e}")
+            raise
         return [
             SearchResult(
                 tool=self.payload_to_tool(hit.payload),
@@ -94,13 +110,20 @@ class QdrantStore:
 
     @staticmethod
     def payload_to_tool(payload: dict) -> MCPTool:
-        return MCPTool(
-            server_id=payload["server_id"],
-            tool_name=payload["tool_name"],
-            tool_id=payload["tool_id"],
-            description=payload.get("description"),
-            input_schema=payload.get("input_schema"),
-        )
+        try:
+            return MCPTool(
+                server_id=payload["server_id"],
+                tool_name=payload["tool_name"],
+                tool_id=payload["tool_id"],
+                description=payload.get("description"),
+                input_schema=payload.get("input_schema"),
+            )
+        except (KeyError, Exception) as e:
+            logger.error(
+                f"Failed to reconstruct MCPTool from payload: {e}. "
+                f"Payload keys: {list(payload.keys())}"
+            )
+            raise
 
     @staticmethod
     def generate_point_id(tool_id: str) -> str:
