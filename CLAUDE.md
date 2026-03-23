@@ -64,7 +64,7 @@ All pluggable components use abstract base classes — business logic depends on
 
 ### Key Data Models (Pydantic v2)
 
-- `MCPTool`: tool_id format is `server_id/tool_name`
+- `MCPTool`: tool_id format is `server_id::tool_name` (TOOL_ID_SEPARATOR = "::", `/` ambiguous in Smithery qualifiedNames)
 - `MCPServer`: contains tools list
 - `SearchResult`: tool + score + rank + reason
 - `GroundTruth`: query + correct_server_id + correct_tool_id + difficulty + category
@@ -91,6 +91,6 @@ When code conflicts with design docs, **docs/ takes precedence**:
 - **Async only**: All I/O uses async/await (AsyncQdrantClient, AsyncOpenAI, httpx.AsyncClient). Never `requests`.
 - **Logging**: loguru only. No `print()`, no `import logging`.
 - **Testing**: pytest + pytest-asyncio with `asyncio_mode="auto"`. Integration tests guarded by `@pytest.mark.skipif(not os.getenv("API_KEY"))`.
-- **Qdrant IDs**: `abs(hash(tool_id)) % (2**63)` — deterministic, upsert-safe.
+- **Qdrant IDs**: `uuid.uuid5(MCP_DISCOVERY_NAMESPACE, tool_id)` — deterministic, upsert-safe. (Python `hash()` is process-local and non-deterministic across runs.)
 - **Confidence branching**: gap-based threshold 0.15 (rank1 - rank2 score gap).
 - **Ground truth**: JSONL format in `data/ground_truth/`. Seed set is manually curated; synthetic is LLM-generated.
