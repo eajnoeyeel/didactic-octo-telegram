@@ -18,7 +18,7 @@
 | `query_id` | 고유 ID (e.g., `gt-search-001`) | 전체 |
 | `query` | 자연어 쿼리 | 모든 지표 입력 |
 | `correct_server_id` | 정답 MCP 서버 ID | Server Recall@K, MRR, Server Error Rate |
-| `correct_tool_id` | 정답 Tool ID (`server_id/tool_name`) | Precision@1, Tool Recall@10, NDCG@5, Confusion Rate |
+| `correct_tool_id` | 정답 Tool ID (`server_id::tool_name`, TOOL_ID_SEPARATOR="::") | Precision@1, Tool Recall@10, NDCG@5, Confusion Rate |
 | `difficulty` | easy / medium / hard | 난이도별 Precision@1 분석 |
 | `category` | 8개 카테고리 | 도메인별 분석, Taxonomy-gated 평가 |
 | `ambiguity` | low / medium / high | 모호도별 분석 |
