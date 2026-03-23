@@ -151,15 +151,16 @@ class MCPServer(BaseModel):
 **MCPTool** (수정):
 ```python
 class MCPTool(BaseModel):
-    tool_id: str             # "{server_id}::{tool_name}"
-    server_id: str
+    server_id: str           # 필드 순서 중요: validator가 참조하는 필드를 먼저 정의
     tool_name: str
+    tool_id: str             # "{server_id}::{tool_name}" — server_id, tool_name 뒤에 위치
     description: str | None = None
     input_schema: dict | None = None
 
     @computed_field
     @property
     def parameter_names(self) -> list[str]:
+        """input_schema에서 파라미터 이름 추출. 향후 required 필드 구분 등 확장 가능."""
         if not self.input_schema:
             return []
         props = self.input_schema.get("properties", {})
@@ -175,6 +176,8 @@ class MCPTool(BaseModel):
             raise ValueError(f"tool_id must be '{expected}', got '{v}'")
         return v
 ```
+
+> **주의**: Pydantic v2 `field_validator`는 필드 정의 순서대로 실행된다. `server_id`와 `tool_name`이 `tool_id`보다 먼저 정의되어야 validator에서 참조 가능하다.
 
 **SearchResult, FindBestToolRequest, FindBestToolResponse, GroundTruthEntry**: 기존 `docs/plan/phase-0-2.md` 설계 유지. tool_id 구분자만 `::` 적용.
 
@@ -234,7 +237,10 @@ class SmitheryClient:
     async def fetch_all_summaries(
         self, max_pages: int = 10
     ) -> list[MCPServerSummary]:
-        """전체 서버 목록 페이지네이션."""
+        """전체 서버 목록 페이지네이션.
+        종료 조건: (1) max_pages 도달 또는 (2) 응답의 servers 배열이 빈 경우 또는
+        (3) 응답의 pagination.currentPage >= pagination.totalPages.
+        """
 
     async def fetch_server_detail(
         self, qualified_name: str
@@ -356,7 +362,10 @@ uv run scripts/collect_data.py --max-pages 5            # 페이지 제한
 | `test_crawler.py` | 크롤링 흐름 (mock client), save/load JSONL |
 | `test_mcp_connector.py` | parse_tools (mock JSON-RPC response) |
 
-### 4.8 완료 기준
+### 4.8 TDD 순서
+각 모듈은 **실패 테스트 작성 → 구현 → 통과 확인** 순서를 따른다. CLI 파싱은 argparse 사용.
+
+### 4.9 완료 기준
 - [ ] 모든 unit test PASS
 - [ ] `scripts/collect_data.py --max-servers 10` 스모크 테스트 성공
 - [ ] `data/raw/servers.jsonl` 생성 및 내용 확인
@@ -442,16 +451,26 @@ class QdrantStore:
         """벡터 유사도 검색. server_id_filter로 특정 서버 내 검색 가능."""
 
     @staticmethod
-    def _build_tool_text(tool: MCPTool) -> str:
-        """임베딩용 텍스트: "{tool_name}: {description}" """
+    def build_tool_text(tool: MCPTool) -> str:
+        """임베딩용 텍스트 생성.
+        - description 있으면: "{tool_name}: {description}"
+        - description 없으면: "{tool_name}" (description=None인 tool도 인덱싱 대상에 포함,
+          단 build_index.py에서 경고 로깅)
+        """
 
     @staticmethod
-    def _tool_to_payload(tool: MCPTool) -> dict:
+    def tool_to_payload(tool: MCPTool) -> dict:
         """Qdrant payload: tool_id, server_id, tool_name, description, input_schema."""
 
     @staticmethod
-    def _generate_point_id(tool_id: str) -> str:
-        """결정적 UUID v5: uuid.uuid5(MCP_DISCOVERY_NAMESPACE, tool_id)."""
+    def payload_to_tool(payload: dict) -> MCPTool:
+        """Qdrant payload → MCPTool 역변환. search() 내부에서 사용."""
+
+    @staticmethod
+    def generate_point_id(tool_id: str) -> str:
+        """결정적 UUID v5: uuid.uuid5(MCP_DISCOVERY_NAMESPACE, tool_id).
+        MCP_DISCOVERY_NAMESPACE는 프로젝트 전용으로 무작위 생성된 고정 UUID.
+        """
 ```
 
 ### 5.5 ToolIndexer (`src/data/indexer.py`)
@@ -466,7 +485,7 @@ class ToolIndexer:
     ) -> int:
         """
         인덱싱 흐름:
-        1. QdrantStore._build_tool_text(tool) per tool → texts
+        1. QdrantStore.build_tool_text(tool) per tool → texts
         2. embedder.embed_batch(texts, batch_size)
         3. store.upsert_tools(tools, vectors)
         반환: 인덱싱된 도구 수.
@@ -488,13 +507,16 @@ uv run scripts/build_index.py --batch-size 100
 | 테스트 파일 | 범위 |
 |------------|------|
 | `test_embedder.py` | Embedder ABC, OpenAIEmbedder 인스턴스화 + model/dimension (mock) |
-| `test_qdrant_store.py` | _build_tool_text, _tool_to_payload, _generate_point_id |
-| `test_indexer.py` (옵션) | index_tools 흐름 (mock embedder + mock store) |
+| `test_qdrant_store.py` | build_tool_text, tool_to_payload, payload_to_tool, generate_point_id |
+| `test_indexer.py` | index_tools 흐름 (mock embedder + mock store) — 필수 |
 
 Integration test (API 키 필요 시 skip):
 - 실제 OpenAI embed → Qdrant upsert → search → SearchResult 반환
 
-### 5.8 완료 기준
+### 5.8 TDD 순서
+각 모듈은 **실패 테스트 작성 → 구현 → 통과 확인** 순서를 따른다.
+
+### 5.9 완료 기준
 - [ ] 모든 unit test PASS
 - [ ] `scripts/build_index.py` 실행 성공 (Qdrant Cloud 연결 필요)
 - [ ] 커밋: `feat: Embedder abstraction + OpenAI embedder` + `feat: Qdrant vector store + indexer`
@@ -512,9 +534,16 @@ Integration test (API 키 필요 시 skip):
 | R5: MCP connector 시기상조 | 인터페이스+mock만 | unit test PASS | Phase 4+에서 구현 |
 | R6: 필드 중복 | input_schema만 + computed property | model test | to_parameters() 추가 |
 
+| R7: Smithery API rate limit/IP 차단 | detail fetch 결과 점진적 저장 (1건씩 append), 중단 후 resume 지원 | 100서버 크롤링 완주 | rate_limit_seconds 증가 (0.5→1.0) |
+| R8: Smithery API 스키마 변경 | parse_*에서 예상치 못한 필드/누락 시 경고 로깅 + 해당 서버 skip | 파싱 실패 서버 0건 확인 | 전체 크롤링 중단 방지 |
+
 **추가 완화 조치**:
 - Smithery API 장애 대비: 첫 성공 크롤링 결과(`servers.jsonl`)를 git에 커밋. Phase 2는 캐시 데이터로 진행 가능.
 - `TOOL_ID_SEPARATOR` 하드코딩 금지: 전체 코드에서 상수 참조만 허용.
+- `::` 구분자 충돌 가능성: Smithery qualifiedName은 `@`, `-`, `/`, 영숫자로 구성되고 MCP tool name은 영숫자+언더스코어. `::` 는 두 문자집합 모두에 포함되지 않으므로 충돌 불가.
+
+**범위 결정 (ADR)**:
+- Phase 2는 **Tool Index(`mcp_tools` 컬렉션)만** 생성한다. Server Index는 Phase 3(Sequential Strategy 구현 시) 또는 Phase 7(Hybrid Search 구현 시)에서 추가한다. 이는 의도적 범위 축소이며, architecture-diagrams.md의 2-Layer 다이어그램과의 차이를 인지하고 있다.
 
 ---
 
@@ -525,7 +554,9 @@ Integration test (API 키 필요 시 skip):
 | `docs/plan/phase-0-2.md` | 6가지 변경사항 전체 반영 (3파일 분리, :: 구분자, UUID v5 등) |
 | `docs/design/code-structure.md` | `smithery_client.py`, `server_selector.py` 추가, `MCPServerSummary` 모델 추가 |
 | `docs/design/architecture.md` | DP7에 크롤링 선택 기준 추가, tool_id 구분자 :: 명시 |
-| `docs/design/ground-truth-schema.md` | tool_id 형식 `{server_id}::{tool_name}` 으로 업데이트 |
+| `docs/design/ground-truth-schema.md` | tool_id 형식 `{server_id}::{tool_name}` 으로 업데이트 + JSON 예시 수정 |
+| `docs/design/ground-truth-design.md` | correct_tool_id 형식 `::` 구분자 적용 |
+| `docs/plan/implementation.md` | 공통 컨벤션의 tool_id 형식 `::` 구분자 적용 |
 
 ---
 
