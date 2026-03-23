@@ -2,6 +2,7 @@
 
 import asyncio
 import time
+from urllib.parse import quote
 
 import httpx
 from loguru import logger
@@ -34,7 +35,10 @@ class SmitheryClient:
 
     def _get_client(self) -> httpx.AsyncClient:
         if self._http_client is None:
-            self._http_client = httpx.AsyncClient(timeout=30.0)
+            raise RuntimeError(
+                "SmitheryClient must be used as an async context manager: "
+                "`async with SmitheryClient(...) as client:`"
+            )
         return self._http_client
 
     async def _rate_limit(self) -> None:
@@ -114,7 +118,7 @@ class SmitheryClient:
     async def fetch_server_detail(self, qualified_name: str) -> MCPServer:
         """Fetch full server detail including tools."""
         response = await self._request_with_retry(
-            "GET", f"{self.base_url}/servers/{qualified_name}"
+            "GET", f"{self.base_url}/servers/{quote(qualified_name, safe='')}"
         )
         data = response.json()
         return self.parse_server_detail(data)
@@ -134,16 +138,23 @@ class SmitheryClient:
     def parse_server_detail(raw: dict) -> MCPServer:
         qualified_name = raw["qualifiedName"]
         raw_tools = raw.get("tools") or []
-        tools = [
-            MCPTool(
-                server_id=qualified_name,
-                tool_name=t["name"],
-                tool_id=f"{qualified_name}{TOOL_ID_SEPARATOR}{t['name']}",
-                description=t.get("description"),
-                input_schema=t.get("inputSchema"),
+        tools = []
+        for t in raw_tools:
+            name = t.get("name")
+            if not name:
+                logger.warning(
+                    f"Skipping tool with missing name in server '{qualified_name}'"
+                )
+                continue
+            tools.append(
+                MCPTool(
+                    server_id=qualified_name,
+                    tool_name=name,
+                    tool_id=f"{qualified_name}{TOOL_ID_SEPARATOR}{name}",
+                    description=t.get("description"),
+                    input_schema=t.get("inputSchema"),
+                )
             )
-            for t in raw_tools
-        ]
         return MCPServer(
             server_id=qualified_name,
             name=raw["displayName"],
