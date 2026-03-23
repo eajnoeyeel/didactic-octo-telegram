@@ -65,17 +65,19 @@ async def main(args: argparse.Namespace) -> None:
         url=settings.qdrant_url,
         api_key=settings.qdrant_api_key,
     )
-    store = QdrantStore(client=qdrant_client, collection_name=settings.qdrant_collection_name)
+    try:
+        store = QdrantStore(client=qdrant_client, collection_name=settings.qdrant_collection_name)
 
-    # Ensure collection exists
-    await store.ensure_collection(dimension=settings.embedding_dimension)
+        # Ensure collection exists
+        await store.ensure_collection(dimension=settings.embedding_dimension)
 
-    # Index
-    indexer = ToolIndexer(embedder=embedder, store=store)
-    count = await indexer.index_tools(tools, batch_size=args.batch_size)
+        # Index
+        indexer = ToolIndexer(embedder=embedder, store=store)
+        count = await indexer.index_tools(tools, batch_size=args.batch_size)
 
-    logger.info(f"Done: Indexed {count} tools from {len(servers)} servers")
-    await qdrant_client.close()
+        logger.info(f"Done: Indexed {count} tools from {len(servers)} servers")
+    finally:
+        await qdrant_client.close()
 
 
 if __name__ == "__main__":
