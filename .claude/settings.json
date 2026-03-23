@@ -3,6 +3,7 @@
     "superpowers@claude-plugins-official": true,
     "playwright@claude-plugins-official": true,
     "claude-code-setup@claude-plugins-official": true,
-    "claude-md-management@claude-plugins-official": true
+    "claude-md-management@claude-plugins-official": true,
+    "everything-claude-code@everything-claude-code": true
   }
 }
