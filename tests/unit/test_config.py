@@ -36,8 +36,13 @@ class TestSettings:
         settings = Settings()
         assert settings.qdrant_collection_name == "mcp_tools"
 
-    def test_optional_fields_default_none(self):
-        settings = Settings()
+    def test_optional_fields_default_none(self, monkeypatch):
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("QDRANT_API_KEY", raising=False)
+        monkeypatch.delenv("COHERE_API_KEY", raising=False)
+        monkeypatch.delenv("LANGFUSE_PUBLIC_KEY", raising=False)
+        monkeypatch.delenv("LANGFUSE_SECRET_KEY", raising=False)
+        settings = Settings(_env_file=None)
         assert settings.openai_api_key is None
         assert settings.qdrant_api_key is None
         assert settings.cohere_api_key is None
