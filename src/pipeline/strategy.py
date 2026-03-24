@@ -45,6 +45,8 @@ class StrategyRegistry:
         """Decorator: register a PipelineStrategy subclass under name."""
 
         def decorator(klass: type[PipelineStrategy]) -> type[PipelineStrategy]:
+            if name in cls._registry:
+                raise ValueError(f"Strategy '{name}' is already registered.")
             cls._registry[name] = klass
             return klass
 
@@ -58,7 +60,7 @@ class StrategyRegistry:
             ValueError: if name is not registered.
         """
         if name not in cls._registry:
-            available = list(cls._registry)
+            available = sorted(cls._registry)
             raise ValueError(f"Unknown strategy '{name}'. Available: {available}")
         return cls._registry[name]
 

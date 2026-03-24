@@ -66,3 +66,15 @@ class TestStrategyRegistry:
                 return []
 
         assert DecoratorStrat.__name__ == "DecoratorStrat"
+
+    def test_register_duplicate_raises_value_error(self):
+        @StrategyRegistry.register("dup_strat")
+        class DupStrat(PipelineStrategy):
+            async def search(self, query: str, top_k: int) -> list[SearchResult]:
+                return []
+
+        with pytest.raises(ValueError, match="already registered"):
+            @StrategyRegistry.register("dup_strat")
+            class DupStrat2(PipelineStrategy):
+                async def search(self, query: str, top_k: int) -> list[SearchResult]:
+                    return []
