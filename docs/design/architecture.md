@@ -17,7 +17,7 @@
 | **DP5** | Reranker: Cohere Rerank 3 + low-confidence LLM fallback | 방향 확정 | Cohere SOTA, free 1000 req/month. Confidence proxy: rank1-rank2 gap |
 | **DP6** | Confidence 분기: gap 기반 (threshold 0.15) | 확정 | calibration 모델 없이 직관적, 구현 단순 |
 | **DP7** | 데이터: Smithery 크롤링 + 직접 MCP 연결 하이브리드 | 확정 | 50~100 서버 큐레이션, GT: 수동 seed + LLM synthetic |
-| **DP8** | 배포: 로컬 FastAPI → Lambda + API Gateway | 확정 | Qdrant Cloud free tier (1GB ~ 40K tools), Bedrock KB $700/월 거부 |
+| **DP8** | 배포: 로컬 FastAPI → Lambda + API Gateway | 확정 | 개발: Docker Qdrant (`localhost:6333`), 배포: Qdrant Cloud free tier (1GB ~ 40K tools). Bedrock KB $700/월 거부 |
 | **DP9** | 평가: 커스텀 하네스 + 11개 지표 | 확정 | Evaluator ABC 플러그인. Position bias 통제: Top-K 랜덤 셔플 |
 
 ---
@@ -29,7 +29,7 @@
 | 언어 | Python 3.12 | type hints 필수 |
 | 의존성 관리 | uv | |
 | 웹 프레임워크 | FastAPI | 로컬 → Lambda 마이그레이션 예정 |
-| Vector Store | Qdrant Cloud free tier | 1GB 무료, real-time upsert, REST API |
+| Vector Store | Qdrant (개발: Docker 로컬, 배포: Cloud free tier) | 1GB 무료, real-time upsert, REST API. 개발 단계에서는 `docker run -p 6333:6333 qdrant/qdrant`로 로컬 실행. AsyncQdrantClient 인터페이스 동일하므로 URL+API key만 전환 |
 | 임베딩 | BGE-M3 or OpenAI text-embedding-3-small | E2 실험으로 결정. voyage-code-2 사용 금지 |
 | Reranker | Cohere Rerank 3 | SOTA, 무료 1000 req/month |
 | LLM Tracing | Langfuse | LLM call + 비용 추적 |

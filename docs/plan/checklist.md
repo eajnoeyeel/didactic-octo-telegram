@@ -56,7 +56,8 @@
 - [ ] `src/embedding/openai_embedder.py`, `src/embedding/bge_m3.py`
 - [ ] `src/retrieval/qdrant_store.py` — Qdrant Cloud wrapper
 - [ ] `src/data/indexer.py` + `scripts/build_index.py`
-- [ ] Qdrant Cloud API key 설정 + 단위 테스트
+- [ ] Qdrant 로컬 Docker 실행 (`docker run -p 6333:6333 qdrant/qdrant`) + 단위 테스트
+- [ ] (배포 시) Qdrant Cloud API key 설정 + URL 전환
 
 ## Phase 3: 코어 파이프라인 — Strategy A (Week 1)
 - [ ] `src/pipeline/strategy.py` — PipelineStrategy ABC + StrategyRegistry
