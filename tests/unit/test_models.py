@@ -4,6 +4,9 @@ import pytest
 
 from models import (
     TOOL_ID_SEPARATOR,
+    Ambiguity,
+    Category,
+    Difficulty,
     FindBestToolRequest,
     FindBestToolResponse,
     GroundTruthEntry,
@@ -134,7 +137,9 @@ class TestMCPTool:
 class TestSearchResult:
     def test_create(self):
         tool = MCPTool(
-            server_id="srv", tool_name="t", tool_id="srv::t",
+            server_id="srv",
+            tool_name="t",
+            tool_id="srv::t",
         )
         result = SearchResult(tool=tool, score=0.95, rank=1)
         assert result.score == 0.95
@@ -163,11 +168,120 @@ class TestFindBestToolResponse:
 
 
 class TestGroundTruthEntry:
-    def test_create(self):
+    def test_legacy_schema_removed(self):
+        """Old simplified schema is gone. Full schema tested in TestGroundTruthEntryFull."""
+        import pytest
+
+        pytest.skip("Legacy simplified GroundTruthEntry schema removed in Phase 4")
+
+
+class TestGroundTruthEntryFull:
+    """Tests for the full Phase 4 GroundTruthEntry schema."""
+
+    def _base(self, **overrides) -> dict:
+        """Minimal valid entry — override individual fields per test."""
+        base = {
+            "query_id": "gt-gen-001",
+            "query": "add two numbers",
+            "correct_server_id": "EthanHenrickson/math-mcp",
+            "correct_tool_id": "EthanHenrickson/math-mcp::add",
+            "difficulty": "easy",
+            "category": "general",
+            "ambiguity": "low",
+            "source": "manual_seed",
+            "manually_verified": True,
+            "author": "test",
+            "created_at": "2026-03-24",
+        }
+        base.update(overrides)
+        return base
+
+    def test_create_valid_entry(self):
+        gt = GroundTruthEntry(**self._base())
+        assert gt.query_id == "gt-gen-001"
+        assert gt.difficulty == Difficulty.EASY
+        assert gt.category == Category.GENERAL
+        assert gt.ambiguity == Ambiguity.LOW
+        assert gt.alternative_tools is None
+        assert gt.notes is None
+
+    def test_difficulty_enum_values(self):
+        for val in ("easy", "medium"):
+            gt = GroundTruthEntry(**self._base(difficulty=val))
+            assert gt.difficulty.value == val
+        # hard requires non-low ambiguity
         gt = GroundTruthEntry(
-            query="search github issues",
-            correct_server_id="@smithery-ai/github",
-            correct_tool_id="@smithery-ai/github::search_issues",
+            **self._base(
+                difficulty="hard",
+                ambiguity="medium",
+                alternative_tools=["EthanHenrickson/math-mcp::subtract"],
+            )
         )
-        assert gt.difficulty is None
+        assert gt.difficulty.value == "hard"
+
+    def test_category_enum_values(self):
+        for cat in (
+            "search",
+            "code",
+            "database",
+            "communication",
+            "productivity",
+            "science",
+            "finance",
+            "general",
+        ):
+            gt = GroundTruthEntry(**self._base(category=cat))
+            assert gt.category.value == cat
+
+    def test_hard_difficulty_requires_non_low_ambiguity(self):
+        with pytest.raises(ValueError, match="hard difficulty"):
+            GroundTruthEntry(**self._base(difficulty="hard", ambiguity="low"))
+
+    def test_hard_with_medium_ambiguity_is_valid(self):
+        gt = GroundTruthEntry(
+            **self._base(
+                difficulty="hard",
+                ambiguity="medium",
+                alternative_tools=["EthanHenrickson/math-mcp::subtract"],
+            )
+        )
+        assert gt.difficulty == Difficulty.HARD
+
+    def test_medium_ambiguity_requires_alternative_tools(self):
+        with pytest.raises(ValueError, match="alternative_tools"):
+            GroundTruthEntry(**self._base(ambiguity="medium"))
+
+    def test_high_ambiguity_requires_alternative_tools(self):
+        with pytest.raises(ValueError, match="alternative_tools"):
+            GroundTruthEntry(**self._base(ambiguity="high"))
+
+    def test_medium_ambiguity_with_alternatives_is_valid(self):
+        gt = GroundTruthEntry(
+            **self._base(
+                ambiguity="medium",
+                alternative_tools=["EthanHenrickson/math-mcp::subtract"],
+            )
+        )
+        assert gt.ambiguity == Ambiguity.MEDIUM
+
+    def test_manual_seed_requires_manually_verified_true(self):
+        with pytest.raises(ValueError, match="manually_verified"):
+            GroundTruthEntry(**self._base(source="manual_seed", manually_verified=False))
+
+    def test_llm_synthetic_can_be_unverified(self):
+        gt = GroundTruthEntry(**self._base(source="llm_synthetic", manually_verified=False))
+        assert gt.source == "llm_synthetic"
         assert gt.manually_verified is False
+
+    def test_correct_tool_id_must_start_with_server_id(self):
+        with pytest.raises(ValueError):
+            GroundTruthEntry(
+                **self._base(
+                    correct_server_id="server-a",
+                    correct_tool_id="server-b::tool",
+                )
+            )
+
+    def test_with_notes(self):
+        gt = GroundTruthEntry(**self._base(notes="test note"))
+        assert gt.notes == "test note"
