@@ -1,14 +1,55 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> **이 파일은 규칙(conventions, constraints)과 참조 포인터만 둔다.** 상세 컨텍스트는 각 문서에 분리.
+> 매 세션마다 전체 로드되므로 prompt bloat 방지를 위해 간결하게 유지할 것.
+> 최종 업데이트: 2026-03-24
 
-## Project Summary
+---
+
+## 메타 규칙
+
+- **CLAUDE.md에는 규칙(conventions, constraints)과 참조 포인터만 기록한다.**
+- 상세 정보가 필요하면 해당 파일을 Read tool로 직접 읽는다.
+- CLAUDE.md 수정 시 200줄 이하를 유지한다.
+
+---
+
+## 프로젝트 한줄 요약
 
 MCP Discovery Platform — a two-sided platform connecting LLM clients with MCP tool providers. LLM clients connect to a single Bridge MCP Server that routes queries to the best tool via a 2-stage retrieval pipeline (embedding search → reranker → confidence branching). Providers get analytics on why their tools are/aren't selected.
 
 **North Star**: Precision@1 >= 50% (Pool 50, mixed domain)
 
 **Core Thesis**: "Higher description quality → higher tool selection rate" (validated via E4 A/B experiment)
+
+---
+
+## 상세 컨텍스트 참조 (Lazy Loading)
+
+필요 시 아래 파일을 Read tool로 읽을 것:
+
+| 파일 | 내용 |
+|------|------|
+| `docs/context/project-overview.md` | 프로젝트 요약, North Star, 테제, 타임라인 |
+| `docs/design/architecture.md` | DP0-DP9 결정, 기술 스택, Provider 기능, 통제 변인 |
+| `docs/design/architecture-diagrams.md` | Mermaid 다이어그램 (파이프라인, 데이터 흐름, 모듈 의존관계) |
+| `docs/design/evaluation.md` | **평가 참조 허브** — 요약 + 하위 상세 문서 포인터 |
+| `docs/design/metrics-rubric.md` | 11개 지표 정의, 임계값 |
+| `docs/design/metrics-dashboard.md` | 대시보드 레이아웃, Metric Tree, Alert, Review Cadence |
+| `docs/design/experiment-design.md` | E0-E7 실험 허브 |
+| `docs/design/experiment-details.md` | 실험 상세 스펙 (조건 테이블, CLI, 출력 형식) |
+| `docs/design/ground-truth-design.md` | GT 스키마, 생성 전략 |
+| `docs/design/code-structure.md` | 계획된 디렉토리/파일 구조 |
+| `docs/plan/implementation.md` | **구현의 source of truth** (Phase 요약 + 상세 파일 포인터) |
+| `docs/plan/deferred.md` | 후순위 기능 + Phase 13 (Gated) |
+| `docs/plan/checklist.md` | 진행 체크리스트 |
+| `docs/mentoring/open-questions.md` | OQ-1~5 미결 사항 (living document) |
+| `docs/CONVENTIONS.md` | papers/, research/ 문서 템플릿, 네이밍 규약 |
+| `proxy_verification/CLAUDE.md` | Proxy MCP 검증 작업 지침 (하위 문서 포인터 포함) |
+
+When code conflicts with design docs, **docs/ takes precedence**.
+
+---
 
 ## Commands
 
@@ -36,6 +77,8 @@ uv run python scripts/build_index.py --pool-size 50
 uv run python scripts/generate_ground_truth.py
 uv run python scripts/run_experiments.py --experiment E1
 ```
+
+---
 
 ## Architecture
 
@@ -73,24 +116,26 @@ All pluggable components use abstract base classes — business logic depends on
 
 Experiments run sequentially with dependencies: E0 (1-Layer vs 2-Layer) → E1 (strategy comparison) → E2 (embedding) → E3 (reranker) → E4/E5/E6 (parallel: thesis validation, pool scale, pool similarity). Each experiment changes exactly one independent variable, controlled via `run_experiments.py --experiment E{n}`.
 
-## Design Documents (Source of Truth)
-
-When code conflicts with design docs, **docs/ takes precedence**:
-
-| Area | SOT |
-|------|-----|
-| Architecture & decisions | `docs/design/architecture.md` |
-| Metrics definitions | `docs/design/metrics-rubric.md` |
-| Ground truth schema | `docs/design/ground-truth-design.md` |
-| Experiment specs | `docs/design/experiment-design.md` + `experiment-details.md` |
-| Code structure | `docs/design/code-structure.md` |
-| Document conventions | `docs/CONVENTIONS.md` |
+---
 
 ## Key Constraints
 
 - **Async only**: All I/O uses async/await (AsyncQdrantClient, AsyncOpenAI, httpx.AsyncClient). Never `requests`.
 - **Logging**: loguru only. No `print()`, no `import logging`.
 - **Testing**: pytest + pytest-asyncio with `asyncio_mode="auto"`. Integration tests guarded by `@pytest.mark.skipif(not os.getenv("API_KEY"))`.
-- **Qdrant IDs**: `uuid.uuid5(MCP_DISCOVERY_NAMESPACE, tool_id)` — deterministic, upsert-safe. (Python `hash()` is process-local and non-deterministic across runs.)
+- **Qdrant IDs**: `uuid.uuid5(MCP_DISCOVERY_NAMESPACE, tool_id)` — deterministic, upsert-safe.
 - **Confidence branching**: gap-based threshold 0.15 (rank1 - rank2 score gap).
 - **Ground truth**: JSONL format in `data/ground_truth/`. Seed set is manually curated; synthetic is LLM-generated.
+- **`.env` 파일은 절대 커밋하지 않음**
+
+---
+
+## 코딩 컨벤션
+
+### 네이밍
+- 파일/변수: `snake_case`, 클래스: `PascalCase`, 상수: `UPPER_SNAKE_CASE`
+- tool_id: `"{server_id}::{tool_name}"`, query_id: `"gt-{category}-{number}"`
+
+### Git
+- 커밋 메시지: `feat: ...`, `fix: ...`, `test: ...`, `docs: ...`, `refactor: ...`
+- Phase 단위 커밋 권장

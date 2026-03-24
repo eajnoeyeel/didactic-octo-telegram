@@ -19,6 +19,12 @@
 
 > `find_best_tool`의 존재 이유. LLM이 한 번에 올바른 Tool을 받는 것이 핵심 가치.
 
+**Ben Yoskovitz 4기준 체크**:
+- Understandable: "추천한 것 중 1위가 정답인 비율" — 누구나 이해 가능
+- Comparative: 전략 간, 임베딩 모델 간, description 품질 간 비교 가능
+- Ratio: 비율 지표
+- Behavior-changing: 낮으면 파이프라인 구조를 바꿔야 함
+
 ---
 
 ## Input Metrics — North Star을 끌어올리는 레버

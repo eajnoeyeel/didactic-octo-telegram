@@ -47,6 +47,8 @@
 - **Provider 고객**: Tool 선택 빈도, 경쟁 분석, 개선 가이드 열람
 - **Core Pipeline**: 양측 동일 파이프라인 사용. Provider 경로는 로그 기반 분석 추가
 
+> **아키텍처 결정 근거**: LLM은 `find_best_tool`을 자발적으로 호출하지 않음 (이미 연결된 도구를 직접 사용). Bridge 패턴만이 LLM이 단일 진입점을 통해 전체 Provider 카탈로그를 활용하게 한다. 실존 솔루션(MetaMCP, Microsoft MCP Gateway 등) 모두 이 패턴 사용.
+
 ### Bridge/Router (DP1)
 
 - LLM은 우리 MCP Server에만 연결, 2개 도구 노출:
