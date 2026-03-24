@@ -1,10 +1,12 @@
 """Ground Truth loading, filtering, and splitting utilities."""
 
+import json
 from pathlib import Path
 
 from loguru import logger
+from openai import AsyncOpenAI
 
-from models import Category, Difficulty, GroundTruthEntry
+from models import TOOL_ID_SEPARATOR, Category, Difficulty, GroundTruthEntry, MCPServer
 
 
 def load_ground_truth(
@@ -170,3 +172,124 @@ class QualityGate:
             raise QualityGateError(
                 f"keyword leakage in {len(violations)} entries:\n" + "\n".join(violations)
             )
+
+
+_SYNTHETIC_PROMPT = """You are generating test queries for a tool recommendation system.
+
+Tool: {tool_name}
+Server ID: {server_id}
+Description: {description}
+
+Generate 10 natural language queries a user would write when they need this tool.
+Distribute difficulty: 4 Easy, 4 Medium, 2 Hard.
+
+Rules:
+- Do NOT include the exact tool_name in Medium or Hard queries
+- Vary sentence structures (question, command, statement of need)
+- Hard queries must be genuinely ambiguous (another tool could also match)
+
+Return a JSON array of 10 objects:
+[
+  {{
+    "query": "...",
+    "difficulty": "easy|medium|hard",
+    "ambiguity": "low|medium|high",
+    "alternative_tool_names": [],
+    "notes": "why this difficulty/ambiguity"
+  }},
+  ...
+]"""
+
+
+async def generate_synthetic_gt(
+    servers: list[MCPServer],
+    client: AsyncOpenAI,
+    model: str = "gpt-4o-mini",
+    author: str = "gpt-4o-mini",
+    created_at: str = "2026-03-24",
+    category_map: dict[str, Category] | None = None,
+) -> list[GroundTruthEntry]:
+    """Generate synthetic ground truth entries using LLM for each tool.
+
+    Generates 10 queries per tool. Filters out entries that fail basic validation.
+    Does NOT run QualityGate — caller must do that.
+
+    Args:
+        servers: MCPServer list to generate queries for.
+        client: AsyncOpenAI client (caller provides key).
+        model: OpenAI model to use.
+        author: Author field in generated entries.
+        created_at: ISO 8601 date string.
+        category_map: Optional server_id -> Category override.
+
+    Returns:
+        List of GroundTruthEntry objects (unverified, source='llm_synthetic').
+    """
+    entries: list[GroundTruthEntry] = []
+    counter = 1
+
+    for server in servers:
+        server_category = (
+            category_map.get(server.server_id, Category.GENERAL)
+            if category_map
+            else Category.GENERAL
+        )
+        for tool in server.tools:
+            prompt = _SYNTHETIC_PROMPT.format(
+                tool_name=tool.tool_name,
+                server_id=server.server_id,
+                description=tool.description or tool.tool_name,
+            )
+            try:
+                response = await client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.7,
+                )
+                raw = response.choices[0].message.content or "[]"
+                items = json.loads(raw)
+            except Exception as e:
+                logger.warning(f"Skipping {tool.tool_id}: LLM call failed: {e}")
+                continue
+
+            for item in items:
+                query_id = f"gt-synth-{counter:04d}"
+                alt_tool_names = item.get("alternative_tool_names", [])
+                alt_tool_ids = [
+                    f"{server.server_id}{TOOL_ID_SEPARATOR}{n}" for n in alt_tool_names
+                ] or None
+                difficulty_val = item.get("difficulty", "medium")
+                ambiguity_val = item.get("ambiguity", "low")
+
+                # Ensure consistency: hard requires non-low ambiguity
+                if difficulty_val == "hard" and ambiguity_val == "low":
+                    ambiguity_val = "medium"
+                    alt_tool_ids = alt_tool_ids or [f"{server.server_id}{TOOL_ID_SEPARATOR}other"]
+
+                # Ensure medium/high has alternatives
+                if ambiguity_val in ("medium", "high") and not alt_tool_ids:
+                    ambiguity_val = "low"
+
+                try:
+                    entry = GroundTruthEntry(
+                        query_id=query_id,
+                        query=item["query"],
+                        correct_server_id=server.server_id,
+                        correct_tool_id=tool.tool_id,
+                        difficulty=difficulty_val,
+                        category=server_category,
+                        ambiguity=ambiguity_val,
+                        source="llm_synthetic",
+                        manually_verified=False,
+                        author=author,
+                        created_at=created_at,
+                        alternative_tools=alt_tool_ids,
+                        notes=item.get("notes"),
+                    )
+                    entries.append(entry)
+                    counter += 1
+                except Exception as e:
+                    logger.warning(f"Skipping malformed entry for {tool.tool_id}: {e}")
+
+    logger.info(f"Generated {len(entries)} synthetic entries for {len(servers)} servers")
+    return entries

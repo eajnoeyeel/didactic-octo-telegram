@@ -1,5 +1,6 @@
 """Tests for ground truth loading and utility functions."""
 
+import os
 from pathlib import Path
 
 import pytest
@@ -232,3 +233,29 @@ class TestQualityGate:
         gate = QualityGate()
         with pytest.raises(QualityGateError, match="keyword leakage"):
             gate.check_no_tool_name_leakage([entry], tool_names=["add", "subtract"])
+
+
+@pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="requires OPENAI_API_KEY")
+async def test_generate_synthetic_gt_integration():
+    """Integration test — only runs when OPENAI_API_KEY is set."""
+    from openai import AsyncOpenAI
+
+    from data.ground_truth import generate_synthetic_gt
+    from models import MCPServer, MCPTool
+
+    server = MCPServer(
+        server_id="EthanHenrickson/math-mcp",
+        name="Math-MCP",
+        tools=[
+            MCPTool(
+                server_id="EthanHenrickson/math-mcp",
+                tool_name="add",
+                tool_id="EthanHenrickson/math-mcp::add",
+                description="Adds two numbers together",
+            )
+        ],
+    )
+    client = AsyncOpenAI()
+    entries = await generate_synthetic_gt([server], client)
+    assert len(entries) > 0
+    assert all(e.source == "llm_synthetic" for e in entries)
