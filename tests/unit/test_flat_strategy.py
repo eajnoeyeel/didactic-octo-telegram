@@ -62,6 +62,11 @@ class TestFlatStrategy:
         call_kwargs = mock_tool_store.search.call_args.kwargs
         assert call_kwargs.get("server_id_filter") is None
 
+    async def test_invalid_top_k_raises(self, mock_embedder, mock_tool_store):
+        strategy = FlatStrategy(embedder=mock_embedder, tool_store=mock_tool_store)
+        with pytest.raises(ValueError, match="top_k must be positive"):
+            await strategy.search("test", top_k=0)
+
     def test_registered_as_flat(self):
         assert "flat" in StrategyRegistry.list_strategies()
         assert StrategyRegistry.get("flat") is FlatStrategy

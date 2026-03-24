@@ -135,6 +135,17 @@ class TestSequentialStrategy:
         assert results == []
         mock_tool_store.search.assert_not_called()
 
+    async def test_invalid_top_k_raises(
+        self, mock_embedder, mock_server_store, mock_tool_store
+    ):
+        strategy = SequentialStrategy(
+            embedder=mock_embedder,
+            tool_store=mock_tool_store,
+            server_store=mock_server_store,
+        )
+        with pytest.raises(ValueError, match="top_k must be positive"):
+            await strategy.search("test", top_k=0)
+
     def test_registered_as_sequential(self):
         assert "sequential" in StrategyRegistry.list_strategies()
         assert StrategyRegistry.get("sequential") is SequentialStrategy

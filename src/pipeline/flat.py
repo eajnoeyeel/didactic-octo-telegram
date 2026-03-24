@@ -31,6 +31,8 @@ class FlatStrategy(PipelineStrategy):
         Returns:
             Top-k SearchResults ranked by vector similarity.
         """
+        if top_k <= 0:
+            raise ValueError(f"top_k must be positive, got {top_k}")
         logger.info(f"FlatStrategy.search: query='{query[:60]}', top_k={top_k}")
         query_vector: np.ndarray = await self.embedder.embed_one(query)
         results = await self.tool_store.search(

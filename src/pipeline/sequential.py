@@ -43,6 +43,8 @@ class SequentialStrategy(PipelineStrategy):
         Returns:
             Top-k SearchResults merged from all candidate servers.
         """
+        if top_k <= 0:
+            raise ValueError(f"top_k must be positive, got {top_k}")
         logger.info(f"SequentialStrategy.search: query='{query[:60]}', top_k={top_k}")
 
         query_vector: np.ndarray = await self.embedder.embed_one(query)
@@ -50,7 +52,7 @@ class SequentialStrategy(PipelineStrategy):
         server_ids = await self.server_store.search_server_ids(
             query_vector, top_k=self.top_k_servers
         )
-        logger.debug(f"Layer 1: {len(server_ids)} candidate servers: {server_ids}")
+        logger.debug(f"Layer 1: {len(server_ids)} candidate servers found")
 
         if not server_ids:
             logger.warning("SequentialStrategy: no servers found in Layer 1")
