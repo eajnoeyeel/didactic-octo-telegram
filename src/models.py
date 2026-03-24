@@ -1,8 +1,41 @@
 """Core data models for MCP Discovery Platform."""
 
-from pydantic import BaseModel, computed_field, field_validator
+from enum import StrEnum
+from typing import Literal
+
+from pydantic import (
+    BaseModel,
+    Field,
+    ValidationInfo,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 TOOL_ID_SEPARATOR = "::"
+
+
+class Difficulty(StrEnum):
+    EASY = "easy"
+    MEDIUM = "medium"
+    HARD = "hard"
+
+
+class Ambiguity(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class Category(StrEnum):
+    SEARCH = "search"
+    CODE = "code"
+    DATABASE = "database"
+    COMMUNICATION = "communication"
+    PRODUCTIVITY = "productivity"
+    SCIENCE = "science"
+    FINANCE = "finance"
+    GENERAL = "general"
 
 
 class MCPServerSummary(BaseModel):
@@ -35,7 +68,7 @@ class MCPTool(BaseModel):
 
     @field_validator("tool_id")
     @classmethod
-    def validate_tool_id(cls, v: str, info) -> str:
+    def validate_tool_id(cls, v: str, info: ValidationInfo) -> str:
         server_id = info.data.get("server_id", "")
         tool_name = info.data.get("tool_name", "")
         expected = f"{server_id}{TOOL_ID_SEPARATOR}{tool_name}"
@@ -83,15 +116,58 @@ class FindBestToolResponse(BaseModel):
 
 
 class GroundTruthEntry(BaseModel):
-    """A single ground truth entry for evaluation.
+    """Ground Truth entry — a single (query, correct_tool) pair for evaluation.
 
-    Simplified model for Phase 0-2. Phase 3+ will extend with:
-    query_id, Difficulty/Ambiguity/Category enums, distractors, acceptable_alternatives.
-    See docs/design/ground-truth-schema.md for the full schema.
+    Full Phase 4 schema with enums and cross-field validation.
     """
 
-    query: str
-    correct_server_id: str
-    correct_tool_id: str
-    difficulty: str | None = None  # Will become Difficulty enum in Phase 3+
+    # Identity
+    query_id: str = Field(description="Unique ID, e.g. 'gt-search-001'")
+    query: str = Field(description="Natural language query")
+
+    # Ground truth labels
+    correct_server_id: str = Field(description="Correct MCP server ID")
+    correct_tool_id: str = Field(description="Correct tool ID (server_id::tool_name)")
+
+    # Classification
+    difficulty: Difficulty
+    category: Category
+    ambiguity: Ambiguity
+
+    # Provenance
+    source: Literal["manual_seed", "llm_synthetic", "llm_verified"] = Field(
+        description="Origin of this ground truth entry"
+    )
     manually_verified: bool = False
+    author: str = Field(description="Author ID or model name")
+    created_at: str = Field(description="ISO 8601 date")
+
+    # Optional — graded relevance for NDCG@5
+    alternative_tools: list[str] | None = None
+    notes: str | None = None
+
+    @field_validator("correct_tool_id")
+    @classmethod
+    def validate_tool_id_matches_server(cls, v: str, info: ValidationInfo) -> str:
+        server_id = info.data.get("correct_server_id", "")
+        if server_id and not v.startswith(f"{server_id}{TOOL_ID_SEPARATOR}"):
+            raise ValueError(
+                f"correct_tool_id '{v}' must start with '{server_id}{TOOL_ID_SEPARATOR}'"
+            )
+        return v
+
+    @model_validator(mode="after")
+    def validate_cross_field_rules(self) -> "GroundTruthEntry":
+        # hard difficulty requires non-low ambiguity
+        if self.difficulty == Difficulty.HARD and self.ambiguity == Ambiguity.LOW:
+            raise ValueError("hard difficulty requires ambiguity 'medium' or 'high', got 'low'")
+        # medium/high ambiguity requires alternative_tools
+        if self.ambiguity in (Ambiguity.MEDIUM, Ambiguity.HIGH):
+            if not self.alternative_tools:
+                raise ValueError(
+                    f"ambiguity '{self.ambiguity.value}' requires non-empty alternative_tools"
+                )
+        # manual_seed must be manually verified
+        if self.source == "manual_seed" and not self.manually_verified:
+            raise ValueError("source='manual_seed' entries must have manually_verified=True")
+        return self
