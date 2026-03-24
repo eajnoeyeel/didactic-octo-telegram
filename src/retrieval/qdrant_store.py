@@ -92,6 +92,38 @@ class QdrantStore:
             for i, hit in enumerate(results)
         ]
 
+    async def search_server_ids(
+        self,
+        query_vector: np.ndarray,
+        top_k: int = 5,
+    ) -> list[str]:
+        """Search collection and extract server_id from each hit's payload.
+
+        Use with mcp_servers collection. Payloads must contain 'server_id'.
+        Hits without 'server_id' in payload are silently skipped.
+
+        Args:
+            query_vector: Embedded query vector.
+            top_k: Maximum number of servers to return.
+
+        Returns:
+            List of server_id strings, ordered by relevance score.
+        """
+        try:
+            results = await self.client.search(
+                collection_name=self.collection_name,
+                query_vector=query_vector.tolist(),
+                limit=top_k,
+            )
+        except Exception as e:
+            logger.error(f"Qdrant server search failed: {e}")
+            raise
+        server_ids = []
+        for hit in results:
+            if hit.payload and (sid := hit.payload.get("server_id")):
+                server_ids.append(sid)
+        return server_ids
+
     @staticmethod
     def build_tool_text(tool: MCPTool) -> str:
         if tool.description:
