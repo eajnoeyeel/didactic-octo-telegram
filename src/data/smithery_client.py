@@ -106,8 +106,7 @@ class SmitheryClient:
                 break
             all_summaries.extend(summaries)
             logger.info(
-                f"Fetched page {page}: {len(summaries)} servers "
-                f"(total: {len(all_summaries)})"
+                f"Fetched page {page}: {len(summaries)} servers (total: {len(all_summaries)})"
             )
             current = pagination.get("currentPage", page)
             total_pages = pagination.get("totalPages", max_pages)
@@ -142,9 +141,7 @@ class SmitheryClient:
         for t in raw_tools:
             name = t.get("name")
             if not name:
-                logger.warning(
-                    f"Skipping tool with missing name in server '{qualified_name}'"
-                )
+                logger.warning(f"Skipping tool with missing name in server '{qualified_name}'")
                 continue
             tools.append(
                 MCPTool(

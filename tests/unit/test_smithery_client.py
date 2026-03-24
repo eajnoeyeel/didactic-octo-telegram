@@ -1,6 +1,5 @@
 """Tests for SmitheryClient — HTTP client for Smithery Registry API."""
 
-
 from data.smithery_client import SmitheryClient
 from models import TOOL_ID_SEPARATOR, MCPServer, MCPServerSummary
 
@@ -139,7 +138,8 @@ class TestFetchAllSummaries:
 
         async def mock_fetch(page, page_size=50):
             return [SmitheryClient.parse_server_summary(SAMPLE_LIST_ITEM)], {
-                "currentPage": page, "totalPages": 100,
+                "currentPage": page,
+                "totalPages": 100,
             }
 
         client.fetch_server_list = mock_fetch
@@ -151,7 +151,8 @@ class TestFetchAllSummaries:
 
         async def mock_fetch(page, page_size=50):
             return [SmitheryClient.parse_server_summary(SAMPLE_LIST_ITEM)], {
-                "currentPage": 2, "totalPages": 2,
+                "currentPage": 2,
+                "totalPages": 2,
             }
 
         client.fetch_server_list = mock_fetch

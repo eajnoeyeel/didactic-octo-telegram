@@ -41,9 +41,7 @@ class SmitheryCrawler:
                     f"({len(server.tools)} tools)"
                 )
             except Exception as e:
-                logger.warning(
-                    f"Failed {i}/{len(selected)}: {summary.qualified_name} — {e}"
-                )
+                logger.warning(f"Failed {i}/{len(selected)}: {summary.qualified_name} — {e}")
         return servers
 
     def save(

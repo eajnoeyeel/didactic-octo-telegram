@@ -23,7 +23,8 @@ class OpenAIEmbedder(Embedder):
     async def embed_one(self, text: str) -> np.ndarray:
         try:
             response = await self._client.embeddings.create(
-                input=[text], model=self.model,
+                input=[text],
+                model=self.model,
             )
         except Exception as e:
             logger.error(f"OpenAI embed_one failed: {e}")
@@ -36,13 +37,12 @@ class OpenAIEmbedder(Embedder):
             batch = texts[i : i + batch_size]
             try:
                 response = await self._client.embeddings.create(
-                    input=batch, model=self.model,
+                    input=batch,
+                    model=self.model,
                 )
             except Exception as e:
                 logger.error(f"OpenAI embed_batch failed (batch_start={i}): {e}")
                 raise
-            vectors = [
-                np.array(item.embedding, dtype=np.float32) for item in response.data
-            ]
+            vectors = [np.array(item.embedding, dtype=np.float32) for item in response.data]
             all_vectors.extend(vectors)
         return all_vectors
