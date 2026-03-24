@@ -206,7 +206,7 @@ async def generate_synthetic_gt(
     client: AsyncOpenAI,
     model: str = "gpt-4o-mini",
     author: str = "gpt-4o-mini",
-    created_at: str = "2026-03-24",
+    created_at: str | None = None,
     category_map: dict[str, Category] | None = None,
 ) -> list[GroundTruthEntry]:
     """Generate synthetic ground truth entries using LLM for each tool.
@@ -225,6 +225,11 @@ async def generate_synthetic_gt(
     Returns:
         List of GroundTruthEntry objects (unverified, source='llm_synthetic').
     """
+    if created_at is None:
+        from datetime import date
+
+        created_at = date.today().isoformat()
+
     entries: list[GroundTruthEntry] = []
     counter = 1
 
@@ -246,8 +251,14 @@ async def generate_synthetic_gt(
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.7,
                 )
-                raw = response.choices[0].message.content or "[]"
+                raw = (response.choices[0].message.content or "[]").strip()
+                # Strip markdown code fences if present
+                if raw.startswith("```"):
+                    lines = raw.split("\n")
+                    raw = "\n".join(line for line in lines if not line.startswith("```")).strip()
                 items = json.loads(raw)
+                if not isinstance(items, list):
+                    items = []
             except Exception as e:
                 logger.warning(f"Skipping {tool.tool_id}: LLM call failed: {e}")
                 continue
@@ -263,8 +274,13 @@ async def generate_synthetic_gt(
 
                 # Ensure consistency: hard requires non-low ambiguity
                 if difficulty_val == "hard" and ambiguity_val == "low":
+                    if not alt_tool_ids:
+                        logger.warning(
+                            f"Skipping hard/low-ambiguity entry for {tool.tool_id}: "
+                            "no alternative_tool_names provided by LLM"
+                        )
+                        continue
                     ambiguity_val = "medium"
-                    alt_tool_ids = alt_tool_ids or [f"{server.server_id}{TOOL_ID_SEPARATOR}other"]
 
                 # Ensure medium/high has alternatives
                 if ambiguity_val in ("medium", "high") and not alt_tool_ids:

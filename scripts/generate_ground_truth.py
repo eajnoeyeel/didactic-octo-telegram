@@ -81,5 +81,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", default="data/ground_truth/synthetic.jsonl")
     parser.add_argument("--seed", default="data/ground_truth/seed_set.jsonl")
     parser.add_argument("--model", default="gpt-4o-mini")
-    parser.add_argument("--date", default="2026-03-24")
+    from datetime import date as _date
+
+    parser.add_argument("--date", default=_date.today().isoformat())
     asyncio.run(main(parser.parse_args()))
