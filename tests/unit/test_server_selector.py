@@ -1,6 +1,5 @@
 """Tests for server selection and filtering logic."""
 
-
 import pytest
 
 from data.server_selector import (

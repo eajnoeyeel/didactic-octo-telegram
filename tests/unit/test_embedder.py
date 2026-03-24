@@ -33,7 +33,9 @@ class TestOpenAIEmbedder:
 
     def test_custom_model(self):
         embedder = OpenAIEmbedder(
-            api_key="fake-key", model="text-embedding-3-large", dimension=3072,
+            api_key="fake-key",
+            model="text-embedding-3-large",
+            dimension=3072,
         )
         assert embedder.model == "text-embedding-3-large"
         assert embedder.dimension == 3072
