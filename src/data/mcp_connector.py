@@ -1,6 +1,8 @@
 """Direct MCP connector — interface only for Phase 1. Full implementation in Phase 4+."""
 
-from models import MCPTool, TOOL_ID_SEPARATOR
+from loguru import logger
+
+from models import TOOL_ID_SEPARATOR, MCPTool
 
 
 class MCPDirectConnector:
@@ -16,13 +18,19 @@ class MCPDirectConnector:
     @staticmethod
     def parse_tools(server_id: str, response: dict) -> list[MCPTool]:
         raw_tools = response.get("tools", [])
-        return [
-            MCPTool(
-                server_id=server_id,
-                tool_name=t["name"],
-                tool_id=f"{server_id}{TOOL_ID_SEPARATOR}{t['name']}",
-                description=t.get("description"),
-                input_schema=t.get("inputSchema"),
+        tools = []
+        for t in raw_tools:
+            name = t.get("name")
+            if not name:
+                logger.warning(f"Skipping tool with missing name in server '{server_id}'")
+                continue
+            tools.append(
+                MCPTool(
+                    server_id=server_id,
+                    tool_name=name,
+                    tool_id=f"{server_id}{TOOL_ID_SEPARATOR}{name}",
+                    description=t.get("description"),
+                    input_schema=t.get("inputSchema"),
+                )
             )
-            for t in raw_tools
-        ]
+        return tools

@@ -44,7 +44,7 @@ class GroundTruthEntry(BaseModel):
     query: str = Field(description="자연어 쿼리")
     correct_server_id: str = Field(description="정답 MCP 서버 ID")
     correct_tool_id: str = Field(
-        description="정답 Tool ID (server_id/tool_name 형식)"
+        description="정답 Tool ID (server_id::tool_name 형식, TOOL_ID_SEPARATOR='::')"
     )
 
     # 분류 필드 — 세분화 분석용
@@ -92,17 +92,17 @@ class GroundTruthEntry(BaseModel):
 
 **Easy** — 키워드 직접 매칭:
 ```jsonl
-{"query_id":"gt-search-001","query":"find recent papers about transformer architectures","correct_server_id":"semantic_scholar","correct_tool_id":"semantic_scholar/search_papers","difficulty":"easy","category":"search","ambiguity":"low","source":"manual_seed","manually_verified":true,"author":"iyeonjae","created_at":"2026-03-20","alternative_tools":["mcp_arxiv/search_arxiv"],"notes":"키워드 'papers'가 명시적으로 매칭됨"}
+{"query_id":"gt-search-001","query":"find recent papers about transformer architectures","correct_server_id":"semantic_scholar","correct_tool_id":"semantic_scholar::search_papers","difficulty":"easy","category":"search","ambiguity":"low","source":"manual_seed","manually_verified":true,"author":"iyeonjae","created_at":"2026-03-20","alternative_tools":["mcp_arxiv::search_arxiv"],"notes":"키워드 'papers'가 명시적으로 매칭됨"}
 ```
 
 **Medium** — 의미적 연결:
 ```jsonl
-{"query_id":"gt-search-002","query":"I need academic research on attention mechanisms","correct_server_id":"semantic_scholar","correct_tool_id":"semantic_scholar/search_papers","difficulty":"medium","category":"search","ambiguity":"medium","source":"manual_seed","manually_verified":true,"author":"iyeonjae","created_at":"2026-03-20","alternative_tools":["mcp_arxiv/search_arxiv"],"notes":"'academic research'가 의미적으로 papers와 연결"}
+{"query_id":"gt-search-002","query":"I need academic research on attention mechanisms","correct_server_id":"semantic_scholar","correct_tool_id":"semantic_scholar::search_papers","difficulty":"medium","category":"search","ambiguity":"medium","source":"manual_seed","manually_verified":true,"author":"iyeonjae","created_at":"2026-03-20","alternative_tools":["mcp_arxiv::search_arxiv"],"notes":"'academic research'가 의미적으로 papers와 연결"}
 ```
 
 **Hard** — 모호/다의적:
 ```jsonl
-{"query_id":"gt-search-003","query":"help me with my research","correct_server_id":"semantic_scholar","correct_tool_id":"semantic_scholar/search_papers","difficulty":"hard","category":"search","ambiguity":"high","source":"manual_seed","manually_verified":true,"author":"iyeonjae","created_at":"2026-03-20","alternative_tools":["mcp_arxiv/search_arxiv","google_scholar/search"],"notes":"'research'가 모호 — 논문? 웹 검색? 데이터 분석?"}
+{"query_id":"gt-search-003","query":"help me with my research","correct_server_id":"semantic_scholar","correct_tool_id":"semantic_scholar::search_papers","difficulty":"hard","category":"search","ambiguity":"high","source":"manual_seed","manually_verified":true,"author":"iyeonjae","created_at":"2026-03-20","alternative_tools":["mcp_arxiv::search_arxiv","google_scholar::search"],"notes":"'research'가 모호 — 논문? 웹 검색? 데이터 분석?"}
 ```
 
 ---
@@ -185,8 +185,9 @@ def split_by_difficulty(
 - 전체 셋에서 unique해야 함
 
 ### tool_id 형식
-- 패턴: `{server_id}/{tool_name}` (e.g., `semantic_scholar/search_papers`)
-- `correct_server_id`는 `correct_tool_id`의 prefix와 일치해야 함
+- 패턴: `{server_id}::{tool_name}` (e.g., `semantic_scholar::search_papers`)
+- 구분자 `::` 사용 이유: Smithery qualifiedName에 `/`가 포함되어 단순 `/` 구분자는 모호성 발생
+- `correct_server_id`는 `correct_tool_id`에서 `::` 기준으로 split한 첫 번째 부분과 일치해야 함
 
 ### 데이터 무결성
 - `difficulty`가 hard이면 `ambiguity`는 medium 또는 high

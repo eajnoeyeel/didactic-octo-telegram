@@ -5,7 +5,6 @@ import pytest
 from data.mcp_connector import MCPDirectConnector
 from models import TOOL_ID_SEPARATOR
 
-
 SAMPLE_TOOLS_RESPONSE = {
     "tools": [
         {

@@ -1,0 +1,89 @@
+"""CLI script for building the Qdrant vector index from crawled data.
+
+Usage:
+    uv run scripts/build_index.py
+    uv run scripts/build_index.py --input data/raw/servers.jsonl
+    uv run scripts/build_index.py --pool-size 50     # max tools to index
+    uv run scripts/build_index.py --batch-size 100   # embedding batch size
+"""
+
+import argparse
+import asyncio
+from pathlib import Path
+
+from loguru import logger
+from qdrant_client import AsyncQdrantClient
+
+from config import Settings
+from data.crawler import SmitheryCrawler
+from data.indexer import ToolIndexer
+from embedding.openai_embedder import OpenAIEmbedder
+from models import MCPTool
+from retrieval.qdrant_store import QdrantStore
+
+
+async def main(args: argparse.Namespace) -> None:
+    settings = Settings()
+
+    # Load servers
+    input_path = Path(args.input)
+    servers = SmitheryCrawler.load(input_path)
+    logger.info(f"Loaded {len(servers)} servers from {input_path}")
+
+    # Flatten tools
+    tools: list[MCPTool] = []
+    no_desc_count = 0
+    for server in servers:
+        for tool in server.tools:
+            if tool.description is None:
+                no_desc_count += 1
+                logger.warning(f"Tool without description: {tool.tool_id}")
+            tools.append(tool)
+    logger.info(f"Total tools: {len(tools)} ({no_desc_count} without description)")
+
+    if not tools:
+        logger.warning("No tools to index. Exiting.")
+        return
+
+    # Truncate to pool_size if specified
+    if args.pool_size and args.pool_size < len(tools):
+        logger.info(f"Truncating to --pool-size={args.pool_size} tools")
+        tools = tools[: args.pool_size]
+
+    # Validate required API key
+    if not settings.openai_api_key:
+        logger.error("OPENAI_API_KEY is required for embedding. Set it in .env")
+        raise SystemExit(1)
+
+    # Setup components
+    embedder = OpenAIEmbedder(
+        api_key=settings.openai_api_key,
+        model=settings.embedding_model,
+        dimension=settings.embedding_dimension,
+    )
+    qdrant_client = AsyncQdrantClient(
+        url=settings.qdrant_url,
+        api_key=settings.qdrant_api_key,
+    )
+    try:
+        store = QdrantStore(client=qdrant_client, collection_name=settings.qdrant_collection_name)
+
+        # Ensure collection exists
+        await store.ensure_collection(dimension=settings.embedding_dimension)
+
+        # Index
+        indexer = ToolIndexer(embedder=embedder, store=store)
+        count = await indexer.index_tools(tools, batch_size=args.batch_size)
+
+        logger.info(f"Done: Indexed {count} tools from {len(servers)} servers")
+    finally:
+        await qdrant_client.close()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Build Qdrant vector index from crawled data")
+    parser.add_argument("--input", type=str, default="data/raw/servers.jsonl")
+    parser.add_argument("--pool-size", type=int, default=None, help="Max number of tools to index")
+    parser.add_argument("--batch-size", type=int, default=50, help="Embedding API batch size")
+    args = parser.parse_args()
+    asyncio.run(main(args))

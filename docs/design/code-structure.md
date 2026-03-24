@@ -5,7 +5,7 @@
 ```
 mcp-discovery/
 ├── src/
-│   ├── models.py              # MCPTool, MCPServer, SearchResult, FindBestToolRequest/Response, GroundTruth
+│   ├── models.py              # MCPServerSummary, MCPTool, MCPServer, SearchResult, FindBestToolRequest/Response, GroundTruthEntry
 │   ├── config.py              # pydantic-settings, 환경변수 기반
 │   ├── pipeline/
 │   │   ├── strategy.py        # PipelineStrategy ABC + StrategyRegistry
@@ -25,8 +25,10 @@ mcp-discovery/
 │   │   ├── cohere_reranker.py # Cohere Rerank 3
 │   │   └── llm_fallback.py    # LLM reranker (low-confidence fallback)
 │   ├── data/
-│   │   ├── crawler.py         # Smithery registry 크롤러
-│   │   ├── mcp_connector.py   # Direct tools/list MCP 연결
+│   │   ├── smithery_client.py # Smithery API HTTP 클라이언트 (async context manager)
+│   │   ├── server_selector.py # 필터링 (deployed), 정렬 (popularity), 큐레이션
+│   │   ├── crawler.py         # SmitheryCrawler 오케스트레이터 (save/load JSONL)
+│   │   ├── mcp_connector.py   # Direct tools/list MCP 연결 (Phase 4+에서 활성화)
 │   │   ├── ground_truth.py    # Synthetic GT 생성 + Quality Gate 검증
 │   │   └── indexer.py         # Batch embed + Qdrant upsert
 │   ├── evaluation/

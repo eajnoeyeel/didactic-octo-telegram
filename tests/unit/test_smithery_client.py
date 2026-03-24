@@ -1,10 +1,8 @@
 """Tests for SmitheryClient — HTTP client for Smithery Registry API."""
 
-import pytest
 
 from data.smithery_client import SmitheryClient
-from models import MCPServerSummary, MCPServer, TOOL_ID_SEPARATOR
-
+from models import TOOL_ID_SEPARATOR, MCPServer, MCPServerSummary
 
 # --- Fixtures: raw API responses ---
 

@@ -1,6 +1,5 @@
 """Tests for server selection and filtering logic."""
 
-from pathlib import Path
 
 import pytest
 
