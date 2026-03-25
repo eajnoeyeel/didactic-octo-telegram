@@ -49,4 +49,9 @@ class TestEmbedBatch:
         individual_results = [await embedder.embed_one(t) for t in texts]
 
         for batch_v, indiv_v in zip(batch_results, individual_results):
-            np.testing.assert_allclose(batch_v, indiv_v, rtol=1e-5)
+            # OpenAI API is non-deterministic across calls; verify vectors
+            # are functionally equivalent via high cosine similarity
+            similarity = np.dot(batch_v, indiv_v) / (
+                np.linalg.norm(batch_v) * np.linalg.norm(indiv_v)
+            )
+            assert similarity > 0.999
