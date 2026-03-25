@@ -167,14 +167,6 @@ class TestFindBestToolResponse:
         assert resp.confidence == 0.85
 
 
-class TestGroundTruthEntry:
-    def test_legacy_schema_removed(self):
-        """Old simplified schema is gone. Full schema tested in TestGroundTruthEntryFull."""
-        import pytest
-
-        pytest.skip("Legacy simplified GroundTruthEntry schema removed in Phase 4")
-
-
 class TestGroundTruthEntryFull:
     """Tests for the full Phase 4 GroundTruthEntry schema."""
 

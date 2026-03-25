@@ -74,6 +74,7 @@ class TestStrategyRegistry:
                 return []
 
         with pytest.raises(ValueError, match="already registered"):
+
             @StrategyRegistry.register("dup_strat")
             class DupStrat2(PipelineStrategy):
                 async def search(self, query: str, top_k: int) -> list[SearchResult]:

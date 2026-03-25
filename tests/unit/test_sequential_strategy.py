@@ -1,4 +1,5 @@
 """Tests for SequentialStrategy — true 2-Layer server→tool pipeline."""
+
 from unittest.mock import AsyncMock
 
 import numpy as np
@@ -48,9 +49,7 @@ def mock_tool_store():
 
 
 class TestSequentialStrategy:
-    async def test_embeds_query_once(
-        self, mock_embedder, mock_server_store, mock_tool_store
-    ):
+    async def test_embeds_query_once(self, mock_embedder, mock_server_store, mock_tool_store):
         strategy = SequentialStrategy(
             embedder=mock_embedder,
             tool_store=mock_tool_store,
@@ -121,9 +120,7 @@ class TestSequentialStrategy:
         results = await strategy.search("test", top_k=1)
         assert len(results) == 1
 
-    async def test_empty_server_results_returns_empty(
-        self, mock_embedder, mock_tool_store
-    ):
+    async def test_empty_server_results_returns_empty(self, mock_embedder, mock_tool_store):
         server_store = AsyncMock()
         server_store.search_server_ids = AsyncMock(return_value=[])
         strategy = SequentialStrategy(
@@ -135,9 +132,7 @@ class TestSequentialStrategy:
         assert results == []
         mock_tool_store.search.assert_not_called()
 
-    async def test_invalid_top_k_raises(
-        self, mock_embedder, mock_server_store, mock_tool_store
-    ):
+    async def test_invalid_top_k_raises(self, mock_embedder, mock_server_store, mock_tool_store):
         strategy = SequentialStrategy(
             embedder=mock_embedder,
             tool_store=mock_tool_store,

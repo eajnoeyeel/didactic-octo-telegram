@@ -1,4 +1,5 @@
 """Tests for gap-based confidence branching."""
+
 import pytest
 
 from models import MCPTool, SearchResult

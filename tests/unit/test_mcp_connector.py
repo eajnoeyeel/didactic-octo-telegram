@@ -46,6 +46,19 @@ class TestParseTools:
         tools = MCPDirectConnector.parse_tools("@test/server", {})
         assert tools == []
 
+    def test_skips_tool_with_missing_name(self):
+        response = {
+            "tools": [
+                {"name": "valid_tool", "description": "ok"},
+                {"description": "no name field here"},
+                {"name": "", "description": "empty name"},
+            ]
+        }
+        tools = MCPDirectConnector.parse_tools("@test/server", response)
+        # Only "valid_tool" should remain — empty string is falsy
+        assert len(tools) == 1
+        assert tools[0].tool_name == "valid_tool"
+
     async def test_fetch_tools_raises_not_implemented(self):
         connector = MCPDirectConnector()
         with pytest.raises(NotImplementedError):
