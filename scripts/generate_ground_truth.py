@@ -14,6 +14,10 @@ import os
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # Add src/ to path so we can import project modules
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -64,6 +68,14 @@ async def main(args: argparse.Namespace) -> None:
         try:
             gate.check_difficulty_distribution(entries, seed)
             logger.info("Quality gate: difficulty distribution OK")
+        except QualityGateError as e:
+            logger.warning(f"Quality gate warning: {e}")
+
+        # Check for tool name leakage in Medium/Hard queries
+        tool_names = [t.tool_name for s in servers for t in s.tools]
+        try:
+            gate.check_no_tool_name_leakage(entries, tool_names)
+            logger.info("Quality gate: no tool name leakage OK")
         except QualityGateError as e:
             logger.warning(f"Quality gate warning: {e}")
 
