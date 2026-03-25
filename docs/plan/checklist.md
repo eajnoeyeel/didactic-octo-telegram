@@ -1,6 +1,6 @@
 # 진행 체크리스트
 
-> 최종 업데이트: 2026-03-22
+> 최종 업데이트: 2026-03-25
 > 상세 구현 스펙: `docs/plan/implementation.md`
 > 타임라인: 2026-03-20 ~ 2026-04-26 (5주)
 
@@ -38,38 +38,42 @@
 
 ---
 
-## Phase 0: 프로젝트 기반 (Week 1)
-- [ ] `pyproject.toml` + `uv sync --extra dev`
-- [ ] `src/config.py` — pydantic-settings
-- [ ] `src/models.py` — MCPTool, MCPServer, SearchResult, GroundTruth 등
-- [ ] `.env.example` + `git init` + 첫 커밋
-- [ ] `tests/unit/test_config.py`, `tests/unit/test_models.py` 통과
+## Phase 0: 프로젝트 기반 (Week 1) — ✅ 완료 (2026-03-25)
+- [x] `pyproject.toml` + `uv sync --extra dev`
+- [x] `src/config.py` — pydantic-settings
+- [x] `src/models.py` — MCPTool, MCPServer, SearchResult, GroundTruth 등
+- [x] `.env.example` + `git init` + 첫 커밋
+- [x] `tests/unit/test_config.py`, `tests/unit/test_models.py` 통과
 
-## Phase 1: 데이터 수집 (Week 1)
-- [ ] `src/data/crawler.py` — SmitheryCrawler
-- [ ] `src/data/mcp_connector.py` — Direct MCP 연결
-- [ ] `scripts/collect_data.py` → `data/raw/servers.jsonl`
-- [ ] 단위 테스트 통과
+## Phase 1: 데이터 수집 (Week 1) — ✅ 완료 (2026-03-25)
+- [x] `src/data/crawler.py` — SmitheryCrawler
+- [x] `src/data/mcp_connector.py` — Direct MCP 연결
+- [x] `scripts/collect_data.py` → `data/raw/servers.jsonl` (8 서버 수집 완료)
+- [x] 단위 테스트 통과
 
-## Phase 2: 임베딩 + Vector Store (Week 1)
-- [ ] `src/embedding/base.py` — Embedder ABC
-- [ ] `src/embedding/openai_embedder.py`, `src/embedding/bge_m3.py`
-- [ ] `src/retrieval/qdrant_store.py` — Qdrant Cloud wrapper
-- [ ] `src/data/indexer.py` + `scripts/build_index.py`
-- [ ] Qdrant 로컬 Docker 실행 (`docker run -p 6333:6333 qdrant/qdrant`) + 단위 테스트
+## Phase 2: 임베딩 + Vector Store (Week 1) — ✅ 완료 (2026-03-25)
+- [x] `src/embedding/base.py` — Embedder ABC
+- [x] `src/embedding/openai_embedder.py`
+- [ ] `src/embedding/bge_m3.py` — E2 임베딩 비교 실험에서 구현 예정 (의도적 연기)
+- [x] `src/retrieval/qdrant_store.py` — Qdrant Cloud wrapper
+- [x] `src/data/indexer.py` + `scripts/build_index.py`
+- [x] Qdrant 로컬 Docker 실행 (`docker run -p 6333:6333 qdrant/qdrant`) + 통합 테스트 검증 완료
 - [ ] (배포 시) Qdrant Cloud API key 설정 + URL 전환
 
-## Phase 3: 코어 파이프라인 — Strategy A (Week 1)
-- [ ] `src/pipeline/strategy.py` — PipelineStrategy ABC + StrategyRegistry
-- [ ] `src/pipeline/confidence.py` — Gap-based confidence (threshold 0.15)
-- [ ] `src/pipeline/sequential.py` — 진짜 2-Layer (OQ-4 반영)
-- [ ] 단위 테스트 + 수동 E2E 검증
+## Phase 3: 코어 파이프라인 — Strategy A (Week 1) — ✅ 완료 (2026-03-25)
+- [x] `src/pipeline/strategy.py` — PipelineStrategy ABC + StrategyRegistry
+- [x] `src/pipeline/confidence.py` — Gap-based confidence (threshold 0.15)
+- [x] `src/pipeline/sequential.py` — 진짜 2-Layer (OQ-4 반영)
+- [x] `src/pipeline/flat.py` — 1-Layer (E0 비교용)
+- [x] 단위 테스트 + 수동 E2E 검증
 
-## Phase 4: Ground Truth (Week 1)
-- [ ] `data/ground_truth/seed_set.jsonl` — 80개 (8 카테고리 x 10개, Easy:Medium:Hard = 4:4:2)
-- [ ] `src/data/ground_truth.py` — Synthetic GT + Quality Gate
-- [ ] `scripts/generate_ground_truth.py`
-- [ ] 파일럿 검증: seed 20개로 파이프라인 테스트
+## Phase 4: Ground Truth (Week 1) — ⏳ 백로그 (OpenAI API 미확보)
+> **코드 구현 완료**. Synthetic GT 생성 및 파일럿 검증에 OpenAI API 키 필요.
+> 상세: `docs/progress/status-report.md` → "백로그" 섹션 참조.
+- [x] `data/ground_truth/seed_set.jsonl` — 80개 (8 카테고리 x 10개, Easy:Medium:Hard = 4:4:2)
+- [x] `src/data/ground_truth.py` — Synthetic GT + Quality Gate
+- [x] `scripts/generate_ground_truth.py`
+- [ ] 파일럿 검증: seed 20개로 파이프라인 테스트 — **OpenAI API 필요**
 
 ## Phase 5: 평가 하네스 (Week 2)
 - [ ] `src/evaluation/evaluator.py` — Evaluator ABC
@@ -106,6 +110,19 @@
 ## Phase 12: E2E 스모크 테스트 (Week 3)
 - [ ] 전체 파이프라인 E2E: collect → index → search → evaluate
 - [ ] 전체 테스트 스위트 통과
+
+---
+
+## 백로그: OpenAI API 확보 후 진행
+
+> OpenAI API 키 확보 시 즉시 실행 가능. 현재 6개 테스트가 skip 상태.
+
+| # | 항목 | 의존 Phase | 우선순위 |
+|---|------|-----------|---------|
+| 1 | `openai_embedder.py` 통합 테스트 활성화 (skip 6개 → 0개) | Phase 2 | 높음 |
+| 2 | Synthetic GT 생성 실행 (`scripts/generate_ground_truth.py`) | Phase 4 | 높음 |
+| 3 | 임베딩 인덱스 빌드 (`scripts/build_index.py`) | Phase 2 | 높음 |
+| 4 | E0 실험: 1-Layer vs 2-Layer 검증 | Phase 5 | 중간 |
 
 ---
 

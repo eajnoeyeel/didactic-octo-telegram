@@ -2,7 +2,7 @@
 
 > **이 파일은 규칙(conventions, constraints)과 참조 포인터만 둔다.** 상세 컨텍스트는 각 문서에 분리.
 > 매 세션마다 전체 로드되므로 prompt bloat 방지를 위해 간결하게 유지할 것.
-> 최종 업데이트: 2026-03-24
+> 최종 업데이트: 2026-03-25
 
 ---
 
@@ -46,6 +46,7 @@ MCP Discovery Platform — a two-sided platform connecting LLM clients with MCP 
 | `docs/mentoring/open-questions.md` | OQ-1~5 미결 사항 (living document) |
 | `docs/CONVENTIONS.md` | papers/, research/ 문서 템플릿, 네이밍 규약 |
 | `proxy_verification/CLAUDE.md` | Proxy MCP 검증 작업 지침 (하위 문서 포인터 포함) |
+| `docs/progress/status-report.md` | **진행 현황 보고서** — Phase별 완료 현황, 테스트/커버리지, 백로그 |
 
 When code conflicts with design docs, **docs/ takes precedence**.
 
