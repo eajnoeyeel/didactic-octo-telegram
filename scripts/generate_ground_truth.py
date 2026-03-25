@@ -25,6 +25,7 @@ from data.ground_truth import (
     QualityGateError,
     generate_synthetic_gt,
     load_ground_truth,
+    save,
 )
 from models import MCPServer
 
@@ -67,12 +68,8 @@ async def main(args: argparse.Namespace) -> None:
             logger.warning(f"Quality gate warning: {e}")
 
     out = Path(args.output)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with open(out, "w") as f:
-        for entry in entries:
-            f.write(entry.model_dump_json() + "\n")
-
-    logger.info(f"Wrote {len(entries)} entries to {out}")
+    count = save(entries, out)
+    logger.info(f"Wrote {count} entries to {out}")
 
 
 if __name__ == "__main__":

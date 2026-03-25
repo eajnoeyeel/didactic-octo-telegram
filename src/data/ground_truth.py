@@ -6,7 +6,7 @@ from pathlib import Path
 from loguru import logger
 from openai import AsyncOpenAI
 
-from models import TOOL_ID_SEPARATOR, Category, Difficulty, GroundTruthEntry, MCPServer
+from models import TOOL_ID_SEPARATOR, Category, Difficulty, GroundTruthEntry, MCPServer, MCPTool
 
 
 def load_ground_truth(
@@ -174,6 +174,124 @@ class QualityGate:
             )
 
 
+def parse_queries(
+    raw: str,
+    tool: MCPTool,
+    *,
+    server_id: str = "",
+    server_category: Category = Category.GENERAL,
+    author: str = "gpt-4o-mini",
+    created_at: str = "",
+    start_counter: int = 1,
+) -> list[GroundTruthEntry]:
+    """Parse raw LLM JSON output into GroundTruthEntry objects.
+
+    Args:
+        raw: Raw JSON string (possibly wrapped in markdown fences).
+        tool: The MCPTool these queries target.
+        server_id: Server ID (defaults to tool.server_id if empty).
+        server_category: Category for generated entries.
+        author: Author field for provenance.
+        created_at: ISO 8601 date string.
+        start_counter: Starting number for query_id generation.
+
+    Returns:
+        List of validated GroundTruthEntry objects (source='llm_synthetic',
+        manually_verified=False). Malformed items are skipped with a warning.
+    """
+    if not server_id:
+        server_id = tool.server_id
+    if not created_at:
+        from datetime import date
+
+        created_at = date.today().isoformat()
+
+    # Strip markdown code fences if present
+    text = raw.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        text = "\n".join(line for line in lines if not line.startswith("```")).strip()
+
+    try:
+        items = json.loads(text)
+        if not isinstance(items, list):
+            items = []
+    except (json.JSONDecodeError, TypeError):
+        logger.warning(f"Failed to parse LLM output as JSON for {tool.tool_id}")
+        return []
+
+    entries: list[GroundTruthEntry] = []
+    counter = start_counter
+
+    for item in items:
+        if not isinstance(item, dict) or "query" not in item:
+            logger.warning(f"Skipping malformed item for {tool.tool_id}: {item!r}")
+            continue
+
+        query_id = f"gt-synth-{counter:04d}"
+        alt_tool_names = item.get("alternative_tool_names", [])
+        alt_tool_ids = [f"{server_id}{TOOL_ID_SEPARATOR}{n}" for n in alt_tool_names] or None
+        difficulty_val = item.get("difficulty", "medium")
+        ambiguity_val = item.get("ambiguity", "low")
+
+        # Ensure consistency: hard requires non-low ambiguity
+        if difficulty_val == "hard" and ambiguity_val == "low":
+            if not alt_tool_ids:
+                logger.warning(
+                    f"Skipping hard/low-ambiguity entry for {tool.tool_id}: "
+                    "no alternative_tool_names provided by LLM"
+                )
+                continue
+            ambiguity_val = "medium"
+
+        # Ensure medium/high ambiguity has alternatives
+        if ambiguity_val in ("medium", "high") and not alt_tool_ids:
+            ambiguity_val = "low"
+
+        try:
+            entry = GroundTruthEntry(
+                query_id=query_id,
+                query=item["query"],
+                correct_server_id=server_id,
+                correct_tool_id=tool.tool_id,
+                difficulty=difficulty_val,
+                category=server_category,
+                ambiguity=ambiguity_val,
+                source="llm_synthetic",
+                manually_verified=False,
+                author=author,
+                created_at=created_at,
+                alternative_tools=alt_tool_ids,
+                notes=item.get("notes"),
+            )
+            entries.append(entry)
+            counter += 1
+        except Exception as e:
+            logger.warning(f"Skipping malformed entry for {tool.tool_id}: {e}")
+
+    return entries
+
+
+def save(entries: list[GroundTruthEntry], output_path: Path) -> int:
+    """Write GroundTruthEntry objects to a JSONL file.
+
+    Creates parent directories if they don't exist.
+
+    Args:
+        entries: List of entries to write.
+        output_path: Path to output .jsonl file.
+
+    Returns:
+        Number of entries written.
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w") as f:
+        for entry in entries:
+            f.write(entry.model_dump_json() + "\n")
+    logger.info(f"Saved {len(entries)} entries to {output_path}")
+    return len(entries)
+
+
 _SYNTHETIC_PROMPT = """You are generating test queries for a tool recommendation system.
 
 Tool: {tool_name}
@@ -252,60 +370,21 @@ async def generate_synthetic_gt(
                     temperature=0.7,
                 )
                 raw = (response.choices[0].message.content or "[]").strip()
-                # Strip markdown code fences if present
-                if raw.startswith("```"):
-                    lines = raw.split("\n")
-                    raw = "\n".join(line for line in lines if not line.startswith("```")).strip()
-                items = json.loads(raw)
-                if not isinstance(items, list):
-                    items = []
             except Exception as e:
                 logger.warning(f"Skipping {tool.tool_id}: LLM call failed: {e}")
                 continue
 
-            for item in items:
-                query_id = f"gt-synth-{counter:04d}"
-                alt_tool_names = item.get("alternative_tool_names", [])
-                alt_tool_ids = [
-                    f"{server.server_id}{TOOL_ID_SEPARATOR}{n}" for n in alt_tool_names
-                ] or None
-                difficulty_val = item.get("difficulty", "medium")
-                ambiguity_val = item.get("ambiguity", "low")
-
-                # Ensure consistency: hard requires non-low ambiguity
-                if difficulty_val == "hard" and ambiguity_val == "low":
-                    if not alt_tool_ids:
-                        logger.warning(
-                            f"Skipping hard/low-ambiguity entry for {tool.tool_id}: "
-                            "no alternative_tool_names provided by LLM"
-                        )
-                        continue
-                    ambiguity_val = "medium"
-
-                # Ensure medium/high has alternatives
-                if ambiguity_val in ("medium", "high") and not alt_tool_ids:
-                    ambiguity_val = "low"
-
-                try:
-                    entry = GroundTruthEntry(
-                        query_id=query_id,
-                        query=item["query"],
-                        correct_server_id=server.server_id,
-                        correct_tool_id=tool.tool_id,
-                        difficulty=difficulty_val,
-                        category=server_category,
-                        ambiguity=ambiguity_val,
-                        source="llm_synthetic",
-                        manually_verified=False,
-                        author=author,
-                        created_at=created_at,
-                        alternative_tools=alt_tool_ids,
-                        notes=item.get("notes"),
-                    )
-                    entries.append(entry)
-                    counter += 1
-                except Exception as e:
-                    logger.warning(f"Skipping malformed entry for {tool.tool_id}: {e}")
+            parsed = parse_queries(
+                raw,
+                tool,
+                server_id=server.server_id,
+                server_category=server_category,
+                author=author,
+                created_at=created_at,
+                start_counter=counter,
+            )
+            entries.extend(parsed)
+            counter += len(parsed)
 
     logger.info(f"Generated {len(entries)} synthetic entries for {len(servers)} servers")
     return entries
