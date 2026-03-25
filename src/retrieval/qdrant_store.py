@@ -74,9 +74,9 @@ class QdrantStore:
                 must=[FieldCondition(key="server_id", match=MatchValue(value=server_id_filter))]
             )
         try:
-            results = await self.client.search(
+            response = await self.client.query_points(
                 collection_name=self.collection_name,
-                query_vector=query_vector.tolist(),
+                query=query_vector.tolist(),
                 limit=top_k,
                 query_filter=query_filter,
             )
@@ -89,7 +89,7 @@ class QdrantStore:
                 score=hit.score,
                 rank=i + 1,
             )
-            for i, hit in enumerate(results)
+            for i, hit in enumerate(response.points)
         ]
 
     async def search_server_ids(
@@ -110,16 +110,16 @@ class QdrantStore:
             List of server_id strings, ordered by relevance score.
         """
         try:
-            results = await self.client.search(
+            response = await self.client.query_points(
                 collection_name=self.collection_name,
-                query_vector=query_vector.tolist(),
+                query=query_vector.tolist(),
                 limit=top_k,
             )
         except Exception as e:
             logger.error(f"Qdrant server search failed: {e}")
             raise
         server_ids = []
-        for hit in results:
+        for hit in response.points:
             if hit.payload and (sid := hit.payload.get("server_id")):
                 server_ids.append(sid)
         return server_ids

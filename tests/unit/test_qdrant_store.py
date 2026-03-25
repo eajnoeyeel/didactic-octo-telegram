@@ -69,6 +69,11 @@ class TestPayloadToTool:
         assert restored.tool_name == sample_tool.tool_name
         assert restored.description == sample_tool.description
 
+    def test_raises_on_missing_key(self):
+        bad_payload = {"server_id": "srv"}  # missing tool_name, tool_id
+        with pytest.raises(Exception):
+            QdrantStore.payload_to_tool(bad_payload)
+
 
 class TestGeneratePointId:
     def test_deterministic(self):
@@ -103,33 +108,35 @@ class TestMCPDiscoveryNamespace:
 class TestSearchServerIds:
     async def test_returns_server_ids_from_payloads(self):
         mock_client = AsyncMock()
-        mock_client.search = AsyncMock(
-            return_value=[
-                MagicMock(payload={"server_id": "srv1", "name": "Server 1"}),
-                MagicMock(payload={"server_id": "srv2", "name": "Server 2"}),
-            ]
-        )
+        mock_response = MagicMock()
+        mock_response.points = [
+            MagicMock(payload={"server_id": "srv1", "name": "Server 1"}),
+            MagicMock(payload={"server_id": "srv2", "name": "Server 2"}),
+        ]
+        mock_client.query_points = AsyncMock(return_value=mock_response)
         store = QdrantStore(client=mock_client, collection_name="mcp_servers")
         server_ids = await store.search_server_ids(np.zeros(1536), top_k=5)
         assert server_ids == ["srv1", "srv2"]
 
     async def test_skips_payloads_without_server_id(self):
         mock_client = AsyncMock()
-        mock_client.search = AsyncMock(
-            return_value=[
-                MagicMock(payload={"server_id": "srv1"}),
-                MagicMock(payload={"name": "no_server_id_here"}),
-                MagicMock(payload=None),
-            ]
-        )
+        mock_response = MagicMock()
+        mock_response.points = [
+            MagicMock(payload={"server_id": "srv1"}),
+            MagicMock(payload={"name": "no_server_id_here"}),
+            MagicMock(payload=None),
+        ]
+        mock_client.query_points = AsyncMock(return_value=mock_response)
         store = QdrantStore(client=mock_client, collection_name="mcp_servers")
         server_ids = await store.search_server_ids(np.zeros(1536), top_k=5)
         assert server_ids == ["srv1"]
 
     async def test_passes_top_k_to_client(self):
         mock_client = AsyncMock()
-        mock_client.search = AsyncMock(return_value=[])
+        mock_response = MagicMock()
+        mock_response.points = []
+        mock_client.query_points = AsyncMock(return_value=mock_response)
         store = QdrantStore(client=mock_client, collection_name="mcp_servers")
         await store.search_server_ids(np.zeros(1536), top_k=7)
-        call_kwargs = mock_client.search.call_args.kwargs
+        call_kwargs = mock_client.query_points.call_args.kwargs
         assert call_kwargs["limit"] == 7
