@@ -1,4 +1,17 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c \":*)",
+      "Bash(docker run:*)",
+      "Bash(curl -s http://localhost:6333/healthz)",
+      "Bash(docker ps:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://registry.smithery.ai/servers?page=1&pageSize=1\")",
+      "Bash(wc -l /root/mcp_optimizer/src/data/*.py)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  },
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
     "playwright@claude-plugins-official": true,
