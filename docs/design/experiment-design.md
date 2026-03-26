@@ -25,7 +25,7 @@
 | **E4** | Description 품질 → 선택률 인과 관계 | A/B Lift > 30% | **가장 중요** |
 | **E5** | Pool 스케일 (5/20/50/100 서버) | Precision@1 저하 곡선 | E4와 병렬 |
 | **E6** | Pool 유사도 (Low/Base/High similarity) | Confusion Rate 변화 | E4와 병렬 |
-| **E7** | SEO 점수 방식 비교 (휴리스틱 vs LLM) | Spearman(score, selection_rate) | OQ-1 해결 |
+| **E7** | GEO 점수 방식 비교 (휴리스틱 vs LLM) | Spearman(geo_score, selection_rate) | OQ-1 해결 |
 
 ---
 
@@ -81,7 +81,7 @@ Phase 4 (병렬):
     +-- E6 (Pool 유사도) — Confusion Rate 심화
 
 Phase 5 (OQ-1 해결 후):
-    +-- E7 (SEO 점수 비교) — E4와 함께 분석
+    +-- E7 (GEO 점수 비교) — E4와 함께 분석
 ```
 
 - **E0은 E1의 전제 조건**: 2-Layer 유효성 미확인 시 E1 전략 비교 의미 변경
@@ -102,6 +102,33 @@ Phase 5 (OQ-1 해결 후):
 
 ---
 
+## 통계적 검증 적용 계획
+
+### X̄-R 관리도 (Control Chart) — E0 직전 1회
+
+실험 전체의 측정 안정성을 먼저 확인한다. 관리도가 불안정하면 이후 모든 실험 결과를 신뢰할 수 없으므로 선행 조건으로 취급.
+
+```
+목적: Precision@1 측정이 반복 실행에서도 일관되는가?
+방법: 동일 조건으로 N회 반복 → 서브그룹(5회 단위) X̄, R 계산 → UCL/LCL ±3σ 이내 확인
+판정: 관리 한계 이탈 시 원인 조사 (랜덤 시드, 파이프라인 비결정성 등) → 수정 후 재확인
+구현: src/evaluation/metrics/control_chart.py
+```
+
+### 가설 검정 (p-value) — 실험별 적용 우선순위
+
+| 실험 | 필요도 | 검정 방법 | 이유 |
+|------|--------|-----------|------|
+| E0 | 권장 | Mann-Whitney U | 1-Layer vs 2-Layer 차이 확인 |
+| E1 | 권장 | Cochran's Q + post-hoc McNemar | 3-way 전략 비교 |
+| E2, E3 | 선택적 | Mann-Whitney U | 탐색 실험, 수치 자체로 판단 가능 |
+| **E4** | **필수** | **McNemar's test** | **핵심 테제 증명, p < 0.05 요구** |
+| E5, E6 | 선택적 | — | 추세 분석이 주목적 |
+
+> **실용적 원칙**: E1-E3는 수치 차이가 명확하면(>10%p) 검정 생략 가능. E4는 논문 수준 증명이 목적이므로 검정 필수.
+
+---
+
 ## 위협 요인 (Threats to Validity)
 
 ### Internal Validity
@@ -117,7 +144,7 @@ Phase 5 (OQ-1 해결 후):
   - 완화: 난이도/모호도 분포를 의도적으로 다양화
 
 ### Construct Validity
-- **SEO 점수 validity (OQ-1)**: 점수 자체가 "품질"을 잘 반영하는지 미검증
+- **GEO 점수 validity (OQ-1)**: 점수 자체가 "품질"을 잘 반영하는지 미검증
   - 완화: E7에서 human agreement 측정
 - **Precision@1 한계**: multi-correct 케이스에서 하나만 정답 인정
   - 완화: NDCG@5 병행, alternative_tools 활용

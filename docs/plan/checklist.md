@@ -98,7 +98,7 @@
 - [ ] 단위 테스트 + curl 수동 테스트
 
 ## Phase 9: Provider Analytics (Week 2-3)
-- [ ] Query 로거, 로그 집계, SEO 점수, A/B 테스트, 유사도 히트맵, Confusion matrix
+- [ ] Query 로거, 로그 집계, GEO 점수, A/B 테스트, 유사도 히트맵, Confusion matrix
 - [ ] Provider REST endpoints
 - [ ] 단위 테스트
 
@@ -157,7 +157,7 @@
 ### E6: Pool 유사도 (Week 4)
 - [ ] Low/Base/High Similarity Pool에서 Confusion Rate, Precision@1, NDCG@5
 
-### E7: SEO 점수 비교 (OQ-1 해결 후)
+### E7: GEO 점수 비교 (OQ-1 해결 후)
 - [ ] 휴리스틱 vs LLM Spearman 비교 + Human agreement (20-30개)
 
 ---

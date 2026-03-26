@@ -5,7 +5,7 @@
 MCP Gateway + Analytics Platform — **양면 플랫폼**
 
 - **LLM 고객**: Bridge 구조 — 우리 MCP만 연결하면 전체 Provider 카탈로그 자동 라우팅. `find_best_tool(query)` → 최적 Tool 추천, `execute_tool(tool_id, params)` → Provider MCP 프록시 실행.
-- **Provider 고객**: 자기 Tool이 왜 선택 안 되는지를 보여주는 Analytics 대시보드 + SEO 점수 + 개선 가이드
+- **Provider 고객**: 자기 Tool이 왜 선택 안 되는지를 보여주는 Analytics 대시보드 + GEO 점수 + 개선 가이드
 
 ## 핵심 아키텍처
 

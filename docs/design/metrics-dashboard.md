@@ -86,7 +86,7 @@
 | ECE | < 0.15 | 0.15-0.25 | > 0.25 | Confidence 분기 로직 재검토 |
 | Latency p95 | < 2s | 2-5s | > 5s | Reranker 병목 또는 Qdrant 연결 점검 |
 | A/B Lift | > 30% | 10-30% | < 10% | Description 차이 불충분 또는 다른 요인 지배 |
-| Spearman r_s | > 0.6 | 0.3-0.6 | < 0.3 | SEO 점수 산정 방식 교체 (OQ-1) |
+| Spearman r_s | > 0.6 | 0.3-0.6 | < 0.3 | GEO 점수 산정 방식 교체 (OQ-1) |
 | Regression R-squared | > 0.4 | 0.2-0.4 | < 0.2 | Quality 하위 요소가 selection 설명 불가 |
 
 ---

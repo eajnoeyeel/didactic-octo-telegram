@@ -26,7 +26,7 @@
 1. **Server Recall@K** (K=3 or 5) — Layer 1에서 정답 서버 포함 여부
 2. **Tool Recall@10** — Reranking 전 후보 품질
 3. **Confusion Rate** — 유사 Tool 혼동으로 인한 오류 비율
-4. **Description Quality Score** — SEO 점수 (Specificity, Disambiguation, Coverage)
+4. **Description Quality Score** — GEO 점수 (Clarity, Disambiguation, Parameter Coverage, Boundary, Stats, Precision)
 
 ### Tier 3: Health Metrics (3개) — 시스템 정상 동작 확인
 5. **ECE** (Expected Calibration Error) — Confidence 신뢰도
@@ -52,7 +52,7 @@ E1 (전략 비교)
               ├─► E5 (Pool 스케일)
               └─► E6 (Pool 유사도)
 
-E7 (SEO 점수 방법) ─ OQ-1 해결 후 독립 실행
+E7 (GEO 점수 방법) ─ OQ-1 해결 후 독립 실행
 ```
 
 | 실험 | 독립 변인 | Primary Metric | 시기 |
@@ -63,4 +63,4 @@ E7 (SEO 점수 방법) ─ OQ-1 해결 후 독립 실행
 | E4 | Description 품질 (A/B) | Selection Rate Lift | Week 4 |
 | E5 | Pool 크기 (5/20/50/100) | Precision@1 degradation | Week 4 |
 | E6 | Pool 유사도 (Low/Base/High) | Confusion Rate | Week 4 |
-| E7 | SEO 점수 방법 (regex/LLM) | Human agreement | TBD |
+| E7 | GEO 점수 방법 (regex/LLM) | Human agreement | TBD |

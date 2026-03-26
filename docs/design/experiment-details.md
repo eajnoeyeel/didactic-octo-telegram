@@ -95,12 +95,25 @@ python run_experiments.py --experiment E1 --strategy taxonomy --pool base
 
 > **이 프로젝트에서 가장 중요한 실험.**
 
+### Version A / B 작성 기준 (GEO 기반)
+
+Version A는 Smithery의 평균적인 원본 description 수준으로 작성 (너무 나쁘게 만들어 lift를 과대 측정하는 것 방지).
+Version B는 GEO 논문 상위 3기법을 적용하여 작성:
+
+| GEO 기법 | MCP Description 적용 | 예시 |
+|----------|---------------------|------|
+| Statistics Addition | 커버리지/성능 수치 포함 | "Supports 50+ file formats, processes up to 10MB" |
+| Fluency Optimization | 첫 문장에 핵심 기능, 구조적 문장 | "Converts PDF to searchable text. Supports OCR for scanned documents." |
+| Cite Sources | 지원 표준/프로토콜 명시 | "Implements RSS 2.0 and Atom 1.0 feed parsing" |
+
+> **E7과의 연결**: E7이 먼저 완료된 경우, E7에서 검증된 채점 방식으로 Version A/B의 점수 차이를 정량화하여 E4 보고서에 포함.
+
 ### 4-1. A/B Selection Rate Lift (Primary — Causal)
 
 | 조건 | Pool 구성 | Description 버전 |
 |------|----------|-----------------|
-| E4-A | Base Pool + 자체 서버 Version A (Poor) | Poor descriptions |
-| E4-B | Base Pool + 자체 서버 Version B (Good) | Good descriptions |
+| E4-A | Base Pool + 자체 서버 Version A (Poor) | Smithery 원본 수준 |
+| E4-B | Base Pool + 자체 서버 Version B (Good) | GEO 기법 적용 |
 
 - 동일 쿼리셋을 두 Pool에 각각 실행
 - `lift = (precision_B - precision_A) / precision_A * 100%`
@@ -110,8 +123,8 @@ python run_experiments.py --experiment E1 --strategy taxonomy --pool base
 ### 4-2. Spearman Correlation (Secondary — Correlational)
 
 ```python
-# 모든 Tool에 대해 (quality_score, selection_rate) 쌍 수집
-quality_scores = [seo_score(tool) for tool in all_tools]
+# 모든 Tool에 대해 (geo_score, selection_rate) 쌍 수집
+quality_scores = [geo_score(tool) for tool in all_tools]
 selection_rates = [precision_per_tool(tool) for tool in all_tools]
 r_s, p_value = scipy.stats.spearmanr(quality_scores, selection_rates)
 # 목표: r_s > 0.6, p < 0.05
@@ -121,8 +134,9 @@ r_s, p_value = scipy.stats.spearmanr(quality_scores, selection_rates)
 
 ```python
 import statsmodels.api as sm
-X = df[['specificity_score', 'disambiguation_score',
-        'parameter_coverage_score', 'negative_instruction_score']]
+X = df[['clarity_score', 'disambiguation_score',
+        'parameter_coverage_score', 'boundary_score',
+        'stats_score', 'precision_score']]
 y = df['selection_rate']
 model = sm.OLS(y, sm.add_constant(X)).fit()
 # R²: quality가 selection_rate 분산의 몇 %를 설명하는가
@@ -166,17 +180,19 @@ model = sm.OLS(y, sm.add_constant(X)).fit()
 
 ---
 
-## E7: SEO 점수 방식 비교 (OQ-1 해결)
+## E7: GEO 점수 방식 비교 (OQ-1 해결)
 
 | 조건 | 점수 방식 |
 |------|----------|
-| E7-A | 정규식 휴리스틱 (`seo_score.py` 현재) |
+| E7-A | 정규식 휴리스틱 (`geo_score.py`) |
 | E7-B | LLM-based (GPT-4o-mini, 1-5점) |
 
 - **측정**:
-  - Spearman(score, selection_rate) — 어느 방식이 selection_rate와 더 상관 있는가
+  - Spearman(geo_score, selection_rate) — 어느 방식이 selection_rate와 더 상관 있는가
   - Human agreement — 20~30개 description에 대해 사람 직접 채점과의 상관
   - 비용 + 재현성
+
+> E4의 Version B는 GEO 기법으로 작성되므로, E7에서 검증된 GEO Score 채점 방식이 Version B에 실제로 높은 점수를 부여하는지 교차 확인 가능.
 
 ---
 

@@ -54,7 +54,7 @@ src/
 ├── analytics/
 │   ├── logger.py          # Query log (JSONL)
 │   ├── aggregator.py      # Log → ToolStats
-│   ├── seo_score.py       # Description SEO score
+│   ├── geo_score.py       # Description GEO score (GEO 기법 기반 품질 평가)
 │   └── ab_test.py         # A/B test runner
 ├── bridge/
 │   ├── mcp_bridge.py      # Bridge MCP Server

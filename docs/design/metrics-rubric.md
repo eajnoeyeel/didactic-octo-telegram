@@ -59,10 +59,21 @@
   - **Miss** (정답이 Top-K에 없음): 임베딩/검색 전략 자체 개선
 - **Provider 연결**: Provider 대시보드 "경쟁 분석" 기능의 원천 데이터
 
-### 4. Description Quality Score (SEO Score)
+### 4. Description Quality Score (GEO Score)
 
-- **정의**: `weighted_average(specificity, disambiguation, parameter_coverage)`
-- **스코어링 방법**: OQ-1 미결 — 정규식 휴리스틱 vs LLM-based, E7 파일럿 후 결정
+- **정의**: `GEO_score = (1/6) × (clarity + disambiguation + parameter_coverage + boundary + stats + precision)`
+- **6개 차원**:
+
+  | 차원 | 기존 명칭 | 내용 | GEO 근거 |
+  |------|-----------|------|----------|
+  | `clarity_score` | specificity_score | 첫 문장의 핵심 기능 명확도 + 구체적 범위 | Fluency Optimization |
+  | `disambiguation_score` | — | 유사 도구와의 차별화 | — |
+  | `parameter_coverage_score` | — | 파라미터 타입/제약/예제 포함 여부 | — |
+  | `boundary_score` | negative_instruction_score | 이 도구가 NOT 하는 것 명확화 | — |
+  | `stats_score` | *(신규)* | 수치/커버리지/성능 정보 포함 여부 | Statistics Addition |
+  | `precision_score` | *(신규)* | 표준/프로토콜/기술 용어 정확도 | Technical Terms |
+
+- **스코어링 방법**: E7 파일럿에서 정규식 휴리스틱 vs LLM-based 비교 후 결정
 - **목표**: Pool 내 평균 >= 0.6 (1.0 만점)
 - **의존성**: Spearman 상관계수의 입력 변수. 이 점수가 나쁘면 상관분석 무의미
 - **행동 변화 기준**: 점수 높은 Tool이 실제로 더 많이 선택되면 → Provider 추천에 신뢰성 부여. 상관 없으면 → 점수 산정 방식 교체
@@ -110,13 +121,13 @@
 ### 8b. Spearman (Secondary — Correlational)
 
 - **정의**: `scipy.stats.spearmanr(quality_scores, precision_per_tool)`
-- **데이터 소스**: SEO score (#4) x Precision@1 per tool — Pool 전체 Tool 대상
+- **데이터 소스**: GEO score (#4) x Precision@1 per tool — Pool 전체 Tool 대상
 - **목표**: r_s > 0.6, p < 0.05
-- **Alert**: r_s < 0.3 OR p > 0.1 → SEO 점수 산정 방식 교체 (OQ-1)
+- **Alert**: r_s < 0.3 OR p > 0.1 → GEO 점수 산정 방식 교체 (OQ-1)
 
 ### 8c. Regression R-squared (Supplementary — Explanatory)
 
-- **정의**: `OLS(selection_rate ~ specificity + disambiguation + param_coverage + negative_instruction).R²`
+- **정의**: `OLS(selection_rate ~ clarity + disambiguation + parameter_coverage + boundary + stats + precision).R²`
 - **목표**: R-squared > 0.4, 최소 1개 요소 coefficient p < 0.05
 - **Alert**: R-squared < 0.2 → quality 하위 요소가 selection rate 설명 불가
 

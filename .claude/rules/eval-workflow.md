@@ -27,7 +27,7 @@ def test_recall_at_3_target():
 
 ### 2. Model Grader (LLM 판단)
 
-복잡한 품질 평가에만 사용 (Description SEO score 등):
+복잡한 품질 평가에만 사용 (Description GEO score 등):
 
 ```python
 # 명확한 루브릭 필요

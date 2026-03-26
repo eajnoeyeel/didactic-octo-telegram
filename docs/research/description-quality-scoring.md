@@ -1,7 +1,8 @@
 # MCP Tool Description 품질 점수 (DQS) — 리서치 요약
 
-> 작성: 2026-03-21 | 최종 업데이트: 2026-03-22
-> 맥락: OQ-1 (SEO 점수 산정 방식) 해결
+> 작성: 2026-03-21 | 최종 업데이트: 2026-03-26
+> 맥락: OQ-1 (GEO 점수 산정 방식) 해결
+> **2026-03-26 업데이트**: CTO 멘토링에서 SEO Score → GEO Score로 개념 전환. 5-dimension DQS에 GEO 기법 2개(stats_score, precision_score) 추가 → 6-dimension GEO Score. 최신 정의는 `docs/design/metrics-rubric.md`가 SOT.
 
 ---
 
@@ -63,7 +64,7 @@
 
 ## 스코어링 방식 비교 (E7 파일럿에서 결정)
 
-### 방식 A: 휴리스틱 (`seo_score.py`)
+### 방식 A: 휴리스틱 (`geo_score.py`)
 
 - Purpose: 행동 동사 시작, "what"+"when-to-use" — Regex 패턴
 - Specificity: 플랫폼명, 출력 형식, 수치 제약 — 명칭 사전
