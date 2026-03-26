@@ -1,0 +1,19 @@
+{
+  "_note": "Populated after E0 runs. Values here become regression floors for E1-E6.",
+  "E0": {
+    "status": "pending",
+    "flat_precision_at_1": null,
+    "sequential_precision_at_1": null,
+    "parallel_precision_at_1": null,
+    "gate_passed": null,
+    "run_date": null
+  },
+  "E1": {
+    "status": "pending",
+    "best_strategy": null,
+    "precision_at_1": null,
+    "server_recall_at_3": null,
+    "latency_p95_ms": null,
+    "run_date": null
+  }
+}
