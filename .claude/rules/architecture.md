@@ -59,7 +59,7 @@ src/
 ├── bridge/
 │   ├── mcp_bridge.py      # Bridge MCP Server
 │   ├── proxy.py           # execute_tool → Provider MCP proxy
-│   └── registry.py        # Provider MCP endpoint cache
+│   └── registry.py        # tool_id → ClientSession 매핑 + 세션 풀 관리 (persistent connections)
 └── api/
     ├── main.py            # FastAPI app
     └── routes/            # search, provider analytics

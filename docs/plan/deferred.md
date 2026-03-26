@@ -27,6 +27,8 @@ All features above WILL be implemented. This plan produces the core pipeline + P
 ## Phase 13: Gated Features (Post-Core, After CTO Mentoring 2026-03-25)
 
 > **Gate**: Do NOT start this phase until (a) Phases 0–12 are passing, AND (b) CTO mentoring on 2026-03-25 has confirmed Strategy C viability and MCP Tool server design.
+>
+> **Pre-implementation reference**: `proxy_verification/docs/verification-report.md` — E2E 검증 완료 (6/6 PASS, 2026-03-22). MCP SDK import 경로, 도구 발견 패턴, 에러 전파 패턴, pytest-asyncio 호환성 이슈 해결책 포함.
 
 ### Task 13.1: Strategy C — Taxonomy-gated Search (stub)
 
@@ -52,23 +54,97 @@ class TaxonomyGatedStrategy(PipelineStrategy):
 ### Task 13.2: MCP Tool Server (DP1 second exposure)
 
 **Files:**
-- Create: `src/api/mcp_server.py`
+- Create: `src/bridge/mcp_bridge.py`
+- Reference: `proxy_verification/src/proxy_server.py` (재사용 가능 패턴)
 
-**Goal**: Expose `find_best_tool` as an actual MCP Tool so LLMs can call it via the MCP protocol natively (not just REST). This is the "protocol-native" DP1 decision.
+**Goal**: `find_best_tool`과 `execute_tool`을 MCP Tool로 노출. LLM이 우리 MCP Server 하나에만 연결하면 전체 Provider 카탈로그를 사용 가능.
+
+**MCP Python SDK v1.26.0 실제 API (proxy_verification에서 검증됨):**
 
 ```python
-# TODO: Implement using mcp Python SDK (pip install mcp).
-# Expose find_best_tool(query: str, top_k: int = 3) as an MCP Tool.
-# Wire to the same SequentialStrategy used by the REST endpoint.
-# Reference: RAG-MCP paper (arxiv:2505.03275) — same approach.
+# ✅ 검증된 import 경로 (mcp>=1.26.0)
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+from mcp.types import Tool, TextContent
 
-# Minimal structure:
-# from mcp.server import Server
-# from mcp.server.stdio import stdio_server
-# server = Server("mcp-discovery")
-# @server.tool("find_best_tool")
-# async def find_best_tool(query: str, top_k: int = 3) -> dict: ...
+server = Server("mcp-discovery")
+
+@server.list_tools()
+async def list_tools() -> list[Tool]:
+    return [
+        Tool(
+            name="find_best_tool",
+            description="Find the best MCP tool for a given query",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "top_k": {"type": "integer", "default": 3}
+                },
+                "required": ["query"]
+            }
+        ),
+        Tool(
+            name="execute_tool",
+            description="Execute a specific MCP tool by ID",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "tool_id": {"type": "string"},
+                    "params": {"type": "object"}
+                },
+                "required": ["tool_id", "params"]
+            }
+        ),
+    ]
+
+@server.call_tool()
+async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    if name == "find_best_tool":
+        result = await pipeline.search(arguments["query"], arguments.get("top_k", 3))
+        return [TextContent(type="text", text=result.model_dump_json())]
+    elif name == "execute_tool":
+        result = await proxy.execute(arguments["tool_id"], arguments["params"])
+        return [TextContent(type="text", text=str(result))]
+    raise ValueError(f"Unknown tool: {name}")
+
+async def main():
+    async with stdio_server() as (read, write):
+        await server.run(read, write, server.create_initialization_options())
 ```
+
+> **❌ 금지 패턴 (v1.26.0에 없음):**
+> ```python
+> @server.tool("find_best_tool")  # 이 데코레이터 존재하지 않음
+> ```
+
+**⚠️ Persistent Connection 필수 (프로토타입과 프로덕션의 차이):**
+
+proxy_verification 실측 레이턴시:
+- Connect-per-call (Python 백엔드): ~2200ms/call
+- Connect-per-call (Node.js 백엔드): ~3300ms/call
+
+프로덕션에서는 `initSessions()` 패턴으로 서버 시작 시 사전 연결 유지 필요:
+
+```python
+# registry.py — Phase 13에서 구현 (proxy_verification/src/proxy_server.py 참조)
+_sessions: dict[str, ClientSession] = {}  # 세션 풀
+
+async def init_sessions(config: RegistryConfig) -> None:
+    """서버 시작 시 모든 Provider MCP에 사전 연결"""
+    for server_id, params in config.backends.items():
+        _sessions[server_id] = await _connect(params)
+
+async def get_session(server_id: str) -> ClientSession:
+    """캐시 히트 시 재사용, 미스 시 재연결 (3회 재시도 + 2.5s 간격)"""
+    if server_id not in _sessions:
+        _sessions[server_id] = await _connect_with_retry(server_id)
+    return _sessions[server_id]
+```
+
+**재사용 가능 패턴**: `proxy_verification/src/` 코드를 `src/bridge/`로 이식 가능.
+- `proxy_verification/src/proxy_server.py` → `src/bridge/mcp_bridge.py` (라우팅 로직)
+- `proxy_verification/src/registry.py` → `src/bridge/registry.py` (tool→client 매핑)
 
 ### Task 13.3: A/B Test with Real Qdrant Payload Swap
 
@@ -106,9 +182,10 @@ True Sequential 2-Layer:
 
 **참고 파일**: `mentoring/open-questions.md` — OQ-2, OQ-4
 
-### SEO 점수 방식 미결
+### GEO 점수 방식 미결 (→ OQ-1 RESOLVED)
 
-정규식 휴리스틱 방식의 한계 확인. 논문 리서치 후 LLM-based 방식과 비교 실험 예정. 핵심 테제(Spearman 상관계수)의 유효성이 SEO 점수 품질에 달려 있음. `mentoring/open-questions.md` — OQ-1 참고.
+정규식 휴리스틱 방식의 한계 확인. GEO 논문(Aggarwal et al., ACM SIGKDD 2024) 리서치 후 LLM-based 방식과 비교 실험 예정. 핵심 테제(Spearman 상관계수)의 유효성이 GEO 점수 품질에 달려 있음.
+OQ-1 RESOLVED (2026-03-26): SEO Score → GEO Score (6-dimension). 상세: `docs/design/metrics-rubric.md` — GEO Score 섹션.
 
 ### Provider 실증용 자체 MCP 서버 필요
 
