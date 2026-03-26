@@ -13,8 +13,10 @@ import numpy as np
 
 from models import GroundTruthEntry, SearchResult
 
+_NDCG_CUTOFF = 5
 
-@dataclass
+
+@dataclass(frozen=True)
 class PerQueryResult:
     """Evaluation result for a single query."""
 
@@ -24,15 +26,16 @@ class PerQueryResult:
     rank_of_correct: int | None  # 1-indexed rank; None if not found in top-k
     confidence: float  # score of top-1 result (0.0 if empty)
     latency_ms: float
-    retrieved_tool_ids: list[str]
+    retrieved_tool_ids: tuple[str, ...]
 
 
-@dataclass
+@dataclass(frozen=True)
 class EvalResult:
     """Aggregated evaluation metrics for a pipeline strategy run."""
 
     strategy_name: str
     n_queries: int
+    n_failed: int
     k_used: int
 
     # Rank-based metrics
@@ -41,8 +44,8 @@ class EvalResult:
     mrr: float  # [0, 1] mean reciprocal rank of correct tool
     ndcg_at_5: float  # [0, 1] NDCG@5 with graded relevance
 
-    # Error analysis
-    confusion_rate: float  # confusion_errors / total_errors; float('nan') if no errors
+    # Error analysis — None when there are no errors (all correct)
+    confusion_rate: float | None
 
     # Calibration (for DP6 confidence branching validation)
     ece: float  # [0, 1] Expected Calibration Error
@@ -54,7 +57,7 @@ class EvalResult:
     latency_mean: float
 
     # Raw per-query data for post-hoc analysis (E4 A/B, E7 correlation)
-    per_query: list[PerQueryResult] = field(default_factory=list)
+    per_query: tuple[PerQueryResult, ...] = field(default_factory=tuple)
 
 
 def compute_precision_at_1(per_query: list[PerQueryResult]) -> float:
@@ -86,15 +89,14 @@ def compute_mrr(per_query: list[PerQueryResult]) -> float:
 def compute_ndcg_at_5(
     results: list[SearchResult],
     entry: GroundTruthEntry,
-    k: int = 5,
 ) -> float:
     """NDCG@5 with graded relevance: correct_tool=2, alternative_tool=1, else=0.
 
     Args:
         results: Ranked SearchResults from strategy.search(), highest score first.
         entry: Ground truth entry defining correct and alternative tools.
-        k: Cutoff rank (default 5).
     """
+    k = _NDCG_CUTOFF
     alternative_ids: set[str] = set(entry.alternative_tools or [])
 
     def grade(tool_id: str) -> int:
@@ -113,17 +115,17 @@ def compute_ndcg_at_5(
     return dcg / idcg if idcg > 0 else 0.0
 
 
-def compute_confusion_rate(per_query: list[PerQueryResult]) -> float:
+def compute_confusion_rate(per_query: list[PerQueryResult]) -> float | None:
     """Fraction of errors where correct tool IS in top-K (confusion vs miss).
 
-    Returns float('nan') if there are no errors at all.
+    Returns None if there are no errors at all.
 
-    - Confusion: wrong rank-1 but correct in top-K → description disambiguation issue
-    - Miss: correct tool absent from top-K → embedding/search strategy issue
+    - Confusion: wrong rank-1 but correct in top-K -> description disambiguation issue
+    - Miss: correct tool absent from top-K -> embedding/search strategy issue
     """
     errors = [r for r in per_query if not r.top_1_correct]
     if not errors:
-        return float("nan")
+        return None
     return sum(1 for r in errors if r.in_top_k) / len(errors)
 
 
@@ -141,9 +143,17 @@ def compute_ece(
         confidences: Rank-1 similarity score per query (proxy for confidence).
         correct: Whether rank-1 result was correct per query.
         n_bins: Number of equal-width bins over [0, 1].
+
+    Raises:
+        ValueError: If any confidence is outside [0, 1].
     """
     if not confidences:
         return 0.0
+    if not all(0.0 <= c <= 1.0 for c in confidences):
+        out_min, out_max = min(confidences), max(confidences)
+        raise ValueError(
+            f"compute_ece: confidences must be in [0, 1], got range [{out_min:.3f}, {out_max:.3f}]"
+        )
     n = len(confidences)
     bin_edges = [i / n_bins for i in range(n_bins + 1)]
     ece = 0.0
