@@ -17,7 +17,8 @@ from evaluation.metrics import (
     compute_precision_at_1,
     compute_recall_at_k,
 )
-from models import GroundTruthEntry, MCPTool, SearchResult
+
+from .conftest import _make_gt, _make_pq, _make_result
 
 
 class TestDataclasses:
@@ -29,19 +30,33 @@ class TestDataclasses:
             rank_of_correct=1,
             confidence=0.9,
             latency_ms=42.5,
-            retrieved_tool_ids=["srv::a", "srv::b"],
+            retrieved_tool_ids=("srv::a", "srv::b"),
         )
         assert r.query_id == "gt-001"
         assert r.top_1_correct is True
         assert r.rank_of_correct == 1
         assert r.confidence == 0.9
         assert r.latency_ms == 42.5
-        assert r.retrieved_tool_ids == ["srv::a", "srv::b"]
+        assert r.retrieved_tool_ids == ("srv::a", "srv::b")
+
+    def test_per_query_result_is_frozen(self):
+        r = PerQueryResult(
+            query_id="gt-001",
+            top_1_correct=True,
+            in_top_k=True,
+            rank_of_correct=1,
+            confidence=0.9,
+            latency_ms=42.5,
+            retrieved_tool_ids=("srv::a",),
+        )
+        with pytest.raises(AttributeError):
+            r.query_id = "changed"  # type: ignore[misc]
 
     def test_eval_result_defaults(self):
         r = EvalResult(
             strategy_name="FlatStrategy",
             n_queries=10,
+            n_failed=0,
             k_used=10,
             precision_at_1=0.6,
             recall_at_k=0.8,
@@ -56,64 +71,46 @@ class TestDataclasses:
         )
         assert r.strategy_name == "FlatStrategy"
         assert r.precision_at_1 == 0.6
-        assert r.per_query == []  # default empty list
+        assert r.per_query == ()  # default empty tuple
 
+    def test_eval_result_is_frozen(self):
+        r = EvalResult(
+            strategy_name="FlatStrategy",
+            n_queries=0,
+            n_failed=0,
+            k_used=10,
+            precision_at_1=0.0,
+            recall_at_k=0.0,
+            mrr=0.0,
+            ndcg_at_5=0.0,
+            confusion_rate=None,
+            ece=0.0,
+            latency_p50=0.0,
+            latency_p95=0.0,
+            latency_p99=0.0,
+            latency_mean=0.0,
+        )
+        with pytest.raises(AttributeError):
+            r.precision_at_1 = 1.0  # type: ignore[misc]
 
-# ── Shared helpers ──────────────────────────────────────────────────────────
-
-
-def make_tool(tool_id: str) -> MCPTool:
-    server_id, tool_name = tool_id.split("::", 1)
-    return MCPTool(
-        tool_id=tool_id,
-        server_id=server_id,
-        tool_name=tool_name,
-        description=f"Description for {tool_name}",
-    )
-
-
-def make_result(tool_id: str, score: float, rank: int) -> SearchResult:
-    return SearchResult(tool=make_tool(tool_id), score=score, rank=rank)
-
-
-def make_gt(
-    correct_tool_id: str,
-    alternative_tools: list[str] | None = None,
-) -> GroundTruthEntry:
-    server_id = correct_tool_id.split("::")[0]
-    return GroundTruthEntry(
-        query_id="gt-test-001",
-        query="test query",
-        correct_server_id=server_id,
-        correct_tool_id=correct_tool_id,
-        difficulty="easy",
-        category="general",
-        ambiguity="low",
-        source="manual_seed",
-        manually_verified=True,
-        author="test",
-        created_at="2026-03-26",
-        alternative_tools=alternative_tools,
-    )
-
-
-def make_pq(
-    query_id: str = "q1",
-    top_1_correct: bool = True,
-    in_top_k: bool = True,
-    rank_of_correct: int | None = 1,
-    confidence: float = 0.9,
-    retrieved_tool_ids: list[str] | None = None,
-) -> PerQueryResult:
-    return PerQueryResult(
-        query_id=query_id,
-        top_1_correct=top_1_correct,
-        in_top_k=in_top_k,
-        rank_of_correct=rank_of_correct,
-        confidence=confidence,
-        latency_ms=10.0,
-        retrieved_tool_ids=retrieved_tool_ids or ["srv::a"],
-    )
+    def test_eval_result_confusion_rate_none(self):
+        r = EvalResult(
+            strategy_name="FlatStrategy",
+            n_queries=1,
+            n_failed=0,
+            k_used=10,
+            precision_at_1=1.0,
+            recall_at_k=1.0,
+            mrr=1.0,
+            ndcg_at_5=1.0,
+            confusion_rate=None,
+            ece=0.0,
+            latency_p50=10.0,
+            latency_p95=10.0,
+            latency_p99=10.0,
+            latency_mean=10.0,
+        )
+        assert r.confusion_rate is None
 
 
 # ── Rank-based metrics ───────────────────────────────────────────────────────
@@ -121,13 +118,13 @@ def make_pq(
 
 class TestPrecisionAt1:
     def test_all_correct(self):
-        assert compute_precision_at_1([make_pq(top_1_correct=True)]) == 1.0
+        assert compute_precision_at_1([_make_pq(top_1_correct=True)]) == 1.0
 
     def test_all_wrong(self):
-        assert compute_precision_at_1([make_pq(top_1_correct=False, rank_of_correct=2)]) == 0.0
+        assert compute_precision_at_1([_make_pq(top_1_correct=False, rank_of_correct=2)]) == 0.0
 
     def test_mixed(self):
-        pqs = [make_pq(top_1_correct=True), make_pq(top_1_correct=False, rank_of_correct=None)]
+        pqs = [_make_pq(top_1_correct=True), _make_pq(top_1_correct=False, rank_of_correct=None)]
         assert compute_precision_at_1(pqs) == pytest.approx(0.5)
 
     def test_empty(self):
@@ -136,11 +133,11 @@ class TestPrecisionAt1:
 
 class TestRecallAtK:
     def test_correct_in_top_k(self):
-        pq = make_pq(top_1_correct=False, in_top_k=True, rank_of_correct=3)
+        pq = _make_pq(top_1_correct=False, in_top_k=True, rank_of_correct=3)
         assert compute_recall_at_k([pq]) == 1.0
 
     def test_correct_not_in_top_k(self):
-        pq = make_pq(top_1_correct=False, in_top_k=False, rank_of_correct=None)
+        pq = _make_pq(top_1_correct=False, in_top_k=False, rank_of_correct=None)
         assert compute_recall_at_k([pq]) == 0.0
 
     def test_empty(self):
@@ -149,18 +146,18 @@ class TestRecallAtK:
 
 class TestMRR:
     def test_correct_at_rank_1(self):
-        assert compute_mrr([make_pq(rank_of_correct=1)]) == pytest.approx(1.0)
+        assert compute_mrr([_make_pq(rank_of_correct=1)]) == pytest.approx(1.0)
 
     def test_correct_at_rank_2(self):
-        assert compute_mrr([make_pq(top_1_correct=False, rank_of_correct=2)]) == pytest.approx(0.5)
+        assert compute_mrr([_make_pq(top_1_correct=False, rank_of_correct=2)]) == pytest.approx(0.5)
 
     def test_not_found(self):
-        pq = make_pq(top_1_correct=False, in_top_k=False, rank_of_correct=None)
+        pq = _make_pq(top_1_correct=False, in_top_k=False, rank_of_correct=None)
         assert compute_mrr([pq]) == pytest.approx(0.0)
 
     def test_mixed(self):
         # (1/1 + 1/4) / 2 = 0.625
-        pqs = [make_pq(rank_of_correct=1), make_pq(top_1_correct=False, rank_of_correct=4)]
+        pqs = [_make_pq(rank_of_correct=1), _make_pq(top_1_correct=False, rank_of_correct=4)]
         assert compute_mrr(pqs) == pytest.approx(0.625)
 
     def test_empty(self):
@@ -169,59 +166,58 @@ class TestMRR:
 
 class TestNDCGAt5:
     def test_correct_at_rank_1_no_alternatives(self):
-        results = [make_result("srv::a", 0.9, 1), make_result("srv::b", 0.5, 2)]
-        entry = make_gt("srv::a")
+        results = [_make_result("srv::a", 0.9, 1), _make_result("srv::b", 0.5, 2)]
+        entry = _make_gt("srv::a")
         # DCG = 2/log2(2) = 2.0; IDCG = 2.0; NDCG = 1.0
         assert compute_ndcg_at_5(results, entry) == pytest.approx(1.0)
 
     def test_correct_at_rank_2(self):
-        results = [make_result("srv::b", 0.9, 1), make_result("srv::a", 0.8, 2)]
-        entry = make_gt("srv::a")
+        results = [_make_result("srv::b", 0.9, 1), _make_result("srv::a", 0.8, 2)]
+        entry = _make_gt("srv::a")
         # DCG = 0 + 2/log2(3); IDCG = 2/log2(2) = 2.0
         expected = (2.0 / math.log2(3)) / 2.0
         assert compute_ndcg_at_5(results, entry) == pytest.approx(expected)
 
     def test_alternative_at_rank_1(self):
-        results = [make_result("srv::alt", 0.9, 1), make_result("srv::a", 0.8, 2)]
-        entry = make_gt("srv::a", alternative_tools=["srv::alt"])
+        results = [_make_result("srv::alt", 0.9, 1), _make_result("srv::a", 0.8, 2)]
+        entry = _make_gt("srv::a", alternative_tools=["srv::alt"])
         # DCG = 1/log2(2) + 2/log2(3); IDCG = 2/log2(2) + 1/log2(3)
         dcg = 1.0 / math.log2(2) + 2.0 / math.log2(3)
         idcg = 2.0 / math.log2(2) + 1.0 / math.log2(3)
         assert compute_ndcg_at_5(results, entry) == pytest.approx(dcg / idcg)
 
     def test_not_found_returns_zero(self):
-        results = [make_result("srv::b", 0.9, 1)]
-        entry = make_gt("srv::a")
+        results = [_make_result("srv::b", 0.9, 1)]
+        entry = _make_gt("srv::a")
         assert compute_ndcg_at_5(results, entry) == pytest.approx(0.0)
 
     def test_empty_results_returns_zero(self):
-        assert compute_ndcg_at_5([], make_gt("srv::a")) == pytest.approx(0.0)
+        assert compute_ndcg_at_5([], _make_gt("srv::a")) == pytest.approx(0.0)
 
 
 # ── Statistical metrics ──────────────────────────────────────────────────────
 
 
 class TestConfusionRate:
-    def test_all_correct_returns_nan(self):
-        result = compute_confusion_rate([make_pq(top_1_correct=True)])
-        assert math.isnan(result)
+    def test_all_correct_returns_none(self):
+        assert compute_confusion_rate([_make_pq(top_1_correct=True)]) is None
 
-    def test_empty_returns_nan(self):
-        assert math.isnan(compute_confusion_rate([]))
+    def test_empty_returns_none(self):
+        assert compute_confusion_rate([]) is None
 
     def test_wrong_but_in_top_k_is_confusion(self):
-        pqs = [make_pq(top_1_correct=False, in_top_k=True, rank_of_correct=3)]
+        pqs = [_make_pq(top_1_correct=False, in_top_k=True, rank_of_correct=3)]
         assert compute_confusion_rate(pqs) == pytest.approx(1.0)
 
     def test_wrong_and_not_in_top_k_is_miss(self):
-        pqs = [make_pq(top_1_correct=False, in_top_k=False, rank_of_correct=None)]
+        pqs = [_make_pq(top_1_correct=False, in_top_k=False, rank_of_correct=None)]
         assert compute_confusion_rate(pqs) == pytest.approx(0.0)
 
     def test_half_confusion_half_miss(self):
         pqs = [
-            make_pq(top_1_correct=True),  # correct — excluded from errors
-            make_pq(top_1_correct=False, in_top_k=True, rank_of_correct=2),  # confusion
-            make_pq(top_1_correct=False, in_top_k=False, rank_of_correct=None),  # miss
+            _make_pq(top_1_correct=True),  # correct — excluded from errors
+            _make_pq(top_1_correct=False, in_top_k=True, rank_of_correct=2),  # confusion
+            _make_pq(top_1_correct=False, in_top_k=False, rank_of_correct=None),  # miss
         ]
         assert compute_confusion_rate(pqs) == pytest.approx(0.5)
 
@@ -241,9 +237,27 @@ class TestECE:
         assert compute_ece([], [], n_bins=10) == 0.0
 
     def test_single_item(self):
-        # One item in bin [0.7, 0.8): acc=1.0, conf=0.75 → ECE = |1.0 - 0.75| = 0.25
+        # One item in bin [0.7, 0.8): acc=1.0, conf=0.75 -> ECE = |1.0 - 0.75| = 0.25
         ece = compute_ece([0.75], [True], n_bins=10)
         assert ece == pytest.approx(0.25)
+
+    def test_confidence_exactly_1_0(self):
+        # Boundary: 1.0 falls in the last bin [0.9, 1.0]
+        ece = compute_ece([1.0], [True], n_bins=10)
+        assert ece == pytest.approx(0.0)  # acc=1.0, conf=1.0
+
+    def test_confidence_exactly_0_0(self):
+        # Boundary: 0.0 falls in the first bin [0.0, 0.1)
+        ece = compute_ece([0.0], [False], n_bins=10)
+        assert ece == pytest.approx(0.0)  # acc=0.0, conf=0.0
+
+    def test_out_of_range_raises(self):
+        with pytest.raises(ValueError, match="confidences must be in"):
+            compute_ece([1.5], [True], n_bins=10)
+
+    def test_negative_confidence_raises(self):
+        with pytest.raises(ValueError, match="confidences must be in"):
+            compute_ece([-0.1, 0.5], [True, False], n_bins=10)
 
 
 class TestLatencyStats:

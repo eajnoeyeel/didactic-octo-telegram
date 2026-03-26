@@ -6,45 +6,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from evaluation.harness import evaluate
+from evaluation.harness import DefaultEvaluator, evaluate
 from evaluation.metrics import EvalResult
-from models import GroundTruthEntry, MCPTool, SearchResult
 
-
-def make_tool(tool_id: str) -> MCPTool:
-    server_id, tool_name = tool_id.split("::", 1)
-    return MCPTool(
-        tool_id=tool_id,
-        server_id=server_id,
-        tool_name=tool_name,
-        description=f"Description for {tool_name}",
-    )
-
-
-def make_result(tool_id: str, score: float, rank: int) -> SearchResult:
-    return SearchResult(tool=make_tool(tool_id), score=score, rank=rank)
-
-
-def make_entry(
-    query_id: str = "gt-test-001",
-    correct_tool_id: str = "srv1::tool_a",
-    query: str = "find tool a",
-) -> GroundTruthEntry:
-    server_id = correct_tool_id.split("::")[0]
-    return GroundTruthEntry(
-        query_id=query_id,
-        query=query,
-        correct_server_id=server_id,
-        correct_tool_id=correct_tool_id,
-        difficulty="easy",
-        category="general",
-        ambiguity="low",
-        source="manual_seed",
-        manually_verified=True,
-        author="test",
-        created_at="2026-03-26",
-        alternative_tools=None,
-    )
+from .conftest import _make_entry, _make_result
 
 
 class TestEvaluate:
@@ -52,10 +17,10 @@ class TestEvaluate:
         mock_strategy = AsyncMock()
         mock_strategy.search = AsyncMock(
             return_value=[
-                make_result("srv1::tool_a", 0.9, 1),
+                _make_result("srv1::tool_a", 0.9, 1),
             ]
         )
-        result = await evaluate(mock_strategy, [make_entry()], top_k=10)
+        result = await evaluate(mock_strategy, [_make_entry()], top_k=10)
         assert isinstance(result, EvalResult)
         assert result.n_queries == 1
         assert result.k_used == 10
@@ -64,11 +29,11 @@ class TestEvaluate:
         mock_strategy = AsyncMock()
         mock_strategy.search = AsyncMock(
             return_value=[
-                make_result("srv1::tool_a", 0.9, 1),
-                make_result("srv1::tool_b", 0.5, 2),
+                _make_result("srv1::tool_a", 0.9, 1),
+                _make_result("srv1::tool_b", 0.5, 2),
             ]
         )
-        entry = make_entry(correct_tool_id="srv1::tool_a")
+        entry = _make_entry(correct_tool_id="srv1::tool_a")
         result = await evaluate(mock_strategy, [entry], top_k=10)
         assert result.precision_at_1 == pytest.approx(1.0)
         assert result.recall_at_k == pytest.approx(1.0)
@@ -78,11 +43,11 @@ class TestEvaluate:
         mock_strategy = AsyncMock()
         mock_strategy.search = AsyncMock(
             return_value=[
-                make_result("srv1::tool_b", 0.9, 1),
-                make_result("srv1::tool_a", 0.5, 2),
+                _make_result("srv1::tool_b", 0.9, 1),
+                _make_result("srv1::tool_a", 0.5, 2),
             ]
         )
-        entry = make_entry(correct_tool_id="srv1::tool_a")
+        entry = _make_entry(correct_tool_id="srv1::tool_a")
         result = await evaluate(mock_strategy, [entry], top_k=10)
         assert result.precision_at_1 == pytest.approx(0.0)
         assert result.recall_at_k == pytest.approx(1.0)
@@ -91,21 +56,21 @@ class TestEvaluate:
     async def test_strategy_called_once_per_query(self):
         mock_strategy = AsyncMock()
         mock_strategy.search = AsyncMock(return_value=[])
-        entries = [make_entry(f"gt-{i:03d}") for i in range(3)]
+        entries = [_make_entry(f"gt-{i:03d}") for i in range(3)]
         await evaluate(mock_strategy, entries, top_k=10)
         assert mock_strategy.search.call_count == 3
 
     async def test_strategy_called_with_correct_query_and_top_k(self):
         mock_strategy = AsyncMock()
         mock_strategy.search = AsyncMock(return_value=[])
-        entry = make_entry(query="search github repos", correct_tool_id="srv::t")
+        entry = _make_entry(query="search github repos", correct_tool_id="srv::t")
         await evaluate(mock_strategy, [entry], top_k=5)
         mock_strategy.search.assert_called_once_with("search github repos", top_k=5)
 
     async def test_latency_is_non_negative(self):
         mock_strategy = AsyncMock()
         mock_strategy.search = AsyncMock(return_value=[])
-        result = await evaluate(mock_strategy, [make_entry()], top_k=10)
+        result = await evaluate(mock_strategy, [_make_entry()], top_k=10)
         assert result.latency_p50 >= 0.0
         assert result.latency_mean >= 0.0
         assert result.per_query[0].latency_ms >= 0.0
@@ -114,18 +79,68 @@ class TestEvaluate:
         mock_strategy = AsyncMock()
         result = await evaluate(mock_strategy, [], top_k=10)
         assert result.n_queries == 0
+        assert result.n_failed == 0
         assert result.precision_at_1 == 0.0
-        assert result.per_query == []
+        assert result.per_query == ()
+        assert result.confusion_rate is None
 
     async def test_per_query_length_matches_input(self):
         mock_strategy = AsyncMock()
-        mock_strategy.search = AsyncMock(return_value=[make_result("srv1::tool_a", 0.9, 1)])
-        entries = [make_entry(f"gt-{i:03d}") for i in range(5)]
+        mock_strategy.search = AsyncMock(return_value=[_make_result("srv1::tool_a", 0.9, 1)])
+        entries = [_make_entry(f"gt-{i:03d}") for i in range(5)]
         result = await evaluate(mock_strategy, entries, top_k=10)
         assert len(result.per_query) == 5
 
-    async def test_strategy_name_is_class_name(self):
+    async def test_strategy_name_uses_class_name(self):
         mock_strategy = AsyncMock()
         mock_strategy.search = AsyncMock(return_value=[])
-        result = await evaluate(mock_strategy, [make_entry()], top_k=10)
+        result = await evaluate(mock_strategy, [_make_entry()], top_k=10)
         assert result.strategy_name == type(mock_strategy).__name__
+
+    async def test_strategy_name_prefers_name_attribute(self):
+        mock_strategy = AsyncMock()
+        mock_strategy.name = "my_custom_strategy"
+        mock_strategy.search = AsyncMock(return_value=[])
+        result = await evaluate(mock_strategy, [_make_entry()], top_k=10)
+        assert result.strategy_name == "my_custom_strategy"
+
+
+class TestExceptionIsolation:
+    async def test_failed_query_is_skipped(self):
+        mock_strategy = AsyncMock()
+        mock_strategy.search = AsyncMock(side_effect=RuntimeError("network timeout"))
+        result = await evaluate(mock_strategy, [_make_entry()], top_k=10)
+        assert result.n_queries == 1
+        assert result.n_failed == 1
+        assert len(result.per_query) == 0
+        assert result.precision_at_1 == 0.0
+
+    async def test_partial_failure(self):
+        """One query fails, one succeeds — only successful query contributes to metrics."""
+        mock_strategy = AsyncMock()
+        mock_strategy.search = AsyncMock(
+            side_effect=[
+                RuntimeError("timeout"),
+                [_make_result("srv1::tool_a", 0.9, 1)],
+            ]
+        )
+        entries = [_make_entry("gt-001"), _make_entry("gt-002")]
+        result = await evaluate(mock_strategy, entries, top_k=10)
+        assert result.n_queries == 2
+        assert result.n_failed == 1
+        assert len(result.per_query) == 1
+        assert result.precision_at_1 == pytest.approx(1.0)
+
+
+class TestDefaultEvaluator:
+    async def test_is_evaluator_subclass(self):
+        from evaluation.evaluator import Evaluator
+
+        assert issubclass(DefaultEvaluator, Evaluator)
+
+    async def test_custom_gap_threshold(self):
+        evaluator = DefaultEvaluator(gap_threshold=0.25)
+        mock_strategy = AsyncMock()
+        mock_strategy.search = AsyncMock(return_value=[_make_result("srv1::tool_a", 0.9, 1)])
+        result = await evaluator.evaluate(mock_strategy, [_make_entry()], top_k=10)
+        assert isinstance(result, EvalResult)
