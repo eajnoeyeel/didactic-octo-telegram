@@ -55,7 +55,14 @@
   - `find_best_tool(query: str)` → ToolRecommendation (Core Pipeline 실행 → Top-1 or Top-3 + confidence)
   - `execute_tool(tool_id: str, params: dict)` → ToolResult (Provider MCP 프록시, MetaMCP 기반)
 - 구현 전략: MetaMCP(metatool-ai/metamcp) base → 정적 라우터를 `find_best_tool()` 벡터 서치로 교체
-- 기술 참조: `mcp` (PyPI v1.7.1+), `fastmcp`, MetaMCP, mcp-bridge
+- 기술 참조: `mcp>=1.26.0` (PyPI), MetaMCP 패턴 참조
+  - ⚠️ v1.26.0+ 기준: `@server.list_tools()` / `@server.call_tool()` 데코레이터 사용 (`@server.tool()` 없음)
+  - import 경로 및 API 상세: `proxy_verification/docs/verification-report.md` 3.1절
+
+> **⚠️ Persistent Connection (Phase 13 구현 시 필수)**:
+> proxy_verification에서 connect-per-call 레이턴시 2200~3300ms 측정.
+> 프로덕션에서는 `registry.py`가 `initSessions()`로 시작 시 백엔드에 사전 연결 유지.
+> 패턴: `proxy_verification/docs/verification-report.md` 4절 참조.
 
 ### Core Pipeline — 2-Stage Retrieval
 
