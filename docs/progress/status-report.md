@@ -1,6 +1,6 @@
 # MCP Discovery Platform — 진행 현황 보고서
 
-> 최종 업데이트: 2026-03-25
+> 최종 업데이트: 2026-03-26
 > 브랜치: `main`
 
 ---
@@ -9,10 +9,10 @@
 
 | 항목 | 현재 상태 |
 |------|-----------|
-| 완료된 Phase | Phase 0 ~ Phase 4 |
-| 다음 Phase | Phase 5 (평가 하네스) |
-| 테스트 | **193 passed**, 0 skipped |
-| 커버리지 | **98%** (목표 80%+ 대폭 초과) |
+| 완료된 Phase | Phase 0 ~ Phase 5 |
+| 다음 Phase | Phase 6 (Reranker) + OQ-2 (Pool 크롤링/인덱싱) |
+| 테스트 | **233 passed**, 0 skipped |
+| 커버리지 | **98.56%** (목표 80%+ 대폭 초과) |
 | Lint/Format | PASS (ruff check + ruff format) |
 | 외부 서비스 | Qdrant Docker 로컬 + Smithery API + OpenAI API 실제 연동 검증 완료 |
 | PR | #1 (core-pipeline), #2 (ground-truth) 머지 완료 |
@@ -125,6 +125,29 @@
 
 **미커버 (2 lines)**: `GroundTruthEntry` 생성 시 Pydantic validation except 분기 (line 269-270) — 정상 데이터에서 발생 불가
 
+### Phase 5: 평가 하네스 — 완료
+
+| 산출물 | 파일 | 커버리지 |
+|--------|------|----------|
+| 메트릭 순수 함수 + dataclass | `src/evaluation/metrics.py` | **100%** |
+| evaluate() 비동기 오케스트레이터 | `src/evaluation/harness.py` | **100%** |
+| 메트릭 단위 테스트 (31개) | `tests/evaluation/test_metrics.py` | - |
+| 하네스 통합 테스트 (9개) | `tests/evaluation/test_harness.py` | - |
+
+**구현된 7개 메트릭**:
+- Precision@1 (North Star)
+- Recall@K
+- MRR (Mean Reciprocal Rank)
+- NDCG@5 (Graded relevance: correct=2, alternative=1)
+- Confusion Rate (confusion vs miss 분류 — 에러 없을 시 `nan`)
+- ECE (Expected Calibration Error, gap-based confidence)
+- Latency (p50 / p95 / p99 / mean)
+
+**설계 원칙**:
+- `metrics.py`: 순수 함수만, I/O 없음, 독립 단위 테스트 가능
+- `harness.py`: async 오케스트레이터, `strategy.search()` 1회/쿼리 호출, `compute_confidence()`로 신뢰도 추출
+- `asyncio_mode="auto"` 활용 — `@pytest.mark.asyncio` 불필요
+
 ---
 
 ## 인프라 현황
@@ -150,8 +173,8 @@
 ## 테스트 현황
 
 ```
-193 passed, 0 skipped
-전체 커버리지: 98%
+233 passed, 0 skipped
+전체 커버리지: 98.56%
 ```
 
 ### 테스트 구조
@@ -173,6 +196,9 @@ tests/
 │   ├── test_sequential_strategy.py
 │   ├── test_flat_strategy.py
 │   └── test_ground_truth.py
+├── evaluation/            # 평가 하네스 테스트 (40개) — Phase 5
+│   ├── test_metrics.py    # 7개 메트릭 순수 함수 단위 테스트 (31개)
+│   └── test_harness.py    # evaluate() 오케스트레이터 통합 테스트 (9개)
 └── integration/           # 통합 테스트 (28개) — 실제 서비스 연동
     ├── test_qdrant_integration.py     # 실제 Qdrant Docker
     ├── test_smithery_integration.py   # 실제 Smithery API
@@ -253,10 +279,8 @@ tests/
 ## 다음 단계
 
 ### 즉시 가능 (외부 서비스 불필요)
-1. **Phase 5: 평가 하네스** 구현 시작
-   - `src/evaluation/evaluator.py` — Evaluator ABC
-   - Precision@1, Recall@K, MRR, Confusion Rate, ECE, Spearman 메트릭 구현
-   - `src/evaluation/harness.py` — `evaluate(strategy, queries, gt) → Metrics`
+1. **OQ-2: 임베딩 인덱스 빌드** — `scripts/collect_data.py` + `scripts/build_index.py --pool-size 50`으로 Pool 50 인덱싱
+2. **E0 실험** — `evaluate(flat_strategy, gt_queries)` vs `evaluate(sequential_strategy, gt_queries)` 비교 (Phase 5 완료로 unblocked)
 
 ### 백로그
 
