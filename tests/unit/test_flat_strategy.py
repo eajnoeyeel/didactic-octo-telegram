@@ -8,6 +8,7 @@ import pytest
 from models import MCPTool, SearchResult
 from pipeline.flat import FlatStrategy
 from pipeline.strategy import StrategyRegistry
+from reranking.base import Reranker
 
 
 def make_tool(n: int = 0) -> MCPTool:
@@ -70,3 +71,30 @@ class TestFlatStrategy:
     def test_registered_as_flat(self):
         assert "flat" in StrategyRegistry.list_strategies()
         assert StrategyRegistry.get("flat") is FlatStrategy
+
+
+async def test_reranker_none_by_default(mock_embedder):
+    store = AsyncMock()
+    strategy = FlatStrategy(embedder=mock_embedder, tool_store=store)
+    assert strategy.reranker is None
+
+
+async def test_search_with_reranker_calls_rerank(mock_embedder):
+    store = AsyncMock()
+    store.search = AsyncMock(return_value=[make_search_result(0), make_search_result(1)])
+    reranker = AsyncMock(spec=Reranker)
+    reranked = [make_search_result(1, score=0.95), make_search_result(0, score=0.85)]
+    reranker.rerank = AsyncMock(return_value=reranked)
+    strategy = FlatStrategy(embedder=mock_embedder, tool_store=store, reranker=reranker)
+    results = await strategy.search("test query", top_k=3)
+    reranker.rerank.assert_called_once_with("test query", store.search.return_value, 3)
+    assert results == reranked
+
+
+async def test_search_without_reranker_returns_store_results(mock_embedder):
+    store = AsyncMock()
+    expected = [make_search_result(0)]
+    store.search = AsyncMock(return_value=expected)
+    strategy = FlatStrategy(embedder=mock_embedder, tool_store=store)
+    results = await strategy.search("test query", top_k=3)
+    assert results == expected
