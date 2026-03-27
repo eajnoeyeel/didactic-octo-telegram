@@ -8,6 +8,7 @@ import pytest
 from models import MCPTool, SearchResult
 from pipeline.sequential import SequentialStrategy
 from pipeline.strategy import StrategyRegistry
+from reranking.base import Reranker
 
 
 def make_tool(server_id: str, name: str = "tool") -> MCPTool:
@@ -144,3 +145,31 @@ class TestSequentialStrategy:
     def test_registered_as_sequential(self):
         assert "sequential" in StrategyRegistry.list_strategies()
         assert StrategyRegistry.get("sequential") is SequentialStrategy
+
+
+async def test_reranker_none_by_default(mock_embedder):
+    strategy = SequentialStrategy(
+        embedder=mock_embedder, tool_store=AsyncMock(), server_store=AsyncMock()
+    )
+    assert strategy.reranker is None
+
+
+async def test_search_with_reranker(mock_embedder):
+    server_store = AsyncMock()
+    server_store.search_server_ids = AsyncMock(return_value=["@srv0"])
+    tool_store = AsyncMock()
+    tool_store.search = AsyncMock(
+        return_value=[make_result("@srv0", "a", 0.9), make_result("@srv0", "b", 0.8)]
+    )
+    reranker = AsyncMock(spec=Reranker)
+    reranked = [make_result("@srv0", "b", 0.95), make_result("@srv0", "a", 0.85)]
+    reranker.rerank = AsyncMock(return_value=reranked)
+    strategy = SequentialStrategy(
+        embedder=mock_embedder,
+        tool_store=tool_store,
+        server_store=server_store,
+        reranker=reranker,
+    )
+    results = await strategy.search("test query", top_k=3)
+    reranker.rerank.assert_called_once()
+    assert results == reranked

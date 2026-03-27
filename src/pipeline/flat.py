@@ -6,6 +6,7 @@ from loguru import logger
 from embedding.base import Embedder
 from models import SearchResult
 from pipeline.strategy import PipelineStrategy, StrategyRegistry
+from reranking.base import Reranker
 from retrieval.qdrant_store import QdrantStore
 
 
@@ -17,9 +18,12 @@ class FlatStrategy(PipelineStrategy):
     No server-level filtering — searches all tools in the collection.
     """
 
-    def __init__(self, embedder: Embedder, tool_store: QdrantStore) -> None:
+    def __init__(
+        self, embedder: Embedder, tool_store: QdrantStore, reranker: Reranker | None = None
+    ) -> None:
         self.embedder = embedder
         self.tool_store = tool_store
+        self.reranker = reranker
 
     async def search(self, query: str, top_k: int) -> list[SearchResult]:
         """Search all tools directly without server-level filtering.
@@ -40,5 +44,7 @@ class FlatStrategy(PipelineStrategy):
             top_k=top_k,
             server_id_filter=None,
         )
+        if self.reranker is not None:
+            results = await self.reranker.rerank(query, results, top_k)
         logger.info(f"FlatStrategy: {len(results)} results returned")
         return results
