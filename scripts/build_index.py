@@ -21,6 +21,8 @@ from embedding.openai_embedder import OpenAIEmbedder
 from models import MCPTool
 from retrieval.qdrant_store import QdrantStore
 
+SERVER_COLLECTION = "mcp_servers"
+
 
 async def main(args: argparse.Namespace) -> None:
     settings = Settings()
@@ -66,16 +68,24 @@ async def main(args: argparse.Namespace) -> None:
         api_key=settings.qdrant_api_key,
     )
     try:
-        store = QdrantStore(client=qdrant_client, collection_name=settings.qdrant_collection_name)
-
-        # Ensure collection exists
-        await store.ensure_collection(dimension=settings.embedding_dimension)
-
-        # Index
-        indexer = ToolIndexer(embedder=embedder, store=store)
+        # --- Tool index ---
+        tool_store = QdrantStore(
+            client=qdrant_client, collection_name=settings.qdrant_collection_name
+        )
+        await tool_store.ensure_collection(dimension=settings.embedding_dimension)
+        indexer = ToolIndexer(embedder=embedder, store=tool_store)
         count = await indexer.index_tools(tools, batch_size=args.batch_size)
+        logger.info(f"Tool index: Indexed {count} tools from {len(servers)} servers")
 
-        logger.info(f"Done: Indexed {count} tools from {len(servers)} servers")
+        # --- Server index ---
+        server_store = QdrantStore(client=qdrant_client, collection_name=SERVER_COLLECTION)
+        await server_store.ensure_collection(dimension=settings.embedding_dimension)
+        server_texts = [server_store.build_server_text(s) for s in servers]
+        server_vectors = await embedder.embed_batch(server_texts)
+        await server_store.upsert_servers(servers, server_vectors)
+        logger.info(f"Server index: Indexed {len(servers)} servers")
+
+        logger.info(f"Done: Indexed {count} tools + {len(servers)} servers")
     finally:
         await qdrant_client.close()
 

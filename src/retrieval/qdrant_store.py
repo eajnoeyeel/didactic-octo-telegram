@@ -14,7 +14,7 @@ from qdrant_client.models import (
     VectorParams,
 )
 
-from models import MCPTool, SearchResult
+from models import MCPServer, MCPTool, SearchResult
 
 MCP_DISCOVERY_NAMESPACE = uuid.UUID("7f1b3d4e-2a5c-4b8f-9e6d-1c0a3f5b7d9e")
 
@@ -123,6 +123,29 @@ class QdrantStore:
             if hit.payload and (sid := hit.payload.get("server_id")):
                 server_ids.append(sid)
         return server_ids
+
+    async def upsert_servers(self, servers: list[MCPServer], vectors: list[np.ndarray]) -> None:
+        """Upsert server-level embeddings into the server collection (mcp_servers)."""
+        points = [
+            PointStruct(
+                id=self.generate_point_id(server.server_id),
+                vector=vector.tolist(),
+                payload={"server_id": server.server_id, "description": server.description},
+            )
+            for server, vector in zip(servers, vectors)
+        ]
+        try:
+            await self.client.upsert(collection_name=self.collection_name, points=points)
+        except Exception as e:
+            logger.error(f"Qdrant server upsert failed ({len(points)} points): {e}")
+            raise
+        logger.info(f"Upserted {len(points)} server points to '{self.collection_name}'")
+
+    @staticmethod
+    def build_server_text(server: MCPServer) -> str:
+        if server.description:
+            return f"{server.name}: {server.description}"
+        return server.name
 
     @staticmethod
     def build_tool_text(tool: MCPTool) -> str:
