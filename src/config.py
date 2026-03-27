@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     # Cohere (Phase 3+)
     cohere_api_key: str | None = None
+    cohere_rerank_model: str = "rerank-v3.5"
 
     # Retrieval
     top_k_retrieval: int = 10
