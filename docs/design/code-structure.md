@@ -45,7 +45,7 @@ mcp-discovery/
 │   ├── analytics/
 │   │   ├── logger.py          # Query 로그 (JSONL)
 │   │   ├── aggregator.py      # 로그 집계 → ToolStats
-│   │   ├── seo_score.py       # Description SEO 점수 (Specificity, Disambiguation, Coverage)
+│   │   ├── geo_score.py       # Description GEO Score (6차원: Clarity, Disambiguation, Parameter Coverage, Boundary, Stats, Precision)
 │   │   ├── ab_test.py         # A/B 테스트 실행기
 │   │   ├── similarity_heatmap.py   # Tool 간 코사인 유사도
 │   │   └── confusion_matrix.py     # Per-tool confusion matrix

@@ -19,7 +19,7 @@ graph LR
 
     subgraph Provider["Provider 고객 경로"]
         P[Provider] --> DASH[Analytics Dashboard<br/>REST API]
-        LOG[로그 집계 + SEO 점수<br/>Confusion Matrix<br/>A/B Test 결과] --> DASH
+        LOG[로그 집계 + GEO Score<br/>Confusion Matrix<br/>A/B Test 결과] --> DASH
     end
 
     subgraph Core["Core Pipeline (공유)"]
@@ -132,12 +132,12 @@ flowchart TD
     LOG --> AGG["Aggregator<br/>per-tool 집계"]
 
     AGG --> SF["Selection<br/>Frequency"]
-    AGG --> SEO["SEO<br/>Score"]
+    AGG --> GEO["GEO<br/>Score"]
     AGG --> CM["Confusion<br/>Matrix"]
     AGG --> SH["Similarity<br/>Heatmap"]
 
     SF --> API["Provider Analytics API<br/>(REST endpoints)"]
-    SEO --> API
+    GEO --> API
     CM --> API
     SH --> API
 ```

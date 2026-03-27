@@ -15,7 +15,7 @@ These features are confirmed requirements but deferred to a follow-up plan after
 | **OAuth UI** (auth modal for credentialed servers) | Requires frontend + auth flow. Lowest priority per DP0 depth allocation. |
 | **Live Query Sandbox** (D-1, real-time "does my tool get selected?") | Depends on working search endpoint (Phase 8). Build as provider dashboard feature after Phase 9. |
 | **Description Diff & Impact Preview** (D-2) | Requires A/B test infra (Phase 9) + UI. Post-core. |
-| **Guided Description Onboarding** (D-4) | Requires SEO scorer (Phase 9) + UI wizard. Post-core. |
+| **Guided Description Onboarding** (D-4) | Requires GEO scorer (Phase 9) + UI wizard. Post-core. |
 | **Feedback Loop Dashboard** (PM-3) | Requires aggregator (Phase 9) + UI. Post-core. |
 | **Strategy C: Taxonomy-gated** | Pending CTO mentoring confirmation (2026-03-25). `taxonomy_gated.py` stub file is in the structure map; implementation task added as Phase 13 (gated). |
 | **MCP Tool Server** (`find_best_tool` as MCP protocol Tool) | DP1 confirmed dual-exposure (REST + MCP). REST implemented in Phase 8. MCP Tool server is Phase 13 (after REST is stable). |

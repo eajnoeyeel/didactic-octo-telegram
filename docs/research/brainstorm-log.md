@@ -25,9 +25,9 @@
 
 ## Perspective 1: Product Manager — 5 아이디어
 
-### PM-1. Provider "Selection SEO Score"
+### PM-1. Provider "Selection GEO Score"
 MCP Provider에게 "내 Tool이 왜 선택 안 되는지"를 정량적으로 보여주는 점수 시스템.
-- Description clarity score, semantic coverage, uniqueness vs. competitors 3축
+- 6차원 GEO Score: clarity, disambiguation, parameter_coverage, boundary, stats, precision
 - BM: Provider가 점수 개선을 위해 프리미엄 분석 구독
 
 ### PM-2. Confidence-Based Multi-Tool Disambiguation
@@ -90,7 +90,7 @@ Reranker가 점수만 반환하는 게 아니라 "왜 이 Tool인가" 설명을 
 | #2 | Provider Analytics + Confusion Analysis | PM-3 + D-5 | Provider가 선택률 데이터를 보면 description을 개선 |
 | #3 | Hybrid BM25 + Dense Search with RRF | E-2 | MCP 쿼리는 의미적/키워드 쿼리 혼재 |
 | #4 | Synthetic Ground Truth Generator | E-3 | LLM 생성 synthetic 쿼리가 실제와 유사 |
-| #5 | Provider Description SEO Score + A/B | PM-1 + PM-4 | Provider가 점수 개선에 동기부여 |
+| #5 | Provider Description GEO Score + A/B | PM-1 + PM-4 | Provider가 점수 개선에 동기부여 |
 
 ---
 ---

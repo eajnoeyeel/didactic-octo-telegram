@@ -36,7 +36,7 @@ E3 (Reranker: Cohere/Cohere+LLM/LLM-only)
  ├→ E5   (Pool Scale: 5/20/50/100 servers)          ├─ PARALLEL
  └→ E6   (Pool Similarity: Low/Base/High)           ─┘
       ↓
-E7 (SEO Score: Heuristic vs LLM) — depends on E4 selection rate data
+E7 (GEO Score: Heuristic vs LLM) — depends on E4 selection rate data
 ```
 
 ### Parallelization Rules

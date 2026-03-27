@@ -7,17 +7,17 @@
 ## Phase 9: Provider Analytics
 
 ### 목표
-- 로깅 파이프라인 + Provider REST API + SEO Score + Confusion Matrix + A/B Test runner
+- 로깅 파이프라인 + Provider REST API + GEO Score + Confusion Matrix + A/B Test runner
 
 ### 산출물
 - file: `src/analytics/logger.py`
 - file: `src/analytics/aggregator.py`
-- file: `src/analytics/seo_score.py`
+- file: `src/analytics/geo_score.py`
 - file: `src/analytics/ab_test.py`
 - file: `src/analytics/confusion_matrix.py`
 - file: `src/api/routes/provider.py`
 - file: `tests/unit/test_analytics.py`
-- file: `tests/unit/test_seo_score.py`
+- file: `tests/unit/test_geo_score.py`
 - file: `tests/integration/test_provider_api.py`
 
 ### 구현 단계
@@ -27,17 +27,20 @@
 2. `src/analytics/logger.py`: `QueryLogger(log_dir)` — 일별 JSONL 파일, entry 필드: timestamp, query, selected_tool_id, server_id, confidence, disambiguation_needed, strategy, latency_ms, alternatives
 3. `src/analytics/aggregator.py`: `LogAggregator(log_dir)`, `ToolStats` dataclass (selection_count, runner_up_count, lost_to dict), `aggregate(days=7)` → per-tool 통계
 
-**Task 9.2: Description SEO Score + A/B Test**
-1. 실패 테스트 (`test_seo_score.py`):
+**Task 9.2: Description GEO Score + A/B Test**
+1. 실패 테스트 (`test_geo_score.py`):
    - vague description ("A tool for doing things.") → total < 0.4
-   - specific description (Semantic Scholar 예시, NOT 포함) → total > 0.7
-   - score에 specificity, disambiguation, parameter_coverage, total 필드 존재
-2. `src/analytics/seo_score.py`:
-   - `SEOScore` dataclass: specificity, disambiguation, parameter_coverage, total
-   - `DescriptionSEOScorer.score(description)`:
-     - specificity (0.4 weight): 문장 수, 예시 포함, 단어 수 기반
-     - disambiguation (0.4 weight): NOT/AVOID 키워드 + vs/unlike 비교 표현
-     - parameter_coverage (0.2 weight): parameter/input/accepts 언급 여부
+   - specific description (Semantic Scholar 예시, NOT 포함, 수치/표준 포함) → total > 0.7
+   - score에 clarity, disambiguation, parameter_coverage, boundary, stats, precision, total 필드 존재
+2. `src/analytics/geo_score.py`:
+   - `GEOScore` dataclass: clarity, disambiguation, parameter_coverage, boundary, stats, precision, total
+   - `DescriptionGEOScorer.score(description)`:
+     - clarity (1/6 weight): 첫 문장의 핵심 기능 명확도 + 구체적 범위 (GEO: Fluency Optimization)
+     - disambiguation (1/6 weight): NOT/AVOID 키워드 + vs/unlike 비교 표현
+     - parameter_coverage (1/6 weight): parameter/input/accepts 언급 여부
+     - boundary (1/6 weight): 이 도구가 NOT 하는 것 명확화
+     - stats (1/6 weight): 수치/커버리지/성능 정보 포함 여부 (GEO: Statistics Addition)
+     - precision (1/6 weight): 표준/프로토콜/기술 용어 정확도 (GEO: Technical Terms)
 3. `src/analytics/ab_test.py`:
    - `ABTestRunner(strategy, indexer)` — description variant A vs B 비교
    - **MVP 제한**: Qdrant payload swap 미구현 (Phase 13에서 완성 예정)
@@ -48,15 +51,15 @@
 **Task 9.3: Provider REST API**
 1. 실패 테스트 (`test_provider_api.py`):
    - `GET /provider/{server_id}/stats` → 200
-   - `POST /provider/seo-score` → 200, total/specificity 필드
+   - `POST /provider/geo-score` → 200, total/clarity 필드
 2. `src/api/routes/provider.py`:
    - `GET /{server_id}/stats`: LogAggregator > server 필터 > tool별 selections/win_rate
-   - `POST /seo-score`: DescriptionSEOScorer.score() 결과 반환
+   - `POST /geo-score`: DescriptionGEOScorer.score() 결과 반환
    - `GET /{server_id}/confusion`: build_confusion_matrix > server 필터
 3. `src/api/main.py`에 `provider_router` 등록
 
 ### 완료 기준
-- [ ] `uv run pytest tests/unit/test_analytics.py tests/unit/test_seo_score.py -v` PASS
+- [ ] `uv run pytest tests/unit/test_analytics.py tests/unit/test_geo_score.py -v` PASS
 - [ ] `uv run pytest tests/integration/test_provider_api.py -v` PASS
 - [ ] Provider API 3개 endpoint 동작
 
@@ -87,7 +90,7 @@
      - `run_all()`: 각 strategy에 evaluate() 실행 > precision, recall, confusion, latency 수집
      - `print_table()`: Strategy / P@1 / R@10 / Confusion / p95 ms
    - `compute_description_correlation(tools, ground_truth, strategy)`:
-     - per-tool SEO score + per-tool Precision@1 계산 > `DescriptionQualityCorrelation.compute()`
+     - per-tool GEO score + per-tool Precision@1 계산 > `DescriptionQualityCorrelation.compute()`
 3. `scripts/run_experiments.py`:
    - ground_truth 로드 > ExperimentRunner 실행 > 테이블 출력 > `data/experiments/` 저장
 
@@ -98,7 +101,7 @@
 
 ### 의존성
 - Phase 5 완료 필요 (evaluation harness)
-- Phase 9 완료 필요 (SEO scorer)
+- Phase 9 완료 필요 (GEO scorer)
 
 ---
 

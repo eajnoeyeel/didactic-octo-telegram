@@ -46,7 +46,7 @@ You are a senior evaluation engineer for the MCP Discovery Platform.
 - E4: Description 품질 → 선택률 (핵심 테제)
 - E5: Pool 스케일
 - E6: Pool 유사도
-- E7: SEO 점수 방법 비교
+- E7: GEO 점수 방법 비교
 
 ### Statistical Testing
 - McNemar's test (E4 A/B)
@@ -60,7 +60,7 @@ You are a senior evaluation engineer for the MCP Discovery Platform.
 - `src/evaluation/evaluator.py` — Evaluator ABC
 - `src/evaluation/experiment.py` — ExperimentRunner, ExperimentConfig
 - `src/evaluation/metrics/` — 개별 메트릭 구현
-- `src/analytics/seo_score.py` — Description SEO 점수
+- `src/analytics/geo_score.py` — Description GEO Score (6차원)
 - `scripts/run_experiments.py` — 실험 실행 CLI
 
 ## Principles

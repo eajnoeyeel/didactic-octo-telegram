@@ -47,7 +47,7 @@
 | 6 | Reranker | [phase-6-8.md](phase-6-8.md) | `src/reranking/`, Cohere + LLM fallback |
 | 7 | Hybrid Search (RRF) | [phase-6-8.md](phase-6-8.md) | `src/retrieval/hybrid.py`, Strategy B (Parallel) |
 | 8 | FastAPI + MCP Tool Server | [phase-6-8.md](phase-6-8.md) | `src/api/`, `/search` endpoint |
-| 9 | Provider Analytics | [phase-9-12.md](phase-9-12.md) | `src/analytics/`, SEO Score, Confusion Matrix |
+| 9 | Provider Analytics | [phase-9-12.md](phase-9-12.md) | `src/analytics/`, GEO Score, Confusion Matrix |
 | 10 | Experiment Runner | [phase-9-12.md](phase-9-12.md) | `src/evaluation/experiment.py`, Description Correlation |
 | 11 | Instrumentation | [phase-9-12.md](phase-9-12.md) | Langfuse tracing, W&B logging |
 | 12 | E2E Smoke Test | [phase-9-12.md](phase-9-12.md) | 전체 파이프라인 로컬 실행 검증 |

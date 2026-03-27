@@ -38,7 +38,7 @@
 
 | OQ | 주제 | 상태 | 블로킹 대상 |
 |----|------|------|------------|
-| **OQ-1** | SEO 점수: 5-dimension rubric 채택 | **RESOLVED** (2026-03-21) | — |
+| **OQ-1** | GEO Score: 6-dimension GEO Score 채택 | **RESOLVED** (2026-03-21, 2026-03-26 업데이트) | — |
 | **OQ-2** | Smithery 크롤링 + Pool 구성 구체화 | 미결 (Critical) | E1-E6 전체 |
 | **OQ-3** | 자체 MCP 서버 3개 구축 범위 | 미결 (High) | E4 A/B 실증 |
 | **OQ-4** | Sequential 2-Layer 버그 수정 | 미결 (Medium) | E1 공정성 |

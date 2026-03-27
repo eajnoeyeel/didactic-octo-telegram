@@ -8,7 +8,7 @@
 
 ## 해결된 사항
 
-- **OQ-1 (SEO 점수 산정)**: RESOLVED (2026-03-21) — 5-dimension DQS 채택, 동등 가중치 0.2x5, E7 calibration. 상세: `docs/research/description-quality-scoring.md`
+- **OQ-1 (GEO 점수 산정)**: RESOLVED (2026-03-21, 2026-03-26 업데이트) — 5-dimension DQS → 6-dimension GEO Score 확장. 동등 가중치 1/6 x 6, E7 calibration. 상세: `docs/research/description-quality-scoring.md`, SOT: `docs/design/metrics-rubric.md`
 
 ---
 
@@ -98,7 +98,7 @@
 - [ ] 단위 테스트 + curl 수동 테스트
 
 ## Phase 9: Provider Analytics (Week 2-3)
-- [ ] Query 로거, 로그 집계, GEO 점수, A/B 테스트, 유사도 히트맵, Confusion matrix
+- [ ] Query 로거, 로그 집계, GEO Score, A/B 테스트, 유사도 히트맵, Confusion matrix
 - [ ] Provider REST endpoints
 - [ ] 단위 테스트
 

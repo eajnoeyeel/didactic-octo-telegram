@@ -4,11 +4,11 @@
 
 ---
 
-## OQ-1. SEO 점수 산정 방식 — 논문 리서치 필요
+## OQ-1. GEO 점수 산정 방식 — 논문 리서치 필요
 
-**상태: 해결 (2026-03-21)** — 5-dimension DQS 채택. 동등 초기 가중치(0.2×5) + E7 calibration으로 실제 중요도 측정. 상세: `../research/description-quality-scoring.md`
+**상태: 해결 (2026-03-21, 2026-03-26 업데이트)** — 5-dimension DQS → 6-dimension GEO Score로 확장. 동등 초기 가중치(1/6 x 6) + E7 calibration으로 실제 중요도 측정. 상세: `../research/description-quality-scoring.md`, SOT: `docs/design/metrics-rubric.md`
 
-**현재 상태**: `seo_score.py`가 정규식 휴리스틱 기반
+**현재 상태**: `geo_score.py`가 정규식 휴리스틱 기반
 - 특정 단어(`e.g.`, `NOT`, `parameter`)가 있으면 점수 가산
 - description 길이가 길면 specificity 점수 가산
 - **문제**: 이 점수가 실제 선택률과 상관관계가 낮으면 핵심 테제(Spearman 상관계수) 자체가 무의미해짐
@@ -108,7 +108,7 @@
 | 검색 전략 | Sequential 2-Layer | Parallel (RRF) | Taxonomy-gated | Precision@1, Recall@10, Latency |
 | 임베딩 모델 | BGE-M3 | OpenAI text-embedding-3-small | Voyage voyage-3 | Recall@10, 비용, cold start |
 | Reranker | Cohere Rerank 3 단독 | Cohere + LLM fallback | LLM-as-Judge 단독 | Precision@1 향상폭, 비용 |
-| SEO 점수 방식 | 정규식 휴리스틱 | LLM-based | (논문에서 나오면 추가) | Spearman(score, selection_rate) |
+| GEO 점수 방식 | 정규식 휴리스틱 | LLM-based | (논문에서 나오면 추가) | Spearman(geo_score, selection_rate) |
 
 **Sequential 2-Layer 구현 버그 수정 필요** (논의 2026-03-19):
 - 현재 `sequential.py`는 서버 인덱스를 거치지 않고 툴 인덱스만 바로 검색함

@@ -100,7 +100,7 @@
 | D-3 | Semantic Similarity Heatmap | Tool 간 의미적 거리 시각화 |
 | D-4 | Guided Description Onboarding | 신규 등록 wizard: 단계별 가이드 + 실시간 점수 |
 | D-5 | Confusion Matrix Visualization | 어떤 쿼리에서 어떤 경쟁 Tool에게 지는지 매트릭스 |
-| PM-1 | Selection SEO Score | Specificity / Disambiguation / Coverage 3축 점수 |
+| PM-1 | Selection GEO Score | 6차원 GEO Score (Clarity, Disambiguation, Parameter Coverage, Boundary, Stats, Precision) |
 | PM-4 | A/B Testing for Descriptions | variant A vs B synthetic 쿼리 대결 → 승자 자동 배포 |
 | PM-3 | Feedback Loop Dashboard | 로그 집계 → description 개선 권고 → 효과 추적 |
 

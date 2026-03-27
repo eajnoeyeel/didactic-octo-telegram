@@ -211,7 +211,7 @@ CTO가 강조한 **두 집단 비교의 통계적 유의성 검증**:
 |-----------|-----------|-----------|
 | A/B Description (paired binary) | McNemar's test | E4 |
 | 전략 A vs B vs C (3그룹 비교) | Cochran's Q test → post-hoc McNemar | E1 |
-| SEO score ↔ Selection Rate (상관) | Spearman rank correlation | E4, E7 |
+| GEO score ↔ Selection Rate (상관) | Spearman rank correlation | E4, E7 |
 | Description 하위 요소별 기여도 | OLS Regression | E4 |
 | 반복 측정 안정성 | X̄-R 관리도 | 전 실험 |
 
@@ -242,7 +242,7 @@ CTO가 Smithery의 비즈니스 모델을 분석한 내용:
 - Smithery는 메타 정보를 보유하고 있으므로, **Description 커스터마이징 서비스**로 발전할 것
 - "돈 받고 너희 MCP 더 잘 찾게 해줄게" → 이것이 곧 우리 프로젝트의 Provider Analytics + Description 개선 가이드
 
-**프로젝트 시사점**: 우리가 구축하는 Analytics + SEO Score + 개선 가이드 기능은 Smithery가 아직 제공하지 않는 가치이며, 이 방향성이 시장의 실제 니즈와 일치함을 CTO가 확인해 준 것.
+**프로젝트 시사점**: 우리가 구축하는 Analytics + GEO Score + 개선 가이드 기능은 Smithery가 아직 제공하지 않는 가치이며, 이 방향성이 시장의 실제 니즈와 일치함을 CTO가 확인해 준 것.
 
 ---
 
@@ -277,7 +277,7 @@ CTO가 언급한 대규모 MCP 운영 구조:
 | # | 항목 | 반영 위치 |
 |---|------|-----------|
 | 5 | E4 실험 스펙에 GEO 기법 명시 | experiment-details.md |
-| 6 | Description Quality Score 산정에 GEO 요소 반영 | metrics-rubric.md (SEO Score → GEO-aware Score) |
+| 6 | Description Quality Score 산정에 GEO 요소 반영 | metrics-rubric.md (GEO Score 6차원 체계) |
 | 7 | 통계적 검증 파이프라인 문서화 | evaluation.md |
 | 8 | Lambda/Boto3 확장 계획 | deferred.md |
 

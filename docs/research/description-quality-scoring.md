@@ -8,11 +8,19 @@
 
 ## 결정
 
-**5-dimension DQS 채택** (동등 가중치 0.2x5, E7 calibration)
+**5-dimension DQS 채택 → 6-dimension GEO Score로 확장** (동등 가중치 1/6 x 6, E7 calibration)
 
-- 차원: Purpose Clarity, Specificity, Disambiguation, Negative Instruction, Parameter Description
-- 초기 가중치: 동등(0.2x5) — 리서치에 명시적 가중치 근거 없으므로 E7 파일럿에서 calibration
+- 원래 차원: Purpose Clarity, Specificity, Disambiguation, Negative Instruction, Parameter Description
+- **2026-03-26 확장**: GEO 기법 반영으로 재명명 + 2개 차원 추가
+  - clarity_score (← Purpose Clarity + Specificity 통합)
+  - disambiguation_score (유지)
+  - parameter_coverage_score (← Parameter Description)
+  - boundary_score (← Negative Instruction)
+  - stats_score (신규 — GEO: Statistics Addition)
+  - precision_score (신규 — GEO: Technical Terms)
+- 초기 가중치: 동등(1/6 x 6) — E7 파일럿에서 calibration
 - 스코어링 방식: E7에서 휴리스틱 vs LLM-as-Judge 비교 후 결정
+- **SOT**: `docs/design/metrics-rubric.md` — GEO Score 섹션
 
 ---
 
@@ -48,17 +56,21 @@
 
 ---
 
-## 5-차원 DQS 정의
+## 5-차원 DQS 정의 (원본 리서치 기반)
 
-| # | 차원 | 정의 | 근거 |
-| --- | ------ | ------ | ------ |
-| 1 | **Purpose Clarity** | 이 도구가 정확히 무엇을 하고 언제 사용하는가? | Paper A (56% 실패), Paper G (라우팅 최우선) |
-| 2 | **Specificity** | 구체적 데이터 소스, 출력 형식, 범위 경계가 있는가? | Paper B (Accuracy +11.6%) |
-| 3 | **Disambiguation** | 유사 도구와 명확히 구분되는가? | Confusion Rate 지표, MetaTool |
-| 4 | **Negative Instruction** | 이 도구가 NOT 하는 것이 명확한가? | Paper A (Limitations 89.3% 부재) |
-| 5 | **Parameter Description** | 입력값이 타입/제약/예제와 함께 설명되는가? | Paper A, Paper G (낮은 우선도) |
+> **주의**: 아래는 원본 논문 리서치 기반의 5-차원 정의. 2026-03-26 CTO 멘토링 이후 6-차원 GEO Score로 확장됨. 최신 정의는 `docs/design/metrics-rubric.md`가 SOT.
 
-**복합 점수**: `DQS = 0.2 x (purpose + specificity + disambiguation + negative_instruction + param_desc)`
+| # | 원본 차원 | → GEO Score 차원 | 정의 | 근거 |
+| --- | ------ | ------ | ------ | ------ |
+| 1 | **Purpose Clarity** | `clarity_score` | 이 도구가 정확히 무엇을 하고 언제 사용하는가? + 구체적 범위 | Paper A (56% 실패), Paper G (라우팅 최우선), GEO: Fluency Optimization |
+| 2 | ~~Specificity~~ | *(clarity에 통합)* | 구체적 데이터 소스, 출력 형식, 범위 경계 | Paper B (Accuracy +11.6%) |
+| 3 | **Disambiguation** | `disambiguation_score` | 유사 도구와 명확히 구분되는가? | Confusion Rate 지표, MetaTool |
+| 4 | **Negative Instruction** | `boundary_score` | 이 도구가 NOT 하는 것이 명확한가? | Paper A (Limitations 89.3% 부재) |
+| 5 | **Parameter Description** | `parameter_coverage_score` | 입력값이 타입/제약/예제와 함께 설명되는가? | Paper A, Paper G (낮은 우선도) |
+| 6 | *(신규)* | `stats_score` | 수치/커버리지/성능 정보 포함 여부 | GEO: Statistics Addition |
+| 7 | *(신규)* | `precision_score` | 표준/프로토콜/기술 용어 정확도 | GEO: Technical Terms |
+
+**복합 점수 (GEO Score)**: `GEO_score = (1/6) x (clarity + disambiguation + parameter_coverage + boundary + stats + precision)`
 
 ---
 
@@ -66,16 +78,17 @@
 
 ### 방식 A: 휴리스틱 (`geo_score.py`)
 
-- Purpose: 행동 동사 시작, "what"+"when-to-use" — Regex 패턴
-- Specificity: 플랫폼명, 출력 형식, 수치 제약 — 명칭 사전
+- Clarity: 행동 동사 시작, "what"+"when-to-use", 구체적 범위 — Regex 패턴 (GEO: Fluency Optimization)
 - Disambiguation: "unlike", "only", domain qualifier — Contrast regex
-- Negative Instruction: "NOT for", "cannot" — 부정 패턴
-- Parameter Description: 파라미터명, 타입명, inputSchema 완성도
+- Parameter Coverage: 파라미터명, 타입명, inputSchema 완성도
+- Boundary: "NOT for", "cannot" — 부정 패턴
+- Stats: 수치, 커버리지, 성능 정보 — 숫자/단위 패턴 (GEO: Statistics Addition)
+- Precision: 표준/프로토콜 명칭 — 기술 용어 사전 (GEO: Technical Terms)
 - 장점: 무료, 결정론적, 즉시 실행
 
 ### 방식 B: LLM-as-Judge (`llm_scorer.py`)
 
-- GPT-4o-mini, 3-judge ensemble (Paper A 기법), 5-차원 rubric 1-5점
+- GPT-4o-mini, 3-judge ensemble (Paper A 기법), 6-차원 rubric 1-5점
 - 출력: JSON, [0.0, 1.0] 정규화 — 비용 ~$0.03 (30개)
 - 장점: 의미론적 이해, 미묘한 차이 감지
 
@@ -84,7 +97,7 @@
 ## E7 파일럿 실험 설계
 
 - **샘플**: 30개 설명 (자체 서버 6 + Smithery 12 + 다양 카테고리 12)
-- **인간 레이블**: 5개 차원별 1-5점 (동일 rubric)
+- **인간 레이블**: 6개 차원별 1-5점 (GEO Score rubric)
 - **비교**: Spearman (인간 vs 휴리스틱/LLM), MAE, Williams' test
 
 ### 결정 기준
@@ -98,14 +111,14 @@
 
 ## Evidence Triangulation 연결
 
-### Metric 8b: Spearman(DQS, Selection Rate)
+### Metric 8b: Spearman(GEO Score, Selection Rate)
 
-- `r_s = Spearman(DQS_i, Precision@1_i)` for all tools
+- `r_s = Spearman(geo_score_i, Precision@1_i)` for all tools
 - 목표: r_s > 0.6, p < 0.05
 
 ### Metric 8c: Regression R²
 
-- `OLS(selection_rate ~ purpose + specificity + disambiguation + negative_instruction + param_desc)`
+- `OLS(selection_rate ~ clarity + disambiguation + parameter_coverage + boundary + stats + precision)`
 - 목표: R² > 0.4, 최소 1개 요소 p < 0.05
 - Provider에게 "설명의 어떤 부분이 선택률에 가장 기여하는가" actionable 피드백
 
