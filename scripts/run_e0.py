@@ -64,7 +64,7 @@ async def main(args: argparse.Namespace) -> None:
         server_store = QdrantStore(client=qdrant_client, collection_name="mcp_servers")
 
         # --- Strategy A: FlatStrategy (1-layer) ---
-        flat = FlatStrategy(embedder=embedder, store=tool_store)
+        flat = FlatStrategy(embedder=embedder, tool_store=tool_store)
         logger.info("Running FlatStrategy (1-layer)...")
         flat_result = await evaluate(flat, entries, top_k=args.top_k)
 
@@ -85,9 +85,11 @@ async def main(args: argparse.Namespace) -> None:
     header = (
         f"\n{'=' * 60}\nE0 EXPERIMENT RESULTS  (n={len(entries)}, top_k={args.top_k})\n{'=' * 60}"
     )
-    def row(metric: str, f: float, s: float, delta: bool = True) -> str:
-        d = f" {s - f:>+8.3f}" if delta else ""
-        return f"{metric:<20} {f:>14.3f} {s:>20.3f}{d}"
+    def row(metric: str, f: float | None, s: float | None, delta: bool = True) -> str:
+        f_str = f"{f:>14.3f}" if f is not None else f"{'N/A':>14}"
+        s_str = f"{s:>20.3f}" if s is not None else f"{'N/A':>20}"
+        d = f" {s - f:>+8.3f}" if delta and f is not None and s is not None else ""
+        return f"{metric:<20} {f_str} {s_str}{d}"
 
     def row_ms(metric: str, f: float, s: float) -> str:
         return f"{metric:<20} {f:>14.1f} {s:>20.1f}"
