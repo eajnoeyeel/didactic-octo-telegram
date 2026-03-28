@@ -77,3 +77,24 @@ class OptimizedDescription(BaseModel):
     def improvement(self) -> float:
         """GEO score improvement (after - before)."""
         return self.geo_score_after - self.geo_score_before
+
+
+class OptimizationContext(BaseModel):
+    """Context for grounded description optimization.
+
+    Carries real tool data (input_schema, sibling tools) so the LLM
+    can produce factually accurate descriptions without hallucination.
+    """
+
+    tool_id: str
+    original_description: str
+    input_schema: dict | None = None
+    sibling_tools: list[dict] = Field(default_factory=list)
+
+    @computed_field
+    @property
+    def parameter_names(self) -> list[str]:
+        if not self.input_schema:
+            return []
+        props = self.input_schema.get("properties", {})
+        return list(props.keys())
