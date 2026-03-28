@@ -32,6 +32,8 @@ class FullGateResult:
     passed: bool
     geo_result: GateResult
     similarity_result: GateResult
+    hallucination_result: GateResult | None = None
+    info_preservation_result: GateResult | None = None
 
     @property
     def reason(self) -> str:
@@ -42,6 +44,10 @@ class FullGateResult:
             reasons.append(f"GEO: {self.geo_result.reason}")
         if not self.similarity_result.passed:
             reasons.append(f"Similarity: {self.similarity_result.reason}")
+        if self.hallucination_result and not self.hallucination_result.passed:
+            reasons.append(f"Hallucination: {self.hallucination_result.reason}")
+        if self.info_preservation_result and not self.info_preservation_result.passed:
+            reasons.append(f"InfoPreservation: {self.info_preservation_result.reason}")
         return "; ".join(reasons)
 
 
@@ -209,21 +215,46 @@ class QualityGate:
         after: AnalysisReport,
         vec_before: np.ndarray,
         vec_after: np.ndarray,
+        input_schema: dict | None = None,
+        optimized_text: str | None = None,
+        original_text: str | None = None,
     ) -> FullGateResult:
         """Run all quality gate checks."""
         geo_result = self.check_geo_score(before, after)
         sim_result = self.check_semantic_similarity(vec_before, vec_after)
 
-        passed = geo_result.passed and sim_result.passed
+        hallucination_result = None
+        info_preservation_result = None
+
+        if optimized_text and input_schema:
+            hallucination_result = self.check_hallucinated_params(optimized_text, input_schema)
+
+        if original_text and optimized_text:
+            info_preservation_result = self.check_info_preservation(original_text, optimized_text)
+
+        passed = (
+            geo_result.passed
+            and sim_result.passed
+            and (hallucination_result is None or hallucination_result.passed)
+            and (info_preservation_result is None or info_preservation_result.passed)
+        )
 
         if not passed:
             logger.warning(
                 f"Quality gate FAILED for {before.tool_id}: "
                 f"GEO={geo_result.passed}, Similarity={sim_result.passed}"
+                + (f", Hallucination={hallucination_result.passed}" if hallucination_result else "")
+                + (
+                    f", InfoPreservation={info_preservation_result.passed}"
+                    if info_preservation_result
+                    else ""
+                )
             )
 
         return FullGateResult(
             passed=passed,
             geo_result=geo_result,
             similarity_result=sim_result,
+            hallucination_result=hallucination_result,
+            info_preservation_result=info_preservation_result,
         )

@@ -172,7 +172,15 @@ class OptimizationPipeline:
         vec_after = await self._embedder.embed_one(optimized_desc)
 
         # Phase 5: Quality Gate
-        gate_result = self._gate.evaluate(report_before, report_after, vec_before, vec_after)
+        gate_result = self._gate.evaluate(
+            report_before,
+            report_after,
+            vec_before,
+            vec_after,
+            input_schema=context.input_schema if context else None,
+            optimized_text=optimized_desc,
+            original_text=desc,
+        )
 
         if not gate_result.passed:
             logger.warning(f"Gate rejected for {tool_id}: {gate_result.reason}")

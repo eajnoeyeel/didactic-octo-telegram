@@ -243,6 +243,45 @@ async def test_run_with_tool_passes_context_to_optimizer() -> None:
     assert len(context.sibling_tools) == 1
 
 
+async def test_pipeline_rejects_hallucinated_params() -> None:
+    """Pipeline should reject optimization that hallucinates parameters."""
+    tool = MCPTool(
+        server_id="test",
+        tool_name="tool1",
+        tool_id="test::tool1",
+        description="A test tool.",
+        input_schema={
+            "type": "object",
+            "properties": {"real_param": {"type": "string"}},
+        },
+    )
+
+    analyzer = AsyncMock()
+    analyzer.analyze.return_value = _make_report_with_tool_id("test::tool1", "A test tool.", 0.3)
+
+    optimizer = AsyncMock()
+    # LLM hallucinates a `query` parameter
+    optimizer.optimize.return_value = {
+        "optimized_description": "A test tool. Accepts `query` string and `limit` integer.",
+        "search_description": "test tool",
+    }
+
+    embedder = AsyncMock()
+    embedder.embed_one.return_value = np.ones(10)
+
+    from description_optimizer.quality_gate import QualityGate
+
+    gate = QualityGate(min_similarity=0.0)  # Relax similarity to isolate hallucination gate
+
+    pipeline = OptimizationPipeline(
+        analyzer=analyzer, optimizer=optimizer, embedder=embedder, gate=gate,
+    )
+
+    result = await pipeline.run_with_tool(tool, sibling_tools=[])
+    assert result.status == OptimizationStatus.GATE_REJECTED
+    assert "hallucinated" in result.skip_reason.lower() or "Hallucinated" in result.skip_reason
+
+
 async def test_run_with_tool_batch() -> None:
     """run_batch_with_tools should process a list of (MCPTool, siblings) tuples."""
     tool = MCPTool(
