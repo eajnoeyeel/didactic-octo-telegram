@@ -120,7 +120,7 @@ class TestOptimizerFailure:
     """Verify optimizer exceptions are caught and return FAILED status."""
 
     async def test_optimizer_exception_returns_failed(self) -> None:
-        """RuntimeError from optimizer → FAILED status, reason contains message, original preserved."""
+        """RuntimeError from optimizer returns FAILED status."""
         pipeline = _build_pipeline(
             geo_before=0.4,
             optimizer_side_effect=RuntimeError("LLM API down"),
