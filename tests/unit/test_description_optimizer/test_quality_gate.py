@@ -179,3 +179,44 @@ class TestFullGate:
         vec_b = np.array([0.95, 0.1, 0.05])
         result = gate.evaluate(before, after, vec_a, vec_b)
         assert result.passed is False
+
+
+class TestHallucinationGate:
+    def test_hallucination_gate_catches_fake_params(self, gate: QualityGate) -> None:
+        schema = {
+            "type": "object",
+            "properties": {
+                "file": {"type": "string"},
+                "id": {"type": "string"},
+            },
+        }
+        # Optimized description mentions "query" and "limit" — not in schema
+        optimized = (
+            "Deletes a comment. Accepts a required `query` string and optional `limit` integer."
+        )
+        result = gate.check_hallucinated_params(optimized, schema)
+        assert not result.passed
+        assert "query" in result.reason or "limit" in result.reason
+
+    def test_hallucination_gate_passes_with_real_params(self, gate: QualityGate) -> None:
+        schema = {
+            "type": "object",
+            "properties": {
+                "file": {"type": "string", "description": "File ID"},
+                "id": {"type": "string", "description": "Comment ID"},
+            },
+        }
+        optimized = "Deletes a comment. Requires `file` (File ID) and `id` (Comment ID) parameters."
+        result = gate.check_hallucinated_params(optimized, schema)
+        assert result.passed
+
+    def test_hallucination_gate_skips_when_no_schema(self, gate: QualityGate) -> None:
+        result = gate.check_hallucinated_params("Any description", None)
+        assert result.passed
+        assert "no schema" in result.reason.lower()
+
+    def test_hallucination_gate_no_backtick_params(self, gate: QualityGate) -> None:
+        """If optimized has no backtick params, gate passes (nothing to verify)."""
+        schema = {"type": "object", "properties": {"x": {"type": "string"}}}
+        result = gate.check_hallucinated_params("A simple tool that does things.", schema)
+        assert result.passed

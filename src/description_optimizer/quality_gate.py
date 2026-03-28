@@ -7,6 +7,7 @@ Validates that optimization:
 Both checks must pass for the optimization to be accepted.
 """
 
+import re
 from dataclasses import dataclass
 
 import numpy as np
@@ -46,6 +47,8 @@ class FullGateResult:
 
 class QualityGate:
     """Validates optimization quality before accepting results."""
+
+    _BACKTICK_PARAM: re.Pattern[str] = re.compile(r"`(\w+)`")
 
     def __init__(
         self,
@@ -103,6 +106,56 @@ class QualityGate:
             passed=True,
             reason=(f"Semantic similarity {similarity:.3f} >= {self._min_similarity}"),
             similarity=similarity,
+        )
+
+    def check_hallucinated_params(
+        self, optimized: str, input_schema: dict | None
+    ) -> GateResult:
+        """Check if optimized description mentions parameters not in the actual schema.
+
+        Args:
+            optimized: The optimized description text.
+            input_schema: The tool's actual input schema (may be None).
+
+        Returns:
+            GateResult indicating pass/fail.
+        """
+        if not input_schema:
+            return GateResult(
+                passed=True, reason="No schema available — hallucination check skipped"
+            )
+
+        actual_params = set(input_schema.get("properties", {}).keys())
+        if not actual_params:
+            return GateResult(
+                passed=True, reason="No schema properties — hallucination check skipped"
+            )
+
+        # Extract backtick-quoted words from optimized description
+        mentioned_params = set(self._BACKTICK_PARAM.findall(optimized))
+        if not mentioned_params:
+            return GateResult(passed=True, reason="No backtick parameters in optimized description")
+
+        # Filter: only flag words that look like parameter names (lowercase, not common words)
+        common_words = {
+            "the", "a", "an", "is", "are", "to", "for", "and", "or",
+            "not", "true", "false", "null", "none",
+        }
+        candidate_params = {p for p in mentioned_params if p.lower() not in common_words}
+
+        hallucinated = candidate_params - actual_params
+        if hallucinated:
+            return GateResult(
+                passed=False,
+                reason=(
+                    f"Hallucinated parameters: {sorted(hallucinated)}."
+                    f" Actual: {sorted(actual_params)}"
+                ),
+            )
+
+        return GateResult(
+            passed=True,
+            reason=f"All mentioned parameters verified against schema: {sorted(candidate_params)}",
         )
 
     def evaluate(
