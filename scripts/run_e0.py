@@ -10,7 +10,11 @@ Results saved to: .claude/evals/E0-baseline.log
 import argparse
 import asyncio
 import json
+import sys
 from pathlib import Path
+
+# Add src/ to path so we can import project modules
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -38,10 +42,7 @@ async def main(args: argparse.Namespace) -> None:
     entries = [e for e in all_entries if e.manually_verified]
 
     # Filter to entries whose correct_server_id is in the index
-    indexed_servers = set(
-        json.loads(line)["server_id"]
-        for line in open("data/raw/servers.jsonl")
-    )
+    indexed_servers = set(json.loads(line)["server_id"] for line in open("data/raw/servers.jsonl"))
     entries = [e for e in entries if e.correct_server_id in indexed_servers]
     logger.info(f"GT: {len(entries)} entries (manually_verified + server in index)")
 
@@ -64,7 +65,7 @@ async def main(args: argparse.Namespace) -> None:
         server_store = QdrantStore(client=qdrant_client, collection_name="mcp_servers")
 
         # --- Strategy A: FlatStrategy (1-layer) ---
-        flat = FlatStrategy(embedder=embedder, store=tool_store)
+        flat = FlatStrategy(embedder=embedder, tool_store=tool_store)
         logger.info("Running FlatStrategy (1-layer)...")
         flat_result = await evaluate(flat, entries, top_k=args.top_k)
 
@@ -85,9 +86,14 @@ async def main(args: argparse.Namespace) -> None:
     header = (
         f"\n{'=' * 60}\nE0 EXPERIMENT RESULTS  (n={len(entries)}, top_k={args.top_k})\n{'=' * 60}"
     )
-    def row(metric: str, f: float, s: float, delta: bool = True) -> str:
-        d = f" {s - f:>+8.3f}" if delta else ""
-        return f"{metric:<20} {f:>14.3f} {s:>20.3f}{d}"
+
+    def row(metric: str, f: float | None, s: float | None, delta: bool = True) -> str:
+        f_str = f"{f:>14.3f}" if f is not None else f"{'N/A':>14}"
+        s_str = f"{s:>20.3f}" if s is not None else f"{'N/A':>20}"
+        d = ""
+        if delta and f is not None and s is not None:
+            d = f" {s - f:>+8.3f}"
+        return f"{metric:<20} {f_str} {s_str}{d}"
 
     def row_ms(metric: str, f: float, s: float) -> str:
         return f"{metric:<20} {f:>14.1f} {s:>20.1f}"

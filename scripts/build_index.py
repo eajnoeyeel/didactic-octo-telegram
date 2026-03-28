@@ -9,7 +9,11 @@ Usage:
 
 import argparse
 import asyncio
+import sys
 from pathlib import Path
+
+# Add src/ to path so we can import project modules
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from loguru import logger
 from qdrant_client import AsyncQdrantClient
@@ -51,6 +55,10 @@ async def main(args: argparse.Namespace) -> None:
     if args.pool_size and args.pool_size < len(tools):
         logger.info(f"Truncating to --pool-size={args.pool_size} tools")
         tools = tools[: args.pool_size]
+        # Sync servers to only those with tools in the truncated pool
+        pool_server_ids = {t.server_id for t in tools}
+        servers = [s for s in servers if s.server_id in pool_server_ids]
+        logger.info(f"Server pool synced to {len(servers)} servers (matching tool pool)")
 
     # Validate required API key
     if not settings.openai_api_key:

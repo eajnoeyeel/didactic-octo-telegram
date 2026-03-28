@@ -56,8 +56,23 @@ class DefaultEvaluator(Evaluator):
             try:
                 results = await strategy.search(entry.query, top_k=top_k)
             except Exception as e:
-                logger.warning(f"evaluate: query_id={entry.query_id} failed — {e}. Skipping.")
+                logger.warning(
+                    f"evaluate: query_id={entry.query_id} failed — {e}. Counting as zero-result."
+                )
                 n_failed += 1
+                # Failed queries count as zero-result (no correct answer found)
+                per_query.append(
+                    PerQueryResult(
+                        query_id=entry.query_id,
+                        top_1_correct=False,
+                        in_top_k=False,
+                        rank_of_correct=None,
+                        confidence=0.0,
+                        latency_ms=(time.perf_counter() - t_start) * 1000.0,
+                        retrieved_tool_ids=(),
+                    )
+                )
+                ndcg_scores.append(0.0)
                 continue
             latency_ms = (time.perf_counter() - t_start) * 1000.0
 
@@ -109,10 +124,11 @@ class DefaultEvaluator(Evaluator):
             per_query=tuple(per_query),
         )
         confusion_str = f"{confusion:.3f}" if confusion is not None else "N/A"
+        ece_str = f"{result.ece:.3f}" if result.ece is not None else "N/A (uncalibrated)"
         logger.info(
             f"evaluate done: P@1={result.precision_at_1:.3f}, "
             f"R@{top_k}={result.recall_at_k:.3f}, MRR={result.mrr:.3f}, "
-            f"NDCG@5={result.ndcg_at_5:.3f}, ECE={result.ece:.3f}, "
+            f"NDCG@5={result.ndcg_at_5:.3f}, ECE={ece_str}, "
             f"Confusion={confusion_str}, Latency_p95={result.latency_p95:.1f}ms"
         )
         if n_failed > 0:
