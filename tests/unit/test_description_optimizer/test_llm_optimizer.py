@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from description_optimizer.models import AnalysisReport, DimensionScore
+from description_optimizer.models import AnalysisReport, DimensionScore, OptimizationContext
 from description_optimizer.optimizer.base import DescriptionOptimizer
 from description_optimizer.optimizer.llm_optimizer import LLMDescriptionOptimizer
 from description_optimizer.optimizer.prompts import (
@@ -116,3 +116,81 @@ class TestPromptBuilding:
             tool_id="s::t",
         )
         assert "An improved tool description" in prompt
+
+
+@pytest.fixture
+def sample_context() -> OptimizationContext:
+    return OptimizationContext(
+        tool_id="slack::SLACK_DELETE_COMMENT",
+        original_description="Deletes a comment from a file.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "file": {"type": "string", "description": "File ID"},
+                "id": {"type": "string", "description": "Comment ID"},
+            },
+            "required": ["file", "id"],
+        },
+        sibling_tools=[
+            {"tool_name": "SLACK_ADD_COMMENT", "description": "Adds a comment to a file."},
+        ],
+    )
+
+
+@pytest.fixture
+def sample_report_for_context() -> AnalysisReport:
+    return AnalysisReport(
+        tool_id="slack::SLACK_DELETE_COMMENT",
+        original_description="Deletes a comment from a file.",
+        dimension_scores=[
+            DimensionScore(dimension="clarity", score=0.35, explanation="low"),
+            DimensionScore(dimension="disambiguation", score=0.0, explanation="none"),
+            DimensionScore(dimension="parameter_coverage", score=0.0, explanation="none"),
+            DimensionScore(dimension="boundary", score=0.0, explanation="none"),
+            DimensionScore(dimension="stats", score=0.0, explanation="none"),
+            DimensionScore(dimension="precision", score=0.0, explanation="none"),
+        ],
+    )
+
+
+class TestOptimizeWithContext:
+    async def test_optimize_with_context_passes_schema_to_prompt(
+        self,
+        sample_report_for_context: AnalysisReport,
+        sample_context: OptimizationContext,
+    ) -> None:
+        mock_client = AsyncMock()
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = (
+            '{"optimized_description": "improved", "search_description": "search"}'
+        )
+        mock_client.chat.completions.create.return_value = mock_response
+
+        optimizer = LLMDescriptionOptimizer(client=mock_client)
+        result = await optimizer.optimize(sample_report_for_context, context=sample_context)
+
+        assert result["optimized_description"] == "improved"
+        # Verify the prompt sent to OpenAI contains schema info
+        call_args = mock_client.chat.completions.create.call_args
+        user_message = call_args.kwargs["messages"][1]["content"]
+        assert '"file"' in user_message
+        assert '"id"' in user_message
+
+    async def test_optimize_without_context_still_works(
+        self,
+        sample_report_for_context: AnalysisReport,
+    ) -> None:
+        """Backward compatibility: optimize() without context uses old prompt."""
+        mock_client = AsyncMock()
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = (
+            '{"optimized_description": "improved", "search_description": "search"}'
+        )
+        mock_client.chat.completions.create.return_value = mock_response
+
+        optimizer = LLMDescriptionOptimizer(client=mock_client)
+        result = await optimizer.optimize(sample_report_for_context)
+
+        assert result["optimized_description"] == "improved"
