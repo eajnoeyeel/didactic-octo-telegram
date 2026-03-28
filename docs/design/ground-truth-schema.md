@@ -54,7 +54,7 @@ class GroundTruthEntry(BaseModel):
 
     # 메타데이터 — 품질 관리
     source: str = Field(
-        description="'manual_seed' | 'llm_synthetic' | 'llm_verified'"
+        description="'manual_seed' | 'llm_synthetic' | 'llm_verified' | 'external_mcp_atlas' | 'external_mcp_zero'"
     )
     manually_verified: bool = Field(default=False)
     author: str = Field(description="작성자 ID 또는 'gpt-4o-mini' 등")
@@ -103,6 +103,11 @@ class GroundTruthEntry(BaseModel):
 **Hard** — 모호/다의적:
 ```jsonl
 {"query_id":"gt-search-003","query":"help me with my research","correct_server_id":"semantic_scholar","correct_tool_id":"semantic_scholar::search_papers","difficulty":"hard","category":"search","ambiguity":"high","source":"manual_seed","manually_verified":true,"author":"iyeonjae","created_at":"2026-03-20","alternative_tools":["mcp_arxiv::search_arxiv","google_scholar::search"],"notes":"'research'가 모호 — 논문? 웹 검색? 데이터 분석?"}
+```
+
+**External (MCP-Atlas)** — human-authored:
+```jsonl
+{"query_id":"gt-atlas-001","query":"Search for recent papers about large language models","correct_server_id":"semantic_scholar","correct_tool_id":"semantic_scholar::search_papers","difficulty":"medium","category":"search","ambiguity":"medium","source":"external_mcp_atlas","manually_verified":true,"author":"scale_ai","created_at":"2026-03-28","alternative_tools":["mcp_arxiv::search_arxiv"],"notes":"MCP-Atlas task converted (first tool call)"}
 ```
 
 ---
@@ -163,8 +168,21 @@ def load_ground_truth(
 
 
 def merge_ground_truth(*paths: Path) -> list[GroundTruthEntry]:
-    """여러 JSONL 파일 합침 (seed + synthetic).
+    """여러 JSONL 파일 합침 (seed + mcp_atlas + synthetic).
     query_id 중복 검사 수행."""
+    ...
+
+
+def load_external_gt(
+    atlas_path: Path,
+    only_first_tool_call: bool = True,
+) -> list[GroundTruthEntry]:
+    """MCP-Atlas 변환 JSONL 로딩.
+
+    Args:
+        atlas_path: 변환된 MCP-Atlas JSONL 경로
+        only_first_tool_call: True면 multi-step 중 첫 번째만 사용 (기본)
+    """
     ...
 
 
@@ -182,6 +200,7 @@ def split_by_difficulty(
 ### query_id 형식
 - 패턴: `gt-{category}-{number}` (e.g., `gt-search-001`)
 - A/B 테스트 쿼리: `gt-ab-{server}-{number}` (e.g., `gt-ab-arxiv-001`)
+- MCP-Atlas 외부 GT: `gt-atlas-{number}` (e.g., `gt-atlas-001`)
 - 전체 셋에서 unique해야 함
 
 ### tool_id 형식
@@ -193,6 +212,7 @@ def split_by_difficulty(
 - `difficulty`가 hard이면 `ambiguity`는 medium 또는 high
 - `ambiguity`가 medium 이상이면 `alternative_tools`는 비어 있지 않아야 함
 - `source`가 `manual_seed`이면 `manually_verified`는 True
+- `source`가 `external_mcp_atlas`이면 `manually_verified`는 True, `author`는 `"scale_ai"`
 - `created_at`은 유효한 ISO 8601 날짜
 
 ### JSONL 형식 규칙

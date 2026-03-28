@@ -73,10 +73,27 @@
   | `stats_score` | *(신규)* | 수치/커버리지/성능 정보 포함 여부 | Statistics Addition |
   | `precision_score` | *(신규)* | 표준/프로토콜/기술 용어 정확도 | Technical Terms |
 
-- **스코어링 방법**: E7 파일럿에서 정규식 휴리스틱 vs LLM-based 비교 후 결정
+- **스코어링 방법**: E7 파일럿에서 정규식 휴리스틱 vs LLM-based vs Description Smells 4D 비교 후 결정
 - **목표**: Pool 내 평균 >= 0.6 (1.0 만점)
 - **의존성**: Spearman 상관계수의 입력 변수. 이 점수가 나쁘면 상관분석 무의미
 - **행동 변화 기준**: 점수 높은 Tool이 실제로 더 많이 선택되면 → Provider 추천에 신뢰성 부여. 상관 없으면 → 점수 산정 방식 교체
+
+**GEO 6D ↔ Description Smells 4D 매핑 테이블** (E7 비교용):
+
+> Description Smells 논문 (arxiv:2602.18914): description 품질 → 선택률 인과 관계 검증 완료 (+11.6%, p<0.001).
+> 4차원 18카테고리 smell 분류. 우리 차별점: smell 유무 비교가 아닌 GEO 기법으로 체계적 개선 방법론 제시.
+
+| GEO 6D 차원 | Description Smells 4D 매핑 | 비고 |
+|-------------|--------------------------|------|
+| `clarity_score` | Accuracy + Functionality | 핵심 기능 명확도 |
+| `disambiguation_score` | — (GEO 고유) | 유사 도구 차별화 |
+| `parameter_coverage_score` | Completeness | 파라미터/제약 포함 |
+| `boundary_score` | — (GEO 고유) | NOT 할 것 명확화 |
+| `stats_score` | Completeness | 수치/커버리지 정보 |
+| `precision_score` | Accuracy | 기술 용어 정확도 |
+| — | Conciseness (Smells 고유) | 불필요한 장황함 탐지 |
+
+E7에서 3축 비교: GEO 6D vs Description Smells 4D vs 통합 모델
 
 ---
 

@@ -39,7 +39,7 @@
 | Phase | 이름 | 상세 파일 | 주요 산출물 |
 |-------|------|-----------|-------------|
 | 0 | Project Foundation | [phase-0-2.md](phase-0-2.md) | `pyproject.toml`, `src/config.py`, `src/models.py` |
-| 1 | Data Collection | [phase-0-2.md](phase-0-2.md) | `src/data/crawler.py`, `src/data/mcp_connector.py` |
+| 1 | Data Collection + 외부 데이터 통합 | [phase-0-2.md](phase-0-2.md) | `src/data/crawler.py`, `src/data/mcp_connector.py`, `scripts/import_mcp_zero.py`, `scripts/convert_mcp_atlas.py` |
 | 2 | Embedding & Vector Store | [phase-0-2.md](phase-0-2.md) | `src/embedding/`, `src/retrieval/qdrant_store.py`, `src/data/indexer.py` |
 | 3 | Core Pipeline (Sequential) | [phase-3-5.md](phase-3-5.md) | `src/pipeline/strategy.py`, `src/pipeline/sequential.py` |
 | 4 | Ground Truth Generation | [phase-3-5.md](phase-3-5.md) | `src/data/ground_truth.py`, `data/ground_truth/` |

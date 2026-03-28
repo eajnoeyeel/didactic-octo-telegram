@@ -14,12 +14,16 @@
 
 ## 미결 Blockers
 
-### OQ-2: Smithery 크롤링 + Pool 구성 (데이터)
-- [ ] Smithery API rate limit 확인
-- [ ] 크롤링 범위 결정: 카테고리별 5-10개 균형 수집
+### OQ-2: Tool Pool 구성 (MCP-Zero + Smithery 보조) — ADR-0011
+- [ ] MCP-Zero 데이터셋 다운로드 → `data/external/mcp-zero/` (308 servers, 2,797 tools)
+- [ ] MCP-Atlas GT 다운로드 → `data/external/mcp-atlas/` (500 human-authored tasks)
+- [ ] `scripts/import_mcp_zero.py` 작성 (JSON → MCPServer/MCPTool 변환 + Qdrant 인덱싱)
+- [ ] `scripts/convert_mcp_atlas.py` 작성 (parquet → JSONL, 첫 번째 tool call 추출)
+- [ ] MCP-Atlas GT + self seed 80 병합 검증 (query_id 중복 없음, 580개 primary GT)
+- [ ] Description Smells 4D vs GEO Score 6D 매핑 테이블 작성 (E7 비교용)
+- [ ] 4종 Pool 정의 (Base, High Similarity, Low Similarity, Description Quality) — MCP-Zero 308 servers에서 선별
+- [ ] Smithery API rate limit 확인 (보조 소스)
 - [ ] `tools/list` 직접 연결 가능한 서버 목록 확인
-- [ ] 4종 Pool 정의 (Base, High Similarity, Low Similarity, Description Quality)
-- [ ] 각 Pool에 포함할 서버 목록 수동 작성
 
 ### OQ-3: 자체 MCP 서버 구축 (A/B 실증)
 - [ ] mcp-arxiv, mcp-calculator, mcp-korean-news 서버 구현
@@ -140,7 +144,7 @@
 - [ ] 지표: Precision@1, Server Recall@K, Tool Recall@10, MRR, Confusion Rate, Latency
 
 ### E2: 임베딩 모델 비교 (Week 3)
-- [ ] BGE-M3, OpenAI text-embedding-3-small, Voyage voyage-3 비교
+- [ ] BGE-M3, OpenAI text-embedding-3-small, OpenAI text-embedding-3-large (MCP-Zero 제공) 비교
 - [ ] BGE-M3 sparse 기여도 측정 (Dense-only vs Dense+Sparse)
 
 ### E3: Reranker 비교 (Week 3)
@@ -152,13 +156,13 @@
 - [ ] Evidence Triangulation: 3개 중 2개 이상 통과 여부
 
 ### E5: Pool 스케일 (Week 4)
-- [ ] Pool 5/20/50/100에서 Precision@1, Latency, Confusion Rate 측정
+- [ ] Pool 5/20/50/100/200/308에서 Precision@1, Latency, Confusion Rate 측정 (MCP-Zero 활용)
 
 ### E6: Pool 유사도 (Week 4)
 - [ ] Low/Base/High Similarity Pool에서 Confusion Rate, Precision@1, NDCG@5
 
 ### E7: GEO 점수 비교 (OQ-1 해결 후)
-- [ ] 휴리스틱 vs LLM Spearman 비교 + Human agreement (20-30개)
+- [ ] 휴리스틱 vs LLM vs Description Smells 4D Spearman 비교 + Human agreement (20-30개)
 
 ---
 

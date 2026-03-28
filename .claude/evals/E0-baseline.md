@@ -8,7 +8,7 @@
 - [ ] `src/pipeline/flat.py` (1-Layer) executes without error
 - [ ] `src/pipeline/sequential.py` (2-Layer Sequential) executes without error
 - [ ] `src/pipeline/parallel.py` (2-Layer Parallel) executes without error
-- [ ] Precision@1 measured for all three on the same 80 seed GT queries
+- [ ] Precision@1 measured for all three on MCP-Atlas 500 + self seed 80 GT queries (580 total)
 - [ ] Results logged to W&B run tagged `E0`
 
 ## Judgment Gate

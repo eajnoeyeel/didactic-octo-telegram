@@ -119,6 +119,31 @@ data/ground-truth/synthetic.jsonl에 저장
 
 ---
 
+## 외부 GT 소스 — MCP-Atlas (ADR-0011)
+
+### MCP-Atlas (Scale AI)
+
+- **출처**: HuggingFace `ScaleAI/MCP-Atlas` (arxiv:2602.00933)
+- **규모**: 500 human-authored tasks, 36 servers, 220 tools
+- **품질**: Human-authored (자연어, tool 이름 미포함 → 자연스러운 Medium/Hard 난이도)
+- **변환 방법**: multi-step task → 첫 번째 tool call만 추출하여 single-step GT로 변환
+- **query_id 네이밍**: `gt-atlas-{number:03d}` (e.g., `gt-atlas-001` ~ `gt-atlas-500`)
+- **source 필드**: `external_mcp_atlas`
+- **검증 규칙**: `manually_verified=True`, `author="scale_ai"`
+- **변환 스크립트**: `scripts/convert_mcp_atlas.py` (parquet → JSONL)
+- **저장 위치**: 원본 `data/external/mcp-atlas/`, 변환 후 `data/ground_truth/mcp_atlas.jsonl`
+
+### GT 통합 전략
+
+| 소스 | 수량 | 역할 | source 필드 |
+|------|------|------|------------|
+| Self seed | 80 | 자체 도메인 특화 (A/B 서버 포함) | `manual_seed` |
+| MCP-Atlas | 500 | Primary human GT | `external_mcp_atlas` |
+| **합계** | **580** | **Primary GT** | — |
+| Synthetic | 838 | 보조 (MCP-Atlas와 겹치는 서버 GT는 대체) | `llm_synthetic` |
+
+---
+
 ## 자체 MCP 서버 — A/B Description 실험용
 
 ### A/B Pair 구조
@@ -144,8 +169,13 @@ data/ground-truth/synthetic.jsonl에 저장
 data/
 +-- ground-truth/
 |   +-- seed_set.jsonl           # 수동 작성 80개
-|   +-- synthetic.jsonl          # LLM 생성 + 품질 게이트 통과분
+|   +-- mcp_atlas.jsonl          # MCP-Atlas 변환 500개 (primary)
+|   +-- synthetic.jsonl          # LLM 생성 + 품질 게이트 통과분 (보조)
 |   +-- quality_gate_report.json # 파일럿 검증 결과
++-- external/                    # Git-ignored, 별도 다운로드
+|   +-- mcp-zero/                # MCP-Zero 308 servers (servers.json, embeddings/)
+|   +-- mcp-atlas/               # MCP-Atlas 원본 (*.parquet)
+|   +-- README.md                # 다운로드 방법, 라이선스 정보
 +-- tool-pools/
 |   +-- base_pool.json           # 기본 50서버 Pool 정의
 |   +-- high_similarity_pool.json

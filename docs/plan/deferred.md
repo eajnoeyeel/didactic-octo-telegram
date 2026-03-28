@@ -20,6 +20,8 @@ These features are confirmed requirements but deferred to a follow-up plan after
 | **Strategy C: Taxonomy-gated** | Pending CTO mentoring confirmation (2026-03-25). `taxonomy_gated.py` stub file is in the structure map; implementation task added as Phase 13 (gated). |
 | **MCP Tool Server** (`find_best_tool` as MCP protocol Tool) | DP1 confirmed dual-exposure (REST + MCP). REST implemented in Phase 8. MCP Tool server is Phase 13 (after REST is stable). |
 
+| **Synthetic GT 추가 수동 검증** (838개) | MCP-Atlas 500 human-authored GT가 primary로 대체. Synthetic은 보조 자료로 격하. 추가 검증은 시간 대비 효율 낮음 (ADR-0011). |
+
 All features above WILL be implemented. This plan produces the core pipeline + Provider Analytics backend. UI and additional features ship in the next plan iteration.
 
 ---

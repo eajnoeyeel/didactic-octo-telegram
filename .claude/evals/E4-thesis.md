@@ -3,6 +3,7 @@
 > Most important experiment. Must pass for CTO demo.
 > Grader type: Code (McNemar's test) + Model (GEO score validation)
 > Depends on E1 best strategy selected.
+> External validation: Description Smells 논문 (arxiv:2602.18914) — description 품질 → 선택률 인과 관계 사전 검증 (+11.6%, p<0.001). 우리 차별점: smell 유무 비교가 아닌 GEO 기법을 통한 체계적 개선 방법론 제시.
 
 ## Success Criteria
 
@@ -13,6 +14,7 @@
 - [ ] McNemar's test p-value computed
 - [ ] Spearman(geo_score, selection_rate) computed across all Pool tools
 - [ ] OLS regression R² computed (6 GEO dimensions → selection_rate)
+- [ ] Description Smells 4D scores computed for comparison (Accuracy/Functionality/Completeness/Conciseness)
 
 ## Evidence Triangulation Gate
 
@@ -28,7 +30,7 @@ McNemar's test: p < 0.05 required independently.
 ## Regression Criteria
 
 - [ ] Best strategy from E1 reproduces E1 Precision@1 within ±2%p (pass^3 = 1.00)
-- [ ] Same 80 GT queries used
+- [ ] Same 580 GT queries used (MCP-Atlas 500 + self seed 80)
 
 ## Metric Targets
 

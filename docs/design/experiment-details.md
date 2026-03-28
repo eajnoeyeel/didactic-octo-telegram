@@ -66,10 +66,12 @@ python run_experiments.py --experiment E1 --strategy taxonomy --pool base
 | E2-A | (E1 최적) | BGE-M3 | Cohere | Base (50) |
 | E2-B | (E1 최적) | OpenAI text-embedding-3-small | Cohere | Base (50) |
 | E2-C | (E1 최적) | Voyage voyage-3 | Cohere | Base (50) |
+| E2-D | (E1 최적) | OpenAI text-embedding-3-large (MCP-Zero 제공, 3072D) | Cohere | Base (50) |
 
 - **Primary**: Tool Recall@10
 - **Secondary**: Precision@1, Latency, 비용 (API call 수 x 단가)
 - **추가**: Cold start time (인덱스 빌드), 인덱스 크기, BGE-M3 sparse 기여도 (Dense-only vs Dense+Sparse)
+- **E2-D 참고**: MCP-Zero에서 사전 계산된 text-embedding-3-large 벡터 활용 (재임베딩 불필요, `data/external/mcp-zero/embeddings/`)
 
 ---
 
@@ -94,6 +96,7 @@ python run_experiments.py --experiment E1 --strategy taxonomy --pool base
 ## E4: Description 품질 → 선택률 인과 관계 (테제 검증)
 
 > **이 프로젝트에서 가장 중요한 실험.**
+> 외부 검증: Description Smells 논문 (arxiv:2602.18914)이 description 품질 → 선택률 인과 관계를 사전 검증 (+11.6% 개선, p<0.001). 우리의 차별점: smell 유무 비교가 아닌 GEO 기법을 통한 체계적 개선 방법론 제시.
 
 ### Version A / B 작성 기준 (GEO 기반)
 
@@ -161,6 +164,8 @@ model = sm.OLS(y, sm.add_constant(X)).fit()
 | E5-B | 20 서버 | Base subset |
 | E5-C | 50 서버 | Base Pool |
 | E5-D | 100 서버 | Expanded Pool |
+| E5-E | 200 서버 | MCP-Zero subset |
+| E5-F | 308 서버 | MCP-Zero 전체 |
 
 - **측정**: Pool 크기별 Precision@1 저하 곡선, Latency 증가율, Confusion Rate 증가율
 - **가설**: Pool 커지면 유사 Tool 증가 → Confusion Rate 상승, Precision@1 하락. 저하 속도는 전략에 따라 다름
@@ -169,11 +174,13 @@ model = sm.OLS(y, sm.add_constant(X)).fit()
 
 ## E6: Pool 유사도 실험
 
+> MCPAgentBench (arxiv:2512.24565) distractor 접근법 참고: 정답 tool + 비슷한 distractor tool 혼합으로 체계적 ambiguity 평가.
+
 | 조건 | Pool 유형 | 목적 |
 |------|----------|------|
 | E6-Low | Low Similarity Pool | Confusion Rate 최저 베이스라인 |
 | E6-Base | Base Pool | 일반적 조건 |
-| E6-High | High Similarity Pool | Confusion Rate 스트레스 테스트 |
+| E6-High | High Similarity Pool (MCP-Zero에서 유사 서버 선별) | Confusion Rate 스트레스 테스트 |
 
 - **Primary**: Confusion Rate 변화
 - **Secondary**: Precision@1, NDCG@5
@@ -184,8 +191,9 @@ model = sm.OLS(y, sm.add_constant(X)).fit()
 
 | 조건 | 점수 방식 |
 |------|----------|
-| E7-A | 정규식 휴리스틱 (`geo_score.py`) |
-| E7-B | LLM-based (GPT-4o-mini, 1-5점) |
+| E7-A | 정규식 휴리스틱 (`geo_score.py`) — GEO 6D |
+| E7-B | LLM-based (GPT-4o-mini, 1-5점) — GEO 6D |
+| E7-C | Description Smells 4D (Accuracy/Functionality/Completeness/Conciseness) — 외부 루브릭 |
 
 - **측정**:
   - Spearman(geo_score, selection_rate) — 어느 방식이 selection_rate와 더 상관 있는가

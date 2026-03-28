@@ -1,7 +1,17 @@
 # MCP Discovery Platform — 진행 현황 보고서
 
-> 최종 업데이트: 2026-03-26
+> 최종 업데이트: 2026-03-28
 > 브랜치: `main`
+
+---
+
+## 전략 변경 (2026-03-28) — ADR-0011
+
+외부 데이터셋 활용 결정: 자체 Synthetic GT 품질 문제 → 고품질 외부 데이터로 대체/보완.
+- **Tool Pool**: Smithery 8 servers → MCP-Zero 308 servers (2,797 tools)
+- **Ground Truth**: self seed 80 + MCP-Atlas 500 human-authored = 580 primary GT. Synthetic 838은 보조.
+- **Description 평가**: GEO 6D + Description Smells 4D 병행 (E7 비교)
+- 상세: `docs/handoff/external-data-strategy-20260328.md`, `docs/adr/0011-external-dataset-strategy.md`
 
 ---
 
@@ -10,7 +20,7 @@
 | 항목 | 현재 상태 |
 |------|-----------|
 | 완료된 Phase | Phase 0 ~ Phase 5 |
-| 다음 Phase | Phase 6 (Reranker) + OQ-2 (Pool 크롤링/인덱싱) |
+| 다음 Phase | Phase 6 (Reranker) + 외부 데이터 통합 (MCP-Zero + MCP-Atlas) |
 | 테스트 | **233 passed**, 0 skipped |
 | 커버리지 | **98.56%** (목표 80%+ 대폭 초과) |
 | Lint/Format | PASS (ruff check + ruff format) |
