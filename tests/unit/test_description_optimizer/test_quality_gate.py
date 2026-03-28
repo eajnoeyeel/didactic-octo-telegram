@@ -220,3 +220,35 @@ class TestHallucinationGate:
         schema = {"type": "object", "properties": {"x": {"type": "string"}}}
         result = gate.check_hallucinated_params("A simple tool that does things.", schema)
         assert result.passed
+
+
+class TestInfoPreservationGate:
+    def test_info_preservation_catches_lost_numbers(self) -> None:
+        gate = QualityGate()
+        original = "Searches across 50,000+ packages with 99.9% uptime."
+        optimized = "Searches for packages in the registry."
+        result = gate.check_info_preservation(original, optimized)
+        assert not result.passed
+        assert "50,000" in result.reason or "99.9" in result.reason
+
+    def test_info_preservation_passes_when_numbers_kept(self) -> None:
+        gate = QualityGate()
+        original = "Returns up to 100 results per query."
+        optimized = "Returns up to 100 results per query. Use for data retrieval."
+        result = gate.check_info_preservation(original, optimized)
+        assert result.passed
+
+    def test_info_preservation_no_numbers_passes(self) -> None:
+        gate = QualityGate()
+        original = "Deletes a comment from a file."
+        optimized = "Deletes a comment from a file in Slack."
+        result = gate.check_info_preservation(original, optimized)
+        assert result.passed
+
+    def test_info_preservation_catches_lost_tech_terms(self) -> None:
+        gate = QualityGate()
+        original = "Queries the PostgreSQL database via the wire protocol."
+        optimized = "Queries the database for records."
+        result = gate.check_info_preservation(original, optimized)
+        assert not result.passed
+        assert "PostgreSQL" in result.reason or "wire protocol" in result.reason

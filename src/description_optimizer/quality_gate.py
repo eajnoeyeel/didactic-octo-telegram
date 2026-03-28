@@ -49,6 +49,13 @@ class QualityGate:
     """Validates optimization quality before accepting results."""
 
     _BACKTICK_PARAM: re.Pattern[str] = re.compile(r"`(\w+)`")
+    _NUMBERS_WITH_CONTEXT: re.Pattern[str] = re.compile(r"\d[\d,]*\.?\d*\s*[%+]?")
+    _TECH_TERMS: re.Pattern[str] = re.compile(
+        r"\b(SQL|PostgreSQL|MySQL|MongoDB|Redis|REST|GraphQL|gRPC|HTTP|HTTPS|JSON|XML|YAML|CSV"
+        r"|API|SDK|OAuth|JWT|WebSocket|TCP|UDP|S3|AWS|GCP|Azure|Docker|Kubernetes"
+        r"|Git|GitHub|Slack|Notion|OWASP|wire protocol|stdio|SSE)\b",
+        re.IGNORECASE,
+    )
 
     def __init__(
         self,
@@ -157,6 +164,44 @@ class QualityGate:
             passed=True,
             reason=f"All mentioned parameters verified against schema: {sorted(candidate_params)}",
         )
+
+    def check_info_preservation(self, original: str, optimized: str) -> GateResult:
+        """Check that key information from original is preserved in optimized.
+
+        Checks for:
+        1. Numbers/statistics (e.g., "50,000+", "99.9%")
+        2. Technical terms (e.g., "PostgreSQL", "wire protocol")
+
+        Args:
+            original: Original description.
+            optimized: Optimized description.
+
+        Returns:
+            GateResult indicating pass/fail.
+        """
+        lost_items: list[str] = []
+        optimized_lower = optimized.lower()
+
+        # Check numbers
+        original_numbers = self._NUMBERS_WITH_CONTEXT.findall(original)
+        significant_numbers = [n.strip() for n in original_numbers if len(n.strip()) >= 2]
+        for num in significant_numbers:
+            if num not in optimized:
+                lost_items.append(f"number '{num}'")
+
+        # Check technical terms
+        original_terms = set(self._TECH_TERMS.findall(original))
+        for term in original_terms:
+            if term.lower() not in optimized_lower:
+                lost_items.append(f"term '{term}'")
+
+        if lost_items:
+            return GateResult(
+                passed=False,
+                reason=f"Information lost from original: {', '.join(lost_items)}",
+            )
+
+        return GateResult(passed=True, reason="Key information preserved from original")
 
     def evaluate(
         self,
