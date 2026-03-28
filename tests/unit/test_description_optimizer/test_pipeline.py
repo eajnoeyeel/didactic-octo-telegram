@@ -13,6 +13,7 @@ from description_optimizer.models import (
 )
 from description_optimizer.pipeline import OptimizationPipeline
 from description_optimizer.quality_gate import FullGateResult, GateResult
+from models import MCPTool
 
 ALL_DIMS = [
     "clarity",
@@ -173,3 +174,107 @@ class TestPipelineEmptyDescription:
     async def test_none_description(self, pipeline: OptimizationPipeline) -> None:
         result = await pipeline.run("s::t", None)
         assert isinstance(result, OptimizedDescription)
+
+
+def _make_report_with_tool_id(tool_id: str, desc: str, geo: float = 0.3) -> AnalysisReport:
+    return AnalysisReport(
+        tool_id=tool_id,
+        original_description=desc,
+        dimension_scores=[
+            DimensionScore(dimension=d, score=geo, explanation="test")
+            for d in ALL_DIMS
+        ],
+    )
+
+
+async def test_run_with_tool_passes_context_to_optimizer() -> None:
+    """Pipeline.run_with_tool() should build OptimizationContext from MCPTool and pass it."""
+    tool = MCPTool(
+        server_id="slack",
+        tool_name="DELETE_COMMENT",
+        tool_id="slack::DELETE_COMMENT",
+        description="Deletes a comment.",
+        input_schema={"type": "object", "properties": {"id": {"type": "string"}}},
+    )
+    sibling_tools = [
+        MCPTool(
+            server_id="slack",
+            tool_name="ADD_COMMENT",
+            tool_id="slack::ADD_COMMENT",
+            description="Adds a comment.",
+        ),
+    ]
+
+    analyzer = AsyncMock()
+    analyzer.analyze.return_value = _make_report_with_tool_id(
+        "slack::DELETE_COMMENT", "Deletes a comment.", 0.3
+    )
+
+    optimizer = AsyncMock()
+    optimizer.optimize.return_value = {
+        "optimized_description": "Deletes a comment. Requires `id` parameter.",
+        "search_description": "delete comment slack",
+    }
+
+    embedder = AsyncMock()
+    embedder.embed_one.return_value = np.ones(10)
+
+    gate = MagicMock()
+    gate.evaluate.return_value = FullGateResult(
+        passed=True,
+        geo_result=GateResult(passed=True, reason="ok"),
+        similarity_result=GateResult(passed=True, reason="ok", similarity=0.95),
+    )
+
+    pipeline = OptimizationPipeline(
+        analyzer=analyzer, optimizer=optimizer, embedder=embedder, gate=gate,
+    )
+
+    result = await pipeline.run_with_tool(tool, sibling_tools=sibling_tools)
+
+    assert result.status == OptimizationStatus.SUCCESS
+    # Verify optimizer was called with context
+    call_args = optimizer.optimize.call_args
+    context = call_args.kwargs.get("context") or (
+        call_args.args[1] if len(call_args.args) > 1 else None
+    )
+    assert context is not None
+    assert context.input_schema == tool.input_schema
+    assert len(context.sibling_tools) == 1
+
+
+async def test_run_with_tool_batch() -> None:
+    """run_batch_with_tools should process a list of (MCPTool, siblings) tuples."""
+    tool = MCPTool(
+        server_id="test",
+        tool_name="tool1",
+        tool_id="test::tool1",
+        description="Tool 1.",
+    )
+
+    analyzer = AsyncMock()
+    analyzer.analyze.return_value = _make_report_with_tool_id("test::tool1", "Tool 1.", 0.3)
+
+    optimizer = AsyncMock()
+    optimizer.optimize.return_value = {
+        "optimized_description": "Improved Tool 1.",
+        "search_description": "tool 1 search",
+    }
+
+    embedder = AsyncMock()
+    embedder.embed_one.return_value = np.ones(10)
+
+    gate = MagicMock()
+    gate.evaluate.return_value = FullGateResult(
+        passed=True,
+        geo_result=GateResult(passed=True, reason="ok"),
+        similarity_result=GateResult(passed=True, reason="ok", similarity=0.95),
+    )
+
+    pipeline = OptimizationPipeline(
+        analyzer=analyzer, optimizer=optimizer, embedder=embedder, gate=gate,
+    )
+
+    results = await pipeline.run_batch_with_tools([(tool, [])])
+    assert len(results) == 1
+    assert results[0].status == OptimizationStatus.SUCCESS

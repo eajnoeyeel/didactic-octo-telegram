@@ -6,10 +6,15 @@ Flow: analyze -> (skip if high GEO) -> optimize -> re-analyze -> gate -> result
 from loguru import logger
 
 from description_optimizer.analyzer.base import DescriptionAnalyzer
-from description_optimizer.models import OptimizationStatus, OptimizedDescription
+from description_optimizer.models import (
+    OptimizationContext,
+    OptimizationStatus,
+    OptimizedDescription,
+)
 from description_optimizer.optimizer.base import DescriptionOptimizer
 from description_optimizer.quality_gate import QualityGate
 from embedding.base import Embedder
+from models import MCPTool
 
 
 class OptimizationPipeline:
@@ -30,7 +35,7 @@ class OptimizationPipeline:
         self._skip_threshold = skip_threshold
 
     async def run(self, tool_id: str, description: str | None) -> OptimizedDescription:
-        """Run the full optimization pipeline for a single tool.
+        """Run the full optimization pipeline for a single tool (legacy interface).
 
         Args:
             tool_id: Tool ID (server_id::tool_name).
@@ -39,8 +44,84 @@ class OptimizationPipeline:
         Returns:
             OptimizedDescription with status indicating outcome.
         """
-        desc = description or ""
+        return await self._run_internal(tool_id, description or "", context=None)
 
+    async def run_with_tool(
+        self,
+        tool: MCPTool,
+        sibling_tools: list[MCPTool] | None = None,
+    ) -> OptimizedDescription:
+        """Run optimization with full tool context (grounded mode).
+
+        Args:
+            tool: MCPTool with tool_id, description, and optional input_schema.
+            sibling_tools: Other tools in the same server for disambiguation context.
+
+        Returns:
+            OptimizedDescription with status indicating outcome.
+        """
+        siblings = sibling_tools or []
+        context = OptimizationContext(
+            tool_id=tool.tool_id,
+            original_description=tool.description or "",
+            input_schema=tool.input_schema,
+            sibling_tools=[
+                {"tool_name": s.tool_name, "description": s.description or ""}
+                for s in siblings
+                if s.tool_id != tool.tool_id
+            ],
+        )
+        return await self._run_internal(tool.tool_id, tool.description or "", context=context)
+
+    async def run_batch_with_tools(
+        self,
+        tools_with_siblings: list[tuple[MCPTool, list[MCPTool]]],
+    ) -> list[OptimizedDescription]:
+        """Run optimization for a batch of tools with context.
+
+        Args:
+            tools_with_siblings: List of (MCPTool, sibling_tools) tuples.
+
+        Returns:
+            List of OptimizedDescription results.
+        """
+        results: list[OptimizedDescription] = []
+        for tool, siblings in tools_with_siblings:
+            result = await self.run_with_tool(tool, sibling_tools=siblings)
+            results.append(result)
+        return results
+
+    async def run_batch(self, tools: list[tuple[str, str | None]]) -> list[OptimizedDescription]:
+        """Run optimization for a batch of tools (legacy interface).
+
+        Args:
+            tools: List of (tool_id, description) tuples.
+
+        Returns:
+            List of OptimizedDescription results.
+        """
+        results: list[OptimizedDescription] = []
+        for tool_id, desc in tools:
+            result = await self.run(tool_id, desc)
+            results.append(result)
+        return results
+
+    async def _run_internal(
+        self,
+        tool_id: str,
+        desc: str,
+        context: OptimizationContext | None,
+    ) -> OptimizedDescription:
+        """Core optimization logic shared by run() and run_with_tool().
+
+        Args:
+            tool_id: Tool ID (server_id::tool_name).
+            desc: Original description string (may be empty).
+            context: Optional grounded optimization context with input_schema and siblings.
+
+        Returns:
+            OptimizedDescription with status indicating outcome.
+        """
         # Phase 1: Analyze original
         report_before = await self._analyzer.analyze(tool_id, desc)
         logger.info(f"Analyzed {tool_id}: GEO={report_before.geo_score:.3f}")
@@ -64,9 +145,9 @@ class OptimizationPipeline:
                 ),
             )
 
-        # Phase 2: Optimize
+        # Phase 2: Optimize (with context if available)
         try:
-            optimized = await self._optimizer.optimize(report_before)
+            optimized = await self._optimizer.optimize(report_before, context=context)
         except Exception as e:
             logger.error(f"Optimization failed for {tool_id}: {e}")
             return OptimizedDescription(
@@ -120,18 +201,3 @@ class OptimizationPipeline:
             geo_score_after=report_after.geo_score,
             status=OptimizationStatus.SUCCESS,
         )
-
-    async def run_batch(self, tools: list[tuple[str, str | None]]) -> list[OptimizedDescription]:
-        """Run optimization for a batch of tools.
-
-        Args:
-            tools: List of (tool_id, description) tuples.
-
-        Returns:
-            List of OptimizedDescription results.
-        """
-        results: list[OptimizedDescription] = []
-        for tool_id, desc in tools:
-            result = await self.run(tool_id, desc)
-            results.append(result)
-        return results
