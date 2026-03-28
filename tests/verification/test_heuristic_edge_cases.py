@@ -52,7 +52,9 @@ class TestUnicodeAndMultilingual:
         """Mixed English/Korean text: English patterns still fire, GEO > 0.0."""
         desc = "파일을 Searches the filesystem for files matching a pattern."
         report = await analyzer.analyze("test::tool", desc)
-        assert report.geo_score > 0.0
+        assert 0.0 < report.geo_score <= 1.0
+        dims = {s.dimension for s in report.dimension_scores}
+        assert dims == GEO_DIMENSIONS
 
     async def test_emoji_in_description(self, analyzer: HeuristicAnalyzer) -> None:
         """Descriptions containing emoji characters produce a valid GEO score."""
