@@ -1,48 +1,75 @@
-# Proxy Verification Instructions
+# Proxy MCP Verification — CLAUDE.md
 
-This directory is a separate MCP proxy prototype. These rules apply in addition to the repository root [`AGENTS.md`](/Users/iyeonjae/Desktop/shockwave/mcp-discovery/AGENTS.md).
+> **이 파일은 규칙과 참조 포인터만 둔다.** 상세 컨텍스트는 각 문서에 분리.
+> 최종 업데이트: 2026-03-24
 
-## Source Priority
+---
 
-1. Current files under `proxy_verification/src/`, `tests/`, and `config.json`
-2. This file
-3. `proxy_verification/docs/`
-4. Root-level planning docs that mention future Bridge/Router work
+## 프로젝트 한줄 요약
 
-Treat `proxy_verification/docs/` as reports and analysis, not as the implementation source of truth.
+MCP Bridge/Router 패턴 검증 프로토타입 — Python 프록시 MCP 서버가 여러 백엔드 MCP 서버의 도구를 수집·네임스페이스화하여 단일 MCP로 노출하고, Claude Code에서 E2E로 사용 가능한지 검증.
 
-## Local Layout
+---
 
-- `src/proxy_server.py`: stdio MCP entry point that exposes namespaced tools.
-- `src/proxy_client.py`: connect-per-call backend client.
-- `src/registry.py`: backend discovery and tool mapping.
-- `src/models.py`: Pydantic config and mapping models.
-- `scripts/verify.py`: end-to-end verification script.
-- `tests/`: async pytest coverage, including optional Node-backed tests.
+## 상세 컨텍스트 참조 (Lazy Loading)
 
-## Coding Rules
+필요 시 아래 파일을 Read tool로 읽을 것:
 
-- Python target is 3.12 with type hints on public functions.
-- Tool namespaces use `__`, not `::`.
-- Keep stdout clean inside MCP servers. Protocol traffic owns stdout, so diagnostics belong on stderr or in test output.
-- `print()` is acceptable in CLI/reporting code such as `scripts/verify.py`, but avoid noisy stdout logging inside `src/proxy_server.py`.
-- Prefer single-scope helper functions around `stdio_client(...)` in tests instead of async fixtures that span setup and teardown. This repo already hit anyio cancel-scope issues with the fixture approach.
-- Keep `config.json` shape and [`src/models.py`](/Users/iyeonjae/Desktop/shockwave/mcp-discovery/proxy_verification/src/models.py) validators in sync.
+| 파일 | 내용 |
+|------|------|
+| `docs/metamcp-analysis.md` | MetaMCP 프록시 아키텍처 분석 (소스 코드 기반) |
+| `docs/verification-report.md` | 검증 결과 보고서 (검증 완료 후 작성) |
 
-## Current Boundaries
+---
 
-- The connect-per-call design is intentional for this prototype. Do not refactor it into persistent sessions unless the user asks for that change.
-- Node.js-backed tests are optional and must stay guarded by `HAS_NPX` / `@pytest.mark.skipif`.
-- The verification prototype is allowed to be simpler than the planned production bridge.
+## 코딩 컨벤션
 
-## Verification
+### 일반 규칙
+- Python 3.12, **type hints 필수**
+- Pydantic v2 모델로 데이터 검증
+- async/await: MCP 통신은 모두 비동기
+- 환경변수: `.env` + pydantic-settings (하드코딩 금지)
+- `.env` 파일은 절대 커밋하지 않음
 
-Run local checks from this directory:
+### 테스트
+- TDD: 실패 테스트 먼저 → 구현 → 통과
+- pytest + pytest-asyncio
+- 외부 MCP 테스트는 `@pytest.mark.skipif` 적용 (Node.js 미설치 대비)
+
+### 네이밍
+- 파일/변수: `snake_case`
+- 클래스: `PascalCase`
+- 상수: `UPPER_SNAKE_CASE`
+- 네임스페이스 구분자: `__` (예: `echo__echo`, `filesystem__read_file`)
+
+### Git
+- 커밋 메시지: `feat: ...`, `fix: ...`, `test: ...`, `docs: ...`, `refactor: ...`
+
+---
+
+## 실행 방법
 
 ```bash
-uv run pytest -v
-uv run pytest tests/test_nodejs_backends.py -v
-uv run python scripts/verify.py
+# 의존성 설치
+cd proxy_verification && uv sync --extra dev
+
+# 테스트 실행
+uv run pytest
+
+# 프록시 서버 실행 (Claude Code 연결용)
+uv run python -m src.proxy_server
 ```
 
-If `npx` is unavailable, call out the skipped Node-backed coverage explicitly.
+---
+
+## 아키텍처
+
+```
+Claude Code --stdio--> Proxy Server --stdio(subprocess)--> Echo Server (Python)
+                                    --stdio(subprocess)--> Filesystem Server (Node.js)
+                                    --stdio(subprocess)--> Memory Server (Node.js)
+```
+
+- 프록시의 stdin/stdout은 Claude Code 전용
+- 백엔드 연결은 별도 subprocess + 별도 파이프 → 충돌 없음
+- 네임스페이스: `{server_id}__{tool_name}` (MetaMCP 패턴 차용)
