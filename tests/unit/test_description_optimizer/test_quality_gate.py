@@ -252,3 +252,64 @@ class TestInfoPreservationGate:
         result = gate.check_info_preservation(original, optimized)
         assert not result.passed
         assert "PostgreSQL" in result.reason or "wire protocol" in result.reason
+
+
+class TestRAGASFaithfulnessGate:
+    """Tests for RAGAS-style faithfulness verification."""
+
+    def test_faithful_description_passes(self) -> None:
+        """Description that only contains verifiable claims passes."""
+        gate = QualityGate()
+        result = gate.check_faithfulness(
+            original="Search the database for records",
+            optimized=(
+                "Search the PostgreSQL database for matching records. Accepts a `query` parameter."
+            ),
+            input_schema={"type": "object", "properties": {"query": {"type": "string"}}},
+            claims=[
+                {"claim": "Searches the PostgreSQL database", "supported": True},
+                {"claim": "Accepts a query parameter", "supported": True},
+            ],
+        )
+        assert result.passed
+
+    def test_hallucinated_claim_fails(self) -> None:
+        """Description with unsupported claims fails."""
+        gate = QualityGate()
+        result = gate.check_faithfulness(
+            original="Search the database",
+            optimized="Search the database. Does not handle complex queries or batch operations.",
+            input_schema={"type": "object", "properties": {"query": {"type": "string"}}},
+            claims=[
+                {"claim": "Searches the database", "supported": True},
+                {"claim": "Does not handle complex queries", "supported": False},
+                {"claim": "Does not handle batch operations", "supported": False},
+            ],
+        )
+        assert not result.passed
+        assert "unsupported" in result.reason.lower() or "hallucin" in result.reason.lower()
+
+    def test_no_claims_passes(self) -> None:
+        """Empty claims list passes (no verification possible)."""
+        gate = QualityGate()
+        result = gate.check_faithfulness(
+            original="Search data",
+            optimized="Search data",
+            input_schema=None,
+            claims=[],
+        )
+        assert result.passed
+
+    def test_all_unsupported_fails(self) -> None:
+        """All claims unsupported results in failure."""
+        gate = QualityGate()
+        result = gate.check_faithfulness(
+            original="Get data",
+            optimized="Retrieves data with millisecond latency across 50 shards.",
+            input_schema=None,
+            claims=[
+                {"claim": "millisecond latency", "supported": False},
+                {"claim": "50 shards", "supported": False},
+            ],
+        )
+        assert not result.passed

@@ -34,6 +34,7 @@ class FullGateResult:
     similarity_result: GateResult
     hallucination_result: GateResult | None = None
     info_preservation_result: GateResult | None = None
+    faithfulness_result: GateResult | None = None
 
     @property
     def reason(self) -> str:
@@ -48,6 +49,8 @@ class FullGateResult:
             reasons.append(f"Hallucination: {self.hallucination_result.reason}")
         if self.info_preservation_result and not self.info_preservation_result.passed:
             reasons.append(f"InfoPreservation: {self.info_preservation_result.reason}")
+        if self.faithfulness_result and not self.faithfulness_result.passed:
+            reasons.append(f"Faithfulness: {self.faithfulness_result.reason}")
         return "; ".join(reasons)
 
 
@@ -218,6 +221,40 @@ class QualityGate:
             )
 
         return GateResult(passed=True, reason="Key information preserved from original")
+
+    def check_faithfulness(
+        self,
+        original: str,
+        optimized: str,
+        input_schema: dict | None,
+        claims: list[dict],
+    ) -> GateResult:
+        """RAGAS-style faithfulness check: verify all claims against source data.
+
+        Each claim has {"claim": str, "supported": bool}.
+        Passes only if ALL claims are supported.
+
+        The claim extraction and verification is done externally (by LLM);
+        this gate makes the pass/fail decision based on the verification results.
+        """
+        if not claims:
+            return GateResult(passed=True, reason="No claims to verify")
+
+        unsupported = [c["claim"] for c in claims if not c["supported"]]
+
+        if unsupported:
+            return GateResult(
+                passed=False,
+                reason=(
+                    f"Faithfulness check failed: {len(unsupported)} unsupported/hallucinated "
+                    f"claim(s): {unsupported[:3]}"
+                ),
+            )
+
+        return GateResult(
+            passed=True,
+            reason=f"All {len(claims)} claims verified as faithful",
+        )
 
     def evaluate(
         self,
