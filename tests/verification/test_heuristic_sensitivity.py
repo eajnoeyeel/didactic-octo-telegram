@@ -94,7 +94,10 @@ class TestFluencyDimension:
     async def test_adding_connectors_increases_fluency(self, analyzer: HeuristicAnalyzer) -> None:
         """Adding connector words increases fluency score."""
         base = "Search data from tables. Filter records by columns."
-        enhanced = "Search data from tables and filter records by columns. Also supports sorting because it uses indexed queries."
+        enhanced = (
+            "Search data from tables and filter records by columns. "
+            "Also supports sorting because it uses indexed queries."
+        )
         base_report = await analyzer.analyze("t", base)
         enh_report = await analyzer.analyze("t", enhanced)
         base_score = next(s.score for s in base_report.dimension_scores if s.dimension == "fluency")

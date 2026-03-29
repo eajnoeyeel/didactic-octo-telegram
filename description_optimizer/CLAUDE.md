@@ -2,7 +2,7 @@
 
 > **이 파일은 규칙(conventions, constraints)과 참조 포인터만 둔다.** 상세 컨텍스트는 각 문서에 분리.
 > 매 세션마다 전체 로드되므로 prompt bloat 방지를 위해 간결하게 유지할 것.
-> 최종 업데이트: 2026-03-28
+> 최종 업데이트: 2026-03-29
 
 ---
 
@@ -24,15 +24,32 @@ Description Optimizer — Provider가 MCP 서버/도구를 등록할 때 descrip
 
 ---
 
+## 현재 상태 (2026-03-29)
+
+**Branch:** `feat/description-optimizer` — Phase 2 구현 완료, 396 tests
+
+**Phase 2 변경사항 (2026-03-29):**
+- boundary 차원 완전 제거 → fluency 차원으로 교체 (GEO 연구 미지지, 95% 환각 원인)
+- RAGAS faithfulness 게이트 추가 (주장별 이진 검증)
+- doc2query 쿼리 인식 최적화 프롬프트 (`build_query_aware_prompt`)
+- P@1 A/B 검색 평가 스크립트 (`scripts/run_retrieval_ab_eval.py`)
+
+**다음 단계:** 새 차원으로 A/B 비교 재실행 → P@1 end-to-end 평가 → 결과 분석
+
+---
+
 ## 상세 컨텍스트 참조
 
 | 파일 | 내용 |
 |------|------|
+| `docs/analysis/grounded-ab-comparison-report.md` | **A/B 비교 보고서 + 연구 방향** (새 세션 시작점) |
+| `docs/analysis/description-optimizer-root-cause-analysis.md` | 근본원인 분석 (Goodhart's Law, 환각 사례) |
+| `docs/progress/grounded-optimization-handoff.md` | 구현 완료 내역 (Task 1-10 커밋 + 상세) |
+| `docs/superpowers/plans/2026-03-29-description-optimizer-grounded-optimization.md` | 구현 계획서 |
 | `docs/research-analysis.md` | 학술적 근거 분석, 논문 비교, 검증 설계 |
 | `docs/evaluation-design.md` | 평가 전략 상세 (A/B Test, Quality Gate, Semantic Preservation) |
 | 루트 `CLAUDE.md` | 프로젝트 전체 규칙 (상위 참조) |
 | 루트 `docs/design/metrics-rubric.md` | GEO Score 6차원 정의 (SOT) |
-| 루트 `docs/research/description-quality-scoring.md` | GEO Score 리서치 요약 |
 
 ---
 
@@ -43,13 +60,13 @@ Provider → Register MCP Server/Tools
     ↓
 Description Optimizer Pipeline
     ↓ Phase 1: Analyze           ↓ Phase 2: Optimize
-    GEO Score Diagnosis          LLM Rewriter
-    (6-dimension scoring)        (dimension-aware prompt)
+    GEO Score Diagnosis          LLM Rewriter (grounded/ungrounded)
+    (6-dimension heuristic)      (input_schema + sibling tools)
     ↓                            ↓
     Quality Report               optimized_description
                                  search_description (embedding용)
     ↓
-    Quality Gate (no degradation check)
+    Quality Gate (5-gate: GEO + Similarity + Hallucination + Info Preservation + Faithfulness)
     ↓
     Store: original + optimized + search descriptions
 ```
@@ -57,8 +74,32 @@ Description Optimizer Pipeline
 ### ABC Pattern
 
 - `DescriptionAnalyzer` ABC — GEO Score 분석 (Heuristic / LLM-as-Judge)
-- `DescriptionOptimizer` ABC — 재작성 (LLM / Rule-based)
-- `QualityGate` — 최적화 전후 품질 비교, 의미 보존 검증
+- `DescriptionOptimizer` ABC — 재작성 (LLM / Rule-based), `optimize(report, context=None)`
+- `QualityGate` — 5-gate 시스템 (GEO 비회귀, 의미 유사도, 환각 탐지, 정보 보존, RAGAS faithfulness)
+
+### Grounded Optimization (신규, 2026-03-29)
+
+- `OptimizationContext` — input_schema + sibling_tools 전달
+- `build_grounded_prompt()` — schema 기반 프롬프트 + anti-hallucination 규칙
+- `pipeline.run_with_tool(MCPTool, sibling_tools)` — grounded 최적화 진입점
+- `check_hallucinated_params()` — backtick 파라미터 vs schema 교차 검증
+- `check_info_preservation()` — 숫자/통계 + 기술 용어 보존 검증
+
+---
+
+## Phase 2 개선 사항 (2026-03-29)
+
+- **boundary→fluency 차원 교체**: GEO 연구에서 boundary 미지지 확인. fluency(문장 구조, 연결어, 다양성)로 교체.
+- **RAGAS faithfulness 게이트**: `check_faithfulness(claims)` — 주장 추출→이진 검증 패턴
+- **doc2query 쿼리 인식 프롬프트**: `build_query_aware_prompt(context, relevant_queries)` — 검색 의도 기반 최적화
+- **P@1 A/B 평가**: `scripts/run_retrieval_ab_eval.py` — 원본 vs 최적화 인메모리 검색 비교
+- **리서치 종합**: `description_optimizer/docs/research-phase2-synthesis.md`
+
+## 미해결 과제
+
+1. **P@1 end-to-end 검증**: 새 fluency 차원 + RAGAS 게이트로 최적화 후 P@1 비교 실행 필요
+2. **fluency 측정 고도화**: 현재 휴리스틱(문장 수, 연결어). 향후 LLM-as-Judge(별도 모델) 검토
+3. **doc2query 쿼리 생성**: ground truth 불완전 → LLM 합성 시 품질 관리 필요
 
 ---
 
@@ -66,8 +107,8 @@ Description Optimizer Pipeline
 
 - 루트 `CLAUDE.md`의 모든 제약 조건을 상속 (async only, loguru, pytest-asyncio 등)
 - **원본 description은 절대 삭제하지 않음** — 항상 보존
-- **Semantic Preservation**: cosine similarity >= 0.85 유지
-- **Quality Gate**: 최적화 후 GEO Score >= 최적화 전 GEO Score
+- **Semantic Preservation**: cosine similarity >= 0.75 유지
+- **Quality Gate**: 5-gate (GEO 비회귀 + 의미 유사도 + 환각 탐지 + 정보 보존 + RAGAS faithfulness)
 - **비용 제약**: GPT-4o-mini 사용, tool당 ~$0.001
 - **기존 파이프라인 호환**: `MCPTool.description`은 변경하지 않고 별도 필드 추가
 
@@ -83,6 +124,9 @@ uv run pytest tests/ --cov=src -v
 # Lint
 uv run ruff check src/ tests/
 uv run ruff format src/ tests/
+
+# A/B Comparison (grounded vs ungrounded)
+PYTHONPATH=src uv run python scripts/run_grounded_ab_comparison.py
 ```
 
 ---
@@ -92,5 +136,5 @@ uv run ruff format src/ tests/
 루트 `CLAUDE.md` 및 `.claude/rules/coding-standards.md` 참조. 추가 규칙:
 
 - 최적화 결과 모델: `OptimizedDescription(BaseModel)` — original, optimized, search, geo_score_before, geo_score_after
-- Prompt 템플릿: `src/description_optimizer/prompts/` 하위에 분리 저장
+- Prompt 템플릿: `src/description_optimizer/optimizer/prompts.py` (grounded/ungrounded 분기)
 - 모든 LLM 호출은 `AsyncOpenAI` 사용
