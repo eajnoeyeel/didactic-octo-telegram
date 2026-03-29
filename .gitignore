@@ -6,3 +6,7 @@ __pycache__
 .coverage
 .serena
 .worktrees
+
+# External datasets (large, downloaded separately)
+data/external/mcp-zero/
+data/external/mcp-atlas/
