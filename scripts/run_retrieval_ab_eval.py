@@ -34,12 +34,10 @@ async def load_tools(tools_path: Path) -> dict[str, str]:
     with open(tools_path) as f:
         for line in f:
             server = json.loads(line.strip())
-            server_id = server.get("qualifiedName", server.get("name", ""))
             for tool in server.get("tools", []):
-                tool_name = tool.get("name", "")
-                tool_id = f"{server_id}::{tool_name}"
+                tool_id = tool.get("tool_id", "")
                 desc = tool.get("description", "")
-                if desc:
+                if tool_id and desc:
                     tool_descriptions[tool_id] = desc
     return tool_descriptions
 
@@ -186,6 +184,43 @@ async def main(args: argparse.Namespace) -> None:
     else:
         logger.info("RESULT: Optimization DEGRADES retrieval — investigate")
 
+    # 결과 JSON 저장
+    output_path = Path(args.output) if args.output else Path("data/verification/retrieval_ab_report.json")
+    report = {
+        "n_tools": len(shared_tools),
+        "n_queries": sum(scores_original[t]["n_queries"] for t in shared_tools),
+        "condition_a": {
+            "name": "original",
+            "p_at_1": float(np.mean(p1_orig)),
+            "mrr": float(np.mean(mrr_orig)),
+        },
+        "condition_b": {
+            "name": "optimized",
+            "p_at_1": float(np.mean(p1_opt)),
+            "mrr": float(np.mean(mrr_opt)),
+        },
+        "delta_p_at_1": float(delta_p1),
+        "delta_mrr": float(delta_mrr),
+        "per_tool_improved": improved,
+        "per_tool_degraded": degraded,
+        "per_tool_same": same,
+        "per_tool_details": {
+            t: {
+                "original_p1": scores_original[t]["p_at_1"],
+                "optimized_p1": scores_optimized[t]["p_at_1"],
+                "delta_p1": scores_optimized[t]["p_at_1"] - scores_original[t]["p_at_1"],
+                "original_mrr": scores_original[t]["mrr"],
+                "optimized_mrr": scores_optimized[t]["mrr"],
+                "n_queries": scores_original[t]["n_queries"],
+            }
+            for t in sorted(shared_tools)
+        },
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w") as f:
+        json.dump(report, f, indent=2, ensure_ascii=False)
+    logger.info(f"Report saved to {output_path}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Retrieval A/B Evaluation")
@@ -195,5 +230,6 @@ if __name__ == "__main__":
         "--optimized",
         default="data/verification/grounded_optimization_results.jsonl",
     )
+    parser.add_argument("--output", default=None, help="Report JSON output path")
     parsed = parser.parse_args()
     asyncio.run(main(parsed))
