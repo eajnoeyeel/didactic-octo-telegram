@@ -132,9 +132,11 @@ async def main(args: argparse.Namespace) -> None:
         f"{len(optimized_descriptions)} optimized descriptions"
     )
 
+    from config import Settings
     from embedding.openai_embedder import OpenAIEmbedder
 
-    embedder = OpenAIEmbedder()
+    settings = Settings()
+    embedder = OpenAIEmbedder(api_key=settings.openai_api_key)
 
     # Condition A: 원본 description
     logger.info("=== Condition A: Original descriptions ===")
