@@ -10,7 +10,7 @@
 | 항목 | 현재 상태 |
 |------|-----------|
 | 완료된 Phase | Phase 0 ~ Phase 5, Description Optimizer Grounded Optimization |
-| 진행중 | **GEO Scorer 개선 리서치** (Goodhart's Law 문제 발견) |
+| 진행중 | **GEO-P@1 불일치 근본원인 분석** (P@1 평가 완료, δP@1=-0.069) |
 | 다음 Phase | Phase 6 (Reranker) + OQ-2 (Pool 크롤링/인덱싱) |
 | 테스트 | **389 passed** (main 233 + desc-optimizer 156) |
 | 커버리지 | **92%** (feat/description-optimizer 기준) |
@@ -26,13 +26,15 @@
 | A/B 비교 (30 tools) | 완료 — 환각 제거 성공, GEO scorer 한계 발견 |
 | **P@1 A/B 평가** | **완료 — δP@1 = -0.069 (검색 성능 저하)** |
 | **핵심 발견** | GEO↑ but P@1↓: 프록시 메트릭이 실제 검색 성능과 불일치 |
-| **다음 단계** | GEO-P@1 불일치 근본원인 분석 → 최적화 전략 재설계 |
+| **다음 단계** | GEO-P@1 불일치 근본원인 분석 → 최적화 전략 재설계 (새 세션) |
 | 상세 보고서 | `data/verification/retrieval_ab_report.json` |
 
 **P@1 A/B 평가 상세 (2026-03-29):**
 - 36 GT 도구 최적화 → 18 success, 18 gate-rejected
-- Original P@1: 0.5417, Optimized P@1: 0.4722
+- Original P@1: 0.5417, Optimized P@1: 0.4722, **δP@1 = -0.069**
 - Per-tool: 1 improved (`github::list_issues`), 3 degraded (`math-mcp::median`, `math-mcp::round`, `instagram::GET_USER_MEDIA`), 32 same
+- **결론**: GEO 프록시 메트릭이 검색 성능과 반대 방향 — 근본원인 분석 필요
+- 가설: (a) GEO 차원 무관성 (b) 길이→임베딩 희석 (c) sibling 혼동
 
 ---
 

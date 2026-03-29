@@ -34,7 +34,7 @@ Description Optimizer — Provider가 MCP 서버/도구를 등록할 때 descrip
 - doc2query 쿼리 인식 최적화 프롬프트 (`build_query_aware_prompt`)
 - P@1 A/B 검색 평가 스크립트 (`scripts/run_retrieval_ab_eval.py`)
 
-**다음 단계:** ~~A/B 비교 재실행~~ (완료) → ~~P@1 end-to-end 평가~~ (완료, δP@1=-0.069) → GEO-P@1 불일치 근본원인 분석
+**다음 단계:** ~~A/B 비교 재실행~~ (완료) → ~~P@1 end-to-end 평가~~ (완료, δP@1=-0.069) → **GEO-P@1 불일치 근본원인 분석** (새 세션)
 
 ---
 
@@ -42,7 +42,9 @@ Description Optimizer — Provider가 MCP 서버/도구를 등록할 때 descrip
 
 | 파일 | 내용 |
 |------|------|
-| `docs/analysis/grounded-ab-comparison-report.md` | **A/B 비교 보고서 + 연구 방향** (새 세션 시작점) |
+| `data/verification/retrieval_ab_report.json` | **P@1 A/B 평가 결과** — per-tool breakdown 포함 (새 세션 시작점) |
+| `data/verification/gt_optimized_descriptions.jsonl` | GT 도구 최적화 결과 (18 success, 18 rejected) |
+| `docs/analysis/grounded-ab-comparison-report.md` | A/B 비교 보고서 + 연구 방향 |
 | `docs/analysis/description-optimizer-root-cause-analysis.md` | 근본원인 분석 (Goodhart's Law, 환각 사례) |
 | `docs/progress/grounded-optimization-handoff.md` | 구현 완료 내역 (Task 1-10 커밋 + 상세) |
 | `docs/superpowers/plans/2026-03-29-description-optimizer-grounded-optimization.md` | 구현 계획서 |
@@ -103,10 +105,21 @@ Description Optimizer Pipeline
 - **결론**: GEO 점수 개선이 실제 검색 성능과 불일치 — GEO 프록시 메트릭 신뢰도 재검토 필요
 - 상세: `data/verification/retrieval_ab_report.json`
 
-## 미해결 과제
+## 미해결 과제 (우선순위순)
 
 1. ~~**P@1 end-to-end 검증**~~ — 완료. δP@1 = -0.069 (검색 성능 저하 확인)
-2. **GEO-P@1 불일치 근본원인 분석**: 최적화된 description이 GEO↑ 하지만 P@1↓인 원인 규명
+2. **[최우선] GEO-P@1 불일치 근본원인 분석** (새 세션에서 작업)
+   - **문제**: GEO +0.19 향상이 P@1 -0.069 하락으로 이어짐 — 프록시가 방향 자체를 반대로 가리킴
+   - **분석 대상 가설 3개**:
+     - (a) GEO 차원 자체의 문제: 휴리스틱이 embedding 검색 성능과 무관한 특성 측정
+     - (b) 길이 효과: 최적화 description 길어짐 → embedding vector가 query에서 멀어짐 (정보 희석)
+     - (c) sibling 혼동: disambiguation 텍스트가 오히려 sibling tool embedding과 가까워지게 함
+   - **분석 도구**: `data/verification/retrieval_ab_report.json` (per-tool breakdown), `data/verification/gt_optimized_descriptions.jsonl` (18 success)
+   - **degraded 3건 집중 분석**: `math-mcp::median`, `math-mcp::round`, `instagram::GET_USER_MEDIA`
+   - **가설별 대응 방향**:
+     - (a) → GEO 차원 재설계 또는 GEO 폐기, P@1 직접 최적화
+     - (b) → search_description(짧은 버전) embedding 사용
+     - (c) → disambiguation 전략 변경
 3. **RAGAS faithfulness 파이프라인 통합**: 현재 gate만 구현됨, 최적화 루프에 check_faithfulness 통합 필요
 4. **disambiguation 개선**: regex 대조 문구 → sibling tools 간 임베딩 거리 기반 측정
 5. **fluency 측정 고도화**: 현재 휴리스틱(문장 수, 연결어). 향후 LLM-as-Judge(별도 모델) 검토
@@ -135,8 +148,18 @@ uv run pytest tests/ --cov=src -v
 uv run ruff check src/ tests/
 uv run ruff format src/ tests/
 
-# A/B Comparison (grounded vs ungrounded)
+# A/B Comparison (grounded vs ungrounded GEO)
 PYTHONPATH=src uv run python scripts/run_grounded_ab_comparison.py
+
+# GT 도구 최적화 (grounded)
+PYTHONPATH=src uv run python scripts/optimize_gt_tools.py
+
+# P@1 A/B 평가 (원본 vs 최적화 embedding 검색)
+PYTHONPATH=src uv run python scripts/run_retrieval_ab_eval.py \
+    --tools data/raw/servers.jsonl \
+    --ground-truth data/ground_truth/seed_set.jsonl \
+    --optimized data/verification/gt_optimized_descriptions.jsonl \
+    --output data/verification/retrieval_ab_report.json
 ```
 
 ---
