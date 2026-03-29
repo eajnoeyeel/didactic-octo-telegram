@@ -1,7 +1,7 @@
 # MCP Discovery Platform — 진행 현황 보고서
 
-> 최종 업데이트: 2026-03-26
-> 브랜치: `main`
+> 최종 업데이트: 2026-03-29
+> 브랜치: `main` + `feat/description-optimizer` (활성)
 
 ---
 
@@ -9,13 +9,30 @@
 
 | 항목 | 현재 상태 |
 |------|-----------|
-| 완료된 Phase | Phase 0 ~ Phase 5 |
+| 완료된 Phase | Phase 0 ~ Phase 5, Description Optimizer Grounded Optimization |
+| 진행중 | **GEO Scorer 개선 리서치** (Goodhart's Law 문제 발견) |
 | 다음 Phase | Phase 6 (Reranker) + OQ-2 (Pool 크롤링/인덱싱) |
-| 테스트 | **233 passed**, 0 skipped |
-| 커버리지 | **98.56%** (목표 80%+ 대폭 초과) |
+| 테스트 | **389 passed** (main 233 + desc-optimizer 156) |
+| 커버리지 | **92%** (feat/description-optimizer 기준) |
 | Lint/Format | PASS (ruff check + ruff format) |
 | 외부 서비스 | Qdrant Docker 로컬 + Smithery API + OpenAI API 실제 연동 검증 완료 |
 | PR | #1 (core-pipeline), #2 (ground-truth) 머지 완료 |
+
+### Description Optimizer 현황 (feat/description-optimizer)
+
+| 항목 | 상태 |
+|------|------|
+| Grounded Optimization | 10 tasks 구현 완료 |
+| A/B 비교 (30 tools) | 완료 — 환각 제거 성공, GEO scorer 한계 발견 |
+| **P@1 A/B 평가** | **완료 — δP@1 = -0.069 (검색 성능 저하)** |
+| **핵심 발견** | GEO↑ but P@1↓: 프록시 메트릭이 실제 검색 성능과 불일치 |
+| **다음 단계** | GEO-P@1 불일치 근본원인 분석 → 최적화 전략 재설계 |
+| 상세 보고서 | `data/verification/retrieval_ab_report.json` |
+
+**P@1 A/B 평가 상세 (2026-03-29):**
+- 36 GT 도구 최적화 → 18 success, 18 gate-rejected
+- Original P@1: 0.5417, Optimized P@1: 0.4722
+- Per-tool: 1 improved (`github::list_issues`), 3 degraded (`math-mcp::median`, `math-mcp::round`, `instagram::GET_USER_MEDIA`), 32 same
 
 ---
 
@@ -278,17 +295,24 @@ tests/
 
 ## 다음 단계
 
-### 즉시 가능 (외부 서비스 불필요)
+### 우선순위 1: Description Optimizer GEO Scorer 개선
+1. **논문 리서치** — G-Eval, FActScore, SelfCheckGPT, doc2query, ToolBench, Gorilla 등
+2. **Scorer 개선 방향 결정** — LLM-as-Judge / Retrieval-based eval / Heuristic 보강 중 선택
+3. **구현 및 A/B 재검증** — 개선된 scorer로 grounded A/B 비교 재실행
+4. **상세:** `docs/analysis/grounded-ab-comparison-report.md` Section 5 참조
+
+### 우선순위 2: 기존 파이프라인 진행
 1. **OQ-2: 임베딩 인덱스 빌드** — `scripts/collect_data.py` + `scripts/build_index.py --pool-size 50`으로 Pool 50 인덱싱
-2. **E0 실험** — `evaluate(flat_strategy, gt_queries)` vs `evaluate(sequential_strategy, gt_queries)` 비교 (Phase 5 완료로 unblocked)
+2. **E0 실험** — `evaluate(flat_strategy, gt_queries)` vs `evaluate(sequential_strategy, gt_queries)` 비교
 
 ### 백로그
 
-> OpenAI API 키 확보 완료 (2026-03-25). 통합 테스트 활성화 완료.
-
 | 우선순위 | 항목 | 상태 |
 |---------|------|------|
-| ~~높음~~ | ~~`openai_embedder.py` 통합 테스트 활성화 (skip 6개 해소)~~ | **완료** |
-| ~~높음~~ | ~~Synthetic GT 생성 실행 (`scripts/generate_ground_truth.py`)~~ — 838개 생성 | **완료** |
+| **높음** | GEO Scorer 개선 리서치 (Goodhart's Law 해결) | **진행중** |
+| ~~높음~~ | ~~Grounded Optimization 구현 (10 tasks)~~ | **완료** (2026-03-29) |
+| ~~높음~~ | ~~`openai_embedder.py` 통합 테스트 활성화~~ | **완료** |
+| ~~높음~~ | ~~Synthetic GT 생성 실행~~ — 838개 생성 | **완료** |
 | 높음 | 임베딩 인덱스 빌드 (`scripts/build_index.py`) | 대기 |
 | 중간 | E0 실험: 1-Layer vs 2-Layer 검증 | Phase 5 완료 후 |
+| 중간 | Precision@1 end-to-end 평가 (tool selection A/B) | Scorer 개선 후 |

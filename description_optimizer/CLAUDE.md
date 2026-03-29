@@ -34,7 +34,7 @@ Description Optimizer — Provider가 MCP 서버/도구를 등록할 때 descrip
 - doc2query 쿼리 인식 최적화 프롬프트 (`build_query_aware_prompt`)
 - P@1 A/B 검색 평가 스크립트 (`scripts/run_retrieval_ab_eval.py`)
 
-**다음 단계:** ~~A/B 비교 재실행~~ (완료) → P@1 end-to-end 평가 → RAGAS 파이프라인 통합
+**다음 단계:** ~~A/B 비교 재실행~~ (완료) → ~~P@1 end-to-end 평가~~ (완료, δP@1=-0.069) → GEO-P@1 불일치 근본원인 분석
 
 ---
 
@@ -95,12 +95,21 @@ Description Optimizer Pipeline
 - **P@1 A/B 평가**: `scripts/run_retrieval_ab_eval.py` — 원본 vs 최적화 인메모리 검색 비교
 - **리서치 종합**: `description_optimizer/docs/research-phase2-synthesis.md`
 
+## P@1 A/B 평가 결과 (2026-03-29)
+
+- **Original P@1: 0.5417, Optimized P@1: 0.4722, Delta: -0.0694**
+- 36 tools (18 optimized, 18 gate-rejected → 원본 유지)
+- Per-tool: 1 improved, 3 degraded, 32 same
+- **결론**: GEO 점수 개선이 실제 검색 성능과 불일치 — GEO 프록시 메트릭 신뢰도 재검토 필요
+- 상세: `data/verification/retrieval_ab_report.json`
+
 ## 미해결 과제
 
-1. **P@1 end-to-end 검증**: `scripts/run_retrieval_ab_eval.py` 실행 — 프록시(GEO)가 아닌 실제 검색 성능 측정
-2. **RAGAS faithfulness 파이프라인 통합**: 현재 gate만 구현됨, 최적화 루프에 check_faithfulness 통합 필요
-3. **disambiguation 개선**: regex 대조 문구 → sibling tools 간 임베딩 거리 기반 측정
-4. **fluency 측정 고도화**: 현재 휴리스틱(문장 수, 연결어). 향후 LLM-as-Judge(별도 모델) 검토
+1. ~~**P@1 end-to-end 검증**~~ — 완료. δP@1 = -0.069 (검색 성능 저하 확인)
+2. **GEO-P@1 불일치 근본원인 분석**: 최적화된 description이 GEO↑ 하지만 P@1↓인 원인 규명
+3. **RAGAS faithfulness 파이프라인 통합**: 현재 gate만 구현됨, 최적화 루프에 check_faithfulness 통합 필요
+4. **disambiguation 개선**: regex 대조 문구 → sibling tools 간 임베딩 거리 기반 측정
+5. **fluency 측정 고도화**: 현재 휴리스틱(문장 수, 연결어). 향후 LLM-as-Judge(별도 모델) 검토
 
 ---
 
