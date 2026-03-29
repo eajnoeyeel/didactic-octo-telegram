@@ -2,7 +2,7 @@
 
 > **이 파일은 규칙(conventions, constraints)과 참조 포인터만 둔다.** 상세 컨텍스트는 각 문서에 분리.
 > 매 세션마다 전체 로드되므로 prompt bloat 방지를 위해 간결하게 유지할 것.
-> 최종 업데이트: 2026-03-26
+> 최종 업데이트: 2026-03-29
 
 ---
 
@@ -20,7 +20,7 @@ MCP Discovery Platform — a two-sided platform connecting LLM clients with MCP 
 
 **North Star**: Precision@1 >= 50% (Pool 50, mixed domain)
 
-**Core Thesis**: "Higher description quality → higher tool selection rate" (validated via E4 A/B experiment)
+**Core Thesis**: "Higher description quality → higher tool selection rate" (E4에서 검증할 핵심 가설)
 
 ---
 
@@ -40,10 +40,12 @@ MCP Discovery Platform — a two-sided platform connecting LLM clients with MCP 
 | `docs/design/experiment-details.md` | 실험 상세 스펙 (조건 테이블, CLI, 출력 형식) |
 | `docs/design/ground-truth-design.md` | GT 스키마, 생성 전략 |
 | `docs/design/code-structure.md` | 계획된 디렉토리/파일 구조 |
-| `docs/plan/implementation.md` | **구현의 source of truth** (Phase 요약 + 상세 파일 포인터) |
+| `docs/plan/implementation.md` | 구현 로드맵 (Phase 요약 + 상세 파일 포인터) |
 | `docs/plan/deferred.md` | 후순위 기능 + Phase 13 (Gated) |
 | `docs/plan/checklist.md` | 진행 체크리스트 |
-| `docs/mentoring/open-questions.md` | OQ-2~5 미결 사항 (OQ-1 해결됨, living document) |
+| `docs/mentoring/open-questions.md` | 과거 멘토링 작업 메모 (historical). 현재 blockers는 `docs/plan/checklist.md` 기준 |
+| `docs/research/external-benchmarks-20260328.md` | 외부 벤치마크 조사 (MCP-Zero, MCP-Atlas, Description Smells) |
+| `docs/handoff/external-data-strategy-20260328.md` | 외부 데이터 전략 변경 핸드오프 (ADR-0011, ADR-0012) |
 | `docs/CONVENTIONS.md` | papers/, research/ 문서 템플릿, 네이밍 규약 |
 | `proxy_verification/CLAUDE.md` | Proxy MCP 검증 작업 지침 (하위 문서 포인터 포함) |
 | `docs/progress/status-report.md` | **진행 현황 보고서** — Phase별 완료 현황, 테스트/커버리지, 백로그 |
@@ -58,8 +60,8 @@ When code conflicts with design docs, **docs/ takes precedence**.
 # Dependencies
 uv sync                              # Install all deps
 
-# Run server
-uv run uvicorn src.api.main:app --reload
+# Run server (planned; `src/api/main.py` not present yet)
+# uv run uvicorn src.api.main:app --reload
 
 # Tests
 uv run pytest tests/ -v              # All tests
@@ -77,7 +79,9 @@ uv run python scripts/collect_data.py
 uv run python scripts/build_index.py --pool-size 50
 uv run python scripts/generate_ground_truth.py
 uv run python scripts/verify_ground_truth.py   # GT 품질 검증 (통계/QualityGate/무결성)
-uv run python scripts/run_experiments.py --experiment E1
+uv run python scripts/import_mcp_zero.py       # MCP-Zero → MCPServer/MCPTool + Qdrant
+uv run python scripts/convert_mcp_atlas.py     # MCP-Atlas → GT JSONL
+uv run python scripts/run_e0.py                         # E0 baseline 실행
 ```
 
 ---
@@ -103,7 +107,7 @@ LLM → Bridge MCP Server (find_best_tool / execute_tool)
 
 All pluggable components use abstract base classes — business logic depends on ABCs only:
 - `PipelineStrategy` — search strategies, swapped via `StrategyRegistry`
-- `Embedder` — BGE-M3, OpenAI text-embedding-3-small (voyage-code-2 prohibited)
+- `Embedder` — BGE-M3, OpenAI text-embedding-3-small, OpenAI text-embedding-3-large (E2 결정, voyage-code-2 prohibited)
 - `Reranker` — Cohere Rerank 3, LLM fallback
 - `Evaluator` — metric computation plugins
 
@@ -116,7 +120,7 @@ All pluggable components use abstract base classes — business logic depends on
 
 ### Experiment System (E0-E7)
 
-Experiments run sequentially with dependencies: E0 (1-Layer vs 2-Layer) → E1 (strategy comparison) → E2 (embedding) → E3 (reranker) → E4/E5/E6 (parallel: thesis validation, pool scale, pool similarity). Each experiment changes exactly one independent variable, controlled via `run_experiments.py --experiment E{n}`.
+Experiments run sequentially with dependencies: E0 (1-Layer vs 2-Layer) → E1 (strategy comparison) → E2 (embedding) → E3 (reranker) → E4/E5/E6 (parallel: thesis validation, pool scale, pool similarity). Each experiment changes exactly one independent variable. Currently only `scripts/run_e0.py` (Flat + Sequential) is implemented; `run_experiments.py` CLI는 Phase 10 이후 구현 예정.
 
 ---
 
@@ -127,8 +131,9 @@ Experiments run sequentially with dependencies: E0 (1-Layer vs 2-Layer) → E1 (
 - **Testing**: pytest + pytest-asyncio with `asyncio_mode="auto"`. Integration tests guarded by `@pytest.mark.skipif(not os.getenv("API_KEY"))`.
 - **Qdrant IDs**: `uuid.uuid5(MCP_DISCOVERY_NAMESPACE, tool_id)` — deterministic, upsert-safe.
 - **Confidence branching**: gap-based threshold 0.15 (rank1 - rank2 score gap).
-- **Ground truth**: JSONL format in `data/ground_truth/`. Seed set is manually curated; synthetic is LLM-generated.
-- **`.env` 파일은 절대 커밋하지 않음**
+- **Ground truth**: JSONL format in `data/ground_truth/`. Seed set is manually curated; MCP-Atlas is per-step decomposed (ADR-0012); synthetic is LLM-generated (보조).
+- **`.env` 파일은 절대 커밋하지 않음** — `.env.example` 참조하여 생성 (필수: OPENAI_API_KEY, QDRANT_URL, COHERE_API_KEY)
+- **External data** (`data/external/`)는 Git-ignored. 별도 다운로드 필요 (`data/external/README.md` 참조)
 
 ---
 

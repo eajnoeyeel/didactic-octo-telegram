@@ -1,6 +1,8 @@
 # 코드 구조 (계획)
 
 > 상세: `docs/superpowers/plans/2026-03-18-mcp-discovery-platform.md`
+> 아래 트리는 current + planned를 함께 보여주는 target structure다.
+> 실제 구현 상태는 `docs/plan/checklist.md`, `docs/progress/status-report.md`를 기준으로 본다.
 
 ```
 mcp-discovery/
@@ -9,9 +11,10 @@ mcp-discovery/
 │   ├── config.py              # pydantic-settings, 환경변수 기반
 │   ├── pipeline/
 │   │   ├── strategy.py        # PipelineStrategy ABC + StrategyRegistry
+│   │   ├── flat.py            # 1-Layer E0 baseline (Tool 전체 직접 검색)
 │   │   ├── sequential.py      # Strategy A: 서버 인덱스 → 서버 내 Tool 검색 → Reranker
-│   │   ├── parallel.py        # Strategy B: 서버/Tool 병렬 검색 → RRF 합산 → Reranker
-│   │   ├── taxonomy_gated.py  # Strategy C: 인텐트 분류 → 카테고리 내 검색 (CTO 확인 후)
+│   │   ├── parallel.py        # [planned] Strategy B: 서버/Tool 병렬 검색 → RRF 합산 → Reranker
+│   │   ├── taxonomy_gated.py  # [planned] Strategy C: 인텐트 분류 → 카테고리 내 검색 (Phase 13)
 │   │   └── confidence.py      # Gap-based confidence 분기 (threshold 0.15)
 │   ├── embedding/
 │   │   ├── base.py            # Embedder ABC
@@ -62,7 +65,7 @@ mcp-discovery/
 │   ├── raw/                   # Smithery 크롤링 결과 (servers.jsonl)
 │   ├── ground_truth/          # seed_set.jsonl, mcp_atlas.jsonl, synthetic.jsonl
 │   ├── external/              # 외부 데이터셋 (Git-ignored, 별도 다운로드)
-│   │   ├── mcp-zero/          # MCP-Zero 308 servers (servers.json, embeddings/)
+│   │   ├── mcp-zero/          # MCP-Zero 308 servers (repo-local canonical input: servers.json)
 │   │   ├── mcp-atlas/         # MCP-Atlas GT 원본 (*.parquet)
 │   │   └── README.md          # 다운로드 방법, 라이선스 정보
 │   └── experiments/           # 실험 결과 (CSV/JSON)
@@ -70,8 +73,8 @@ mcp-discovery/
 │   ├── collect_data.py        # 크롤러 + 직접 연결 실행
 │   ├── build_index.py         # 임베딩 + Qdrant upsert (--pool-size 옵션)
 │   ├── generate_ground_truth.py  # GT 생성 + 검증
-│   ├── import_mcp_zero.py     # MCP-Zero JSON → MCPServer/MCPTool + Qdrant 인덱싱
-│   ├── convert_mcp_atlas.py   # MCP-Atlas parquet → GT JSONL (첫 번째 tool call 추출)
+│   ├── import_mcp_zero.py     # MCP-Zero canonical JSON → MCPServer/MCPTool + Qdrant 인덱싱
+│   ├── convert_mcp_atlas.py   # MCP-Atlas parquet → GT JSONL (target: ADR-0012 per-step 분해)
 │   └── run_experiments.py     # 실험 실행 CLI
 ├── tests/
 │   ├── unit/                  # 모듈별 단위 테스트

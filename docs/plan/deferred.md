@@ -28,7 +28,9 @@ All features above WILL be implemented. This plan produces the core pipeline + P
 
 ## Phase 13: Gated Features (Post-Core, After CTO Mentoring 2026-03-25)
 
-> **Gate**: Do NOT start this phase until (a) Phases 0–12 are passing, AND (b) CTO mentoring on 2026-03-25 has confirmed Strategy C viability and MCP Tool server design.
+> **Gate**: Do NOT start this phase until (a) Phases 0–12 are passing, AND (b) CTO mentoring confirmation.
+>
+> **CTO 멘토링 결과 (2026-03-25)**: Strategy C(Taxonomy-gated)는 E1에서 A/B와 비교 후 결정. MCP Tool Server는 core pipeline 안정화 후 구현. Phase 13 gate 조건 (a) 유지 — Phases 0-12 완료 후 진행.
 >
 > **Pre-implementation reference**: `proxy_verification/docs/verification-report.md` — E2E 검증 완료 (6/6 PASS, 2026-03-22). MCP SDK import 경로, 도구 발견 패턴, 에러 전파 패턴, pytest-asyncio 호환성 이슈 해결책 포함.
 

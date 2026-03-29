@@ -1,28 +1,34 @@
 # 실험 상세 — E0-E7 Full Specs
 
-> 최종 업데이트: 2026-03-22
+> 최종 업데이트: 2026-03-29
 > 실험 허브 (요약/방법론): `./experiment-design.md`
 
 ---
 
 ## E0: 1-Layer vs 2-Layer 아키텍처 검증
 
-> E1의 전제 조건. 2-Layer가 이 규모(50-100 서버)에서 Precision@1을 높이는지 확인.
+> E1의 전제 조건. 2-Layer가 MCP-Zero 308 서버 규모에서 Precision@1을 높이는지 확인.
 
 | 조건 | 아키텍처 | 전략 | 임베딩 | Reranker | Pool |
 |------|----------|------|--------|----------|------|
-| E0-A | **1-Layer** (Tool 전체 직접 검색) | — | BGE-M3 | Cohere | Base (50) |
-| E0-B | **2-Layer** Sequential | Sequential | BGE-M3 | Cohere | Base (50) |
-| E0-C | **2-Layer** Parallel (RRF) | Parallel | BGE-M3 | Cohere | Base (50) |
+| E0-A | **1-Layer** (Tool 전체 직접 검색) | — | OpenAI text-embedding-3-small | Cohere | MCP-Zero (308) |
+| E0-B | **2-Layer** Sequential | Sequential | OpenAI text-embedding-3-small | Cohere | MCP-Zero (308) |
+| E0-C | **2-Layer** Parallel (RRF) | Parallel | OpenAI text-embedding-3-small | Cohere | MCP-Zero (308) |
+
+> **임베딩 선택 근거**: E0의 독립 변수는 아키텍처(1-Layer vs 2-Layer)이므로 임베딩은 통제 변인. 현재 구현된 `OpenAIEmbedder`(text-embedding-3-small)를 사용. BGE-M3는 E2에서 비교. MCP-Zero pre-computed `text-embedding-3-large` 벡터는 E2-C 조건에서 활용.
 
 - **측정**: Precision@1, Tool Recall@10, MRR, Latency (p50/p95), Server Classification Error Rate (E0-B만)
-- **판정**: E0-B 또는 E0-C가 E0-A 대비 Precision@1 **+5%p 이상** → 2-Layer 유효 → E1 진행
+- **판정**: E0-B가 E0-A 대비 Precision@1 **+5%p 이상** → 2-Layer 유효 → E1 진행. E0-C는 Phase 7(Parallel 구현) 이후 추가 실행.
 - **미달 시**: 2-Layer 복잡성 대비 이득 없음 → E1을 1-Layer 기준 재설계 (CTO 논의)
 
 ```bash
-python run_experiments.py --experiment E0 --architecture 1layer --pool base
-python run_experiments.py --experiment E0 --strategy sequential --pool base
-python run_experiments.py --experiment E0 --strategy parallel --pool base
+# 현재 구현됨:
+uv run python scripts/run_e0.py                # Flat + Sequential (Parallel은 Phase 7 이후)
+
+# 계획됨 (run_experiments.py 구현 후):
+# python run_experiments.py --experiment E0 --architecture 1layer --pool base
+# python run_experiments.py --experiment E0 --strategy sequential --pool base
+# python run_experiments.py --experiment E0 --strategy parallel --pool base
 ```
 
 ---
@@ -33,17 +39,18 @@ python run_experiments.py --experiment E0 --strategy parallel --pool base
 
 | 조건 | 전략 | 임베딩 | Reranker | Pool |
 |------|------|--------|----------|------|
-| E1-A | Sequential | BGE-M3 | Cohere | Base (50) |
-| E1-B | Parallel (RRF) | BGE-M3 | Cohere | Base (50) |
-| E1-C | Taxonomy-gated | BGE-M3 | Cohere | Base (50) |
+| E1-A | Sequential | BGE-M3 | Cohere | MCP-Zero (308) |
+| E1-B | Parallel (RRF) | BGE-M3 | Cohere | MCP-Zero (308) |
+| E1-C | Taxonomy-gated | BGE-M3 | Cohere | MCP-Zero (308) |
 
 - **측정**: Precision@1, Server Recall@K, Tool Recall@10, MRR, NDCG@5, Confusion Rate, Latency (p50/p95/p99)
 - **특수 측정 (Sequential만)**: Server Classification Error Rate 별도 로깅
 
 ```bash
-python run_experiments.py --experiment E1 --strategy sequential --pool base
-python run_experiments.py --experiment E1 --strategy parallel --pool base
-python run_experiments.py --experiment E1 --strategy taxonomy --pool base
+# 계획됨 (run_experiments.py + Parallel/Taxonomy 구현 후):
+# python run_experiments.py --experiment E1 --strategy sequential --pool base
+# python run_experiments.py --experiment E1 --strategy parallel --pool base
+# python run_experiments.py --experiment E1 --strategy taxonomy --pool base
 ```
 
 ### 결과 보고 형식
@@ -51,7 +58,7 @@ python run_experiments.py --experiment E1 --strategy taxonomy --pool base
 | 지표 | Sequential (A) | Parallel (B) | Taxonomy (C) | 최적 |
 |------|---------------|-------------|-------------|------|
 | Precision@1 | — | — | — | — |
-| Server Recall@3 | — | — | — | — |
+| Server Recall@5 | — | — | — | — |
 | Latency p95 | — | — | — | — |
 | Confusion Rate | — | — | — | — |
 
@@ -63,10 +70,9 @@ python run_experiments.py --experiment E1 --strategy taxonomy --pool base
 
 | 조건 | 전략 | 임베딩 | Reranker | Pool |
 |------|------|--------|----------|------|
-| E2-A | (E1 최적) | BGE-M3 | Cohere | Base (50) |
-| E2-B | (E1 최적) | OpenAI text-embedding-3-small | Cohere | Base (50) |
-| E2-C | (E1 최적) | Voyage voyage-3 | Cohere | Base (50) |
-| E2-D | (E1 최적) | OpenAI text-embedding-3-large (MCP-Zero 제공, 3072D) | Cohere | Base (50) |
+| E2-A | (E1 최적) | BGE-M3 | Cohere | MCP-Zero (308) |
+| E2-B | (E1 최적) | OpenAI text-embedding-3-small | Cohere | MCP-Zero (308) |
+| E2-C | (E1 최적) | OpenAI text-embedding-3-large (MCP-Zero 제공, 3072D) | Cohere | MCP-Zero (308) |
 
 - **Primary**: Tool Recall@10
 - **Secondary**: Precision@1, Latency, 비용 (API call 수 x 단가)
@@ -81,9 +87,9 @@ python run_experiments.py --experiment E1 --strategy taxonomy --pool base
 
 | 조건 | 전략 | 임베딩 | Reranker | Pool |
 |------|------|--------|----------|------|
-| E3-A | (E1 최적) | (E2 최적) | Cohere Rerank 3 단독 | Base (50) |
-| E3-B | (E1 최적) | (E2 최적) | Cohere + LLM fallback (gap < threshold) | Base (50) |
-| E3-C | (E1 최적) | (E2 최적) | LLM-as-Judge 단독 | Base (50) |
+| E3-A | (E1 최적) | (E2 최적) | Cohere Rerank 3 단독 | MCP-Zero (308) |
+| E3-B | (E1 최적) | (E2 최적) | Cohere + LLM fallback (gap < threshold) | MCP-Zero (308) |
+| E3-C | (E1 최적) | (E2 최적) | LLM-as-Judge 단독 | MCP-Zero (308) |
 
 - **측정**: Precision@1 향상폭 (vs no-reranker baseline), Latency 증가, 비용
 - **Confidence 분기 최적화 (E3-B 세부)**:
@@ -204,12 +210,15 @@ model = sm.OLS(y, sm.add_constant(X)).fit()
 
 ---
 
-## 실험 자동화 — CLI 인터페이스
+## 실험 자동화 — CLI 인터페이스 (계획)
+
+> `scripts/run_experiments.py`는 아직 미구현. 현재는 `scripts/run_e0.py`만 사용 가능.
 
 ```bash
-python run_experiments.py --experiment E1 --strategy sequential --embedding bge-m3 --reranker cohere --pool base --ground-truth data/ground-truth/seed_set.jsonl
-python run_experiments.py --experiment E1 --all-conditions          # 전체 매트릭스
-python run_experiments.py --experiment E1 --strategy sequential --difficulty hard  # 특정 난이도
+# 계획된 CLI (Phase 10 이후):
+# python run_experiments.py --experiment E1 --strategy sequential --embedding bge-m3 --reranker cohere --pool base --ground-truth data/ground_truth/seed_set.jsonl
+# python run_experiments.py --experiment E1 --all-conditions          # 전체 매트릭스
+# python run_experiments.py --experiment E1 --strategy sequential --difficulty hard  # 특정 난이도
 ```
 
 ## 실험 출력 형식

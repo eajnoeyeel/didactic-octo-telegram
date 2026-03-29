@@ -18,19 +18,25 @@
 
 ## Evidence Triangulation Gate
 
-Pass if ≥ 2 of 3:
-```
-1. A/B Lift > 30%                    (causal)
-2. Spearman r_s > 0.6, p < 0.05     (correlational)
-3. OLS R² > 0.4                      (explanatory)
-```
+Per `docs/design/metrics-rubric.md` §Evidence Triangulation:
 
-McNemar's test: p < 0.05 required independently.
+```
+Criteria:
+  1. A/B Lift > 30%, McNemar p < 0.05  (causal — Primary)
+  2. Spearman r_s > 0.6, p < 0.05     (correlational)
+  3. OLS R² > 0.4                      (explanatory)
+
+Judgment (metrics-rubric.md §Evidence Triangulation):
+  3개 모두 통과  → 강한 증거
+  Primary + 1개  → 보통 증거
+  Primary만 통과 → 약한 증거
+  Primary 미통과 → 테제 기각
+```
 
 ## Regression Criteria
 
 - [ ] Best strategy from E1 reproduces E1 Precision@1 within ±2%p (pass^3 = 1.00)
-- [ ] Same 580 GT queries used (MCP-Atlas 500 + self seed 80)
+- [ ] Same ~230-320 GT queries used (MCP-Atlas per-step + self seed 80, all single-step)
 
 ## Metric Targets
 
@@ -54,10 +60,11 @@ Risk: HIGH — over-optimizing Version B inflates lift artificially
 ## CLI
 
 ```bash
-uv run python scripts/run_experiments.py --experiment E4 --pool description-quality
+# 계획됨 (`scripts/run_experiments.py` 구현 후):
+# uv run python scripts/run_experiments.py --experiment E4 --pool description-quality
 ```
 
 ## pass@k
 
 - Capability: pass@1 (single run, deterministic metrics)
-- Evidence gate: ≥ 2/3 triangulation criteria met
+- Evidence gate: Primary required + ≥ 1/2 remaining for moderate evidence
