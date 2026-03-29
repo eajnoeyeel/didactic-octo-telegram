@@ -1,6 +1,6 @@
 # Evaluation Metrics Rubric — 11개 지표 정의
 
-> 최종 업데이트: 2026-03-22
+> 최종 업데이트: 2026-03-29
 > 대시보드/모니터링: `./metrics-dashboard.md`
 
 ---
@@ -33,7 +33,7 @@
 
 - **정의**: `count(correct_server in top_K_servers) / total_queries`
 - **K값**: K=3 (서버 50개 이하), K=5 (서버 50개 이상)
-- **목표**: >= 90% (K=3)
+- **목표**: >= 90% (K값 규칙에 따름: 서버 ≤50이면 K=3, >50이면 K=5)
 - **Alert**: < 80% → 서버 임베딩 품질 문제 또는 서버 description 부족
 - **논문 근거**: ToolBench/ToolLLM (ICLR 2024)
 - **역할**: Leading indicator. Precision@1이 떨어질 때 이 지표를 먼저 확인. Sequential(A)에서 hard gate 역할
@@ -119,7 +119,7 @@ E7에서 3축 비교: GEO 6D vs Description Smells 4D vs 통합 모델
 ### 7. Server Classification Error Rate
 
 - **정의**: `1 - Server Recall@K` = 정답 서버가 Top-K에서 빠진 비율
-- **목표**: < 10% (K=3)
+- **목표**: < 10% (K값 규칙에 따름: 서버 ≤50이면 K=3, >50이면 K=5)
 - **Alert**: > 20% → Sequential 전략의 Layer 1 cutoff가 너무 공격적
 - **진단 용도**: Precision@1 낮을 때 "Layer 1 문제 vs Layer 2 문제" 분리
 
@@ -175,9 +175,9 @@ E7에서 3축 비교: GEO 6D vs Description Smells 4D vs 통합 모델
 - **Alert**: < 0.50
 - **Precision@1 보완**: disambiguation 케이스(Top-3 반환)에서 순위 전체 품질 측정. DP6 동적 분기 효과 필수 지표
 
-### 11. MRR (서버 레벨)
+### 11. MRR (Tool 레벨)
 
-- **정의**: `(1/|Q|) * Sum (1/rank_i)` (rank_i = 정답 서버 순위)
+- **정의**: `(1/|Q|) * Sum (1/rank_i)` (rank_i = 정답 tool의 검색 결과 내 순위)
 - **목표**: >= 0.80
 - **Alert**: < 0.60 → 서버 임베딩 또는 서버 description 품질 문제
 - **논문 근거**: Voorhees (TREC-8 QA, 1999)
@@ -193,6 +193,6 @@ E7에서 3축 비교: GEO 6D vs Description Smells 4D vs 통합 모델
 | `correct_tool_id` | Precision@1, Tool Recall@10, NDCG@5, Confusion Rate |
 | `difficulty` | 난이도별 Precision@1 분석 |
 | `category` | 도메인별 분석, Taxonomy-gated 평가 |
-| `relevance_grade` | NDCG graded relevance (0/1/2) |
+| `alternative_tools` | NDCG graded relevance (correct_tool=2, alternative=1, else=0) |
 | `manually_verified` | seed vs synthetic 구분 |
 | `ambiguity` | 모호도별 분석 |

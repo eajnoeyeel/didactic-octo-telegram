@@ -63,7 +63,7 @@
 ### 즉시 반영 (Phase 1-2)
 
 - **Confusion Rate metric 설계**: `src/evaluation/metrics/precision.py`에서 confusion failure 분석 시, 오답 Tool의 provider/등록 시점/description 유사도를 함께 로깅. 향후 "자연적 혼동 vs 의도적 혼동" 분류의 기반 데이터.
-- **Ground Truth adversarial 케이스**: `data/ground-truth/` 구조에 severity 필드 추가 — `"severity": "low" | "medium" | "high"`. ToolEmu의 risk-weighted evaluation 개념을 GT 스키마에 선반영.
+- **Ground Truth adversarial 케이스**: `data/ground_truth/` 구조에 severity 필드 추가 — `"severity": "low" | "medium" | "high"`. ToolEmu의 risk-weighted evaluation 개념을 GT 스키마에 선반영.
 - **High Similarity Pool에 adversarial 케이스 포함**: E6 실험(Pool 유사도 실험)의 High Similarity Pool 정의 시, ToolFlood 패턴을 모사한 Tool 클러스터 의도적 포함:
   - 동일 기능의 3-5개 Tool이 미세하게 다른 description 보유
   - 정상 Tool 1개 + 의미적으로 유사한 distractor 2-4개

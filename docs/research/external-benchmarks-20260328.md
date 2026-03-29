@@ -28,14 +28,14 @@
 
 ## 발견한 외부 자원 한눈에 보기
 
-| 자원 | 규모 | 핵심 특징 | 우리에게 쓸모 |
-|------|------|----------|-------------|
-| **MCP-Zero** | 308 servers, 2,797 tools | 우리 Sequential(A)와 거의 같은 2-stage routing. 임베딩 벡터 포함 | Pool 확장 (E0, E2, E5) |
-| **MCP-Atlas** | 500 human-authored tasks, 36 servers | Scale AI가 사람이 직접 작성. tool 이름 안 들어간 자연어 쿼리 | GT 대체 (E1) |
-| **MCPAgentBench** | 841 tasks, 20K+ tools | 정답 tool + 비슷한 distractor tool 섞어서 평가 | Ambiguity 설계 (E6) |
-| **Description Smells** | 4차원 18카테고리 smell 분류 | **Description 품질 → 선택률 인과 관계 검증 완료** (p < 0.001) | E4 선행 연구 / E7 루브릭 |
-| **BFCL** | 2,000 QA pairs | 업계 표준 function calling 벤치마크. Irrelevance Detection 포함 | 방법론 참고 |
-| **MCP-Bench** | 250 tools | 실제 MCP 서버를 Docker로 띄워 E2E 실행 평가 | Bridge proxy 검증 참고 |
+| 자원 | 규모 | 핵심 특징 | 우리에게 쓸모 | 검증 상태 |
+|------|------|----------|-------------|----------|
+| **MCP-Zero** | 308 servers, 2,797 tools | 2-stage routing + text-embedding-3-large (3072d) 벡터 포함 (단일 JSON) | Pool 확장 (E0, E2, E5) | ✅ GitHub에서 전체 스키마 확인 |
+| **MCP-Atlas** | 500 tasks, 36 servers, 307 tools | Scale AI human-authored. TRAJECTORY에 tool call 시퀀스 포함 | GT 대체 (E1) | ✅ 논문+코드 교차 확인 (parquet 다운로드 후 최종 확인 필요) |
+| **MCPAgentBench** | 200+ tasks (180 curated) | 정답 + distractor 혼합. 실행 기반 벤치마크 | 개념 참고 (E6) | ✅ tasks.json 스키마 확인 |
+| **Description Smells** | 10,831 servers 분석 | **Description → 선택률 인과 검증** (p < 0.001) | E4 선행 연구 / E7 | ✅ 수치 확인 (논문 2편 확인) |
+| **BFCL** | 2,000 QA pairs | 업계 표준 function calling. Irrelevance Detection | 방법론 참고 | - |
+| **MCP-Bench** | 28 servers | Docker E2E 실행 평가 (Apache 2.0) | Bridge proxy 참고 | - |
 
 ---
 
@@ -55,18 +55,11 @@
 
 **문제**: GT 품질이 낮으면 전략 비교 결과를 못 믿음.
 
-**해결**: **MCP-Atlas 500개 human GT**를 가져다 씀. 사람이 쓴 자연어라 tool 이름이 쿼리에 안 들어감(= Medium/Hard 난이도). multi-step task이므로 **첫 번째 tool call만 추출**하는 스크립트 하나 만들면 됨.
+**해결**: **MCP-Atlas 500개 human GT**를 가져다 씀. 사람이 쓴 자연어라 tool 이름이 쿼리에 안 들어감(= Medium/Hard 난이도). parquet 필드는 `TASK`, `PROMPT`, `ENABLED_TOOLS`, `TRAJECTORY`, `GTFA_CLAIMS`.
 
-```python
-for task in mcp_atlas_tasks:
-    first_tool = task["tool_calls"][0]
-    gt_entry = {
-        "query": task["instruction"],
-        "correct_tool_id": f"{first_tool['server_id']}::{first_tool['tool_name']}",
-    }
-```
+**핵심 발견 (parquet 분석 완료)**: MCP-Atlas는 multi-step 벤치마크. 평균 4.8 tool calls/task (min 3, max 17). TRAJECTORY는 대화 메시지 + tool_calls 내장 JSON array. 보일러플레이트 초기화 호출(`filesystem_list_allowed_directories` 36회 등)도 포함.
 
-→ 수동 검증 168개에 매달리던 시간 절약
+**GT 변환 전략**: per-step single-tool 분해 (ADR-0012). 상세 → `docs/adr/0012-per-step-ground-truth-decomposition.md`
 
 ---
 
@@ -74,7 +67,7 @@ for task in mcp_atlas_tasks:
 
 **문제**: BGE-M3 vs text-embedding-3-small 두 개만 비교하려 했음.
 
-**해결**: MCP-Zero에 **text-embedding-3-large (3072차원) 벡터가 이미 계산되어 포함**돼 있음. re-embed 필요 없이 baseline 공짜로 확보. 비교 대상이 2개 → 3개로 풍부해짐.
+**해결**: MCP-Zero에 **text-embedding-3-large (3072차원) 벡터가 이미 계산되어 포함**돼 있음 (server-level: `description_embedding` + `summary_embedding`, tool-level: `description_embedding`). re-embed 필요 없이 baseline 공짜로 확보. 비교 대상이 2개 → 3개로 풍부해짐.
 
 ---
 
@@ -111,9 +104,9 @@ for task in mcp_atlas_tasks:
 
 **문제**: 비슷한 tool 세트를 직접 구성하기 어려움.
 
-**해결**: MCPAgentBench의 **distractor 접근법** 차용. 정답 tool과 비슷하지만 다른 tool(= distractor)을 섞어서 유사도 수준별 pool 구성:
+**해결**: MCPAgentBench의 **distractor 개념**을 참고하되, 구현은 자체 설계. MCPAgentBench는 실행 기반 벤치마크라 정적 데이터 추출이 어려울 수 있음. MCP-Zero 308개 서버에서 도메인 유사도 기준으로 직접 서브셋 구성:
 
-- High similarity = distractor 많이 → 혼동 잘 되는 환경
+- High similarity = 같은 도메인 서버 밀집 → 혼동 잘 되는 환경
 - Low similarity = 완전 다른 도메인만 → 혼동 안 되는 환경
 
 ---
@@ -122,16 +115,20 @@ for task in mcp_atlas_tasks:
 
 **해결**: Description Smells의 **4차원(Accuracy / Functionality / Completeness / Conciseness)** 18카테고리를 우리 GEO Score 6차원과 비교. Spearman 상관으로 어느 루브릭이 selection_rate와 더 관련 높은지 측정.
 
+> 참고: Description Smells 관련 논문이 2편 존재:
+> - `2602.18914`: "From Docs to Descriptions" — 10,831 servers, 4차원 18카테고리 smell 분류
+> - `2602.14878`: "Tool Descriptions Are Smelly!" — 856 tools / 103 servers, 6-component scoring rubric
+
 ---
 
 ## 전략 변경 요약
 
 | 영역 | AS-IS (지금) | TO-BE (변경 후) |
 |------|-------------|----------------|
-| Tool Pool | 8 servers, ~80 tools | MCP-Zero 308 servers |
-| Ground Truth | gpt-4o-mini 838개 + 수동 검증 168개 | MCP-Atlas 500개 (human) + 자체 seed 80개 |
-| Distractor | 없음 | MCPAgentBench 방식 |
-| Description 평가 | GEO Score 6차원 | GEO Score + Description Smells 4차원 비교 |
+| Tool Pool | 8 servers, ~80 tools | MCP-Zero 308 servers, 2,797 tools (✅ 바로 사용 가능) |
+| Ground Truth | gpt-4o-mini 838개 + 수동 검증 168개 | MCP-Atlas 500개 (human, 36 servers, 307 tools) + 자체 seed 80개 (✅ 구조 대부분 확인, parquet 최종 확인만 남음) |
+| Distractor | 없음 | MCPAgentBench 개념 참고 + 자체 설계 |
+| Description 평가 | GEO Score 6차원 | GEO Score + Description Smells 4차원 비교 (✅ 수치 검증됨) |
 
 ---
 
@@ -139,12 +136,14 @@ for task in mcp_atlas_tasks:
 
 ### 이번 주 (High)
 
-1. **MCP-Zero 데이터셋 다운로드** → `data/external/mcp-zero/`
-   - GitHub README의 Google Drive 링크에서 JSON + 임베딩 벡터
-2. **MCP-Atlas GT 다운로드** → `data/external/mcp-atlas/`
-   - HuggingFace parquet → 첫 번째 tool call 추출 스크립트 작성
+1. **MCP-Atlas parquet 다운로드 + TRAJECTORY 구조 확인** → `data/external/mcp-atlas/`
+   - HuggingFace parquet 다운로드 후 TRAJECTORY 필드를 열어서 내부 구조 파악
+   - tool call 추출 가능 여부 판단 → 변환 스크립트 설계
+2. **MCP-Zero 데이터셋 다운로드** → `data/external/mcp-zero/`
+   - GitHub README의 Google Drive에서 `mcp_tools_with_embedding.json` (단일 파일). repo-local canonical filename은 `data/external/mcp-zero/servers.json`
+   - `tool_id` 없으므로 `"{server_name}::{tool_name}"` 조합 확인
 3. **Description Smells 논문 정독**
-   - 4차원 18카테고리 목록 정리, 우리 GEO Score와 매핑 테이블 작성
+   - 4차원 18카테고리 전체 목록 정리 (Table 3), 우리 GEO Score와 매핑 테이블 작성
 
 ### 다음 주 (Medium)
 
@@ -179,9 +178,13 @@ for task in mcp_atlas_tasks:
 |------|------|
 | MCP-Zero 논문 | https://arxiv.org/abs/2506.01056 |
 | MCP-Zero GitHub | https://github.com/xfey/MCP-Zero |
+| MCP-Atlas 논문 | https://arxiv.org/abs/2602.00933 |
+| MCP-Atlas GitHub | https://github.com/scaleapi/mcp-atlas |
 | MCP-Atlas HuggingFace | https://huggingface.co/datasets/ScaleAI/MCP-Atlas |
 | MCP-Atlas Leaderboard | https://labs.scale.com/leaderboard/mcp_atlas |
 | MCPAgentBench 논문 | https://arxiv.org/abs/2512.24565 |
-| Description Smells 논문 | https://arxiv.org/abs/2602.18914 |
+| MCPAgentBench GitHub | https://github.com/zixianglhhh/MCPAgentBench |
+| Description Smells 논문 (1) | https://arxiv.org/abs/2602.18914 (From Docs to Descriptions, 10,831 servers) |
+| Description Smells 논문 (2) | https://arxiv.org/abs/2602.14878 (Tool Descriptions Are Smelly!, 103 servers) |
 | BFCL V4 | https://gorilla.cs.berkeley.edu/leaderboard.html |
 | MCP-Bench GitHub | https://github.com/Accenture/mcp-bench |

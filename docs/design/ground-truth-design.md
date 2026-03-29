@@ -1,6 +1,6 @@
 # Ground Truth 설계 — 스키마, Seed 전략, 품질 규칙
 
-> 최종 업데이트: 2026-03-22
+> 최종 업데이트: 2026-03-29
 > Pydantic 모델/JSON 예시: `./ground-truth-schema.md`
 
 ---
@@ -8,7 +8,7 @@
 ## 스키마 개요
 
 - 파일 형식: **JSONL** (한 줄 = 한 엔트리, Git diff 추적 용이, 스트리밍 로딩 가능)
-- 파일 위치: `data/ground-truth/seed_set.jsonl`, `data/ground-truth/synthetic.jsonl`
+- 파일 위치: `data/ground_truth/seed_set.jsonl`, `data/ground_truth/synthetic.jsonl`
 - 모든 엔트리는 `GroundTruthEntry` Pydantic 모델로 검증
 
 ### 필수 필드
@@ -17,15 +17,27 @@
 |------|------|----------|
 | `query_id` | 고유 ID (e.g., `gt-search-001`) | 전체 |
 | `query` | 자연어 쿼리 | 모든 지표 입력 |
-| `correct_server_id` | 정답 MCP 서버 ID | Server Recall@K, MRR, Server Error Rate |
-| `correct_tool_id` | 정답 Tool ID (`server_id::tool_name`, TOOL_ID_SEPARATOR="::") | Precision@1, Tool Recall@10, NDCG@5, Confusion Rate |
+| `correct_server_id` | 정답 MCP 서버 ID (primary, backward compat) | Server Recall@K, MRR, Server Error Rate |
+| `correct_tool_id` | 정답 Tool ID — primary tool (`server_id::tool_name`) | Precision@1, Tool Recall@10, NDCG@5, Confusion Rate |
 | `difficulty` | easy / medium / hard | 난이도별 Precision@1 분석 |
 | `category` | 8개 카테고리 | 도메인별 분석, Taxonomy-gated 평가 |
 | `ambiguity` | low / medium / high | 모호도별 분석 |
-| `source` | manual_seed / llm_synthetic / llm_verified | 데이터 품질 추적 |
+| `source` | manual_seed / llm_synthetic / llm_verified / external_mcp_atlas / external_mcp_zero | 데이터 품질 추적 |
 | `manually_verified` | boolean | seed vs synthetic 구분 |
 | `author` | 작성자 ID 또는 모델명 | 출처 추적 |
 | `created_at` | ISO 8601 | 버전 추적 |
+| `task_type` | `single_step` | 모든 GT는 single-step (ADR-0012 per-step 분해). 분석 필터링용 |
+
+### Lineage 필드 (ADR-0012: Per-Step Decomposition)
+
+| 필드 | 설명 | 용도 |
+|------|------|------|
+| `origin_task_id` | MCP-Atlas 원본 task ID (e.g., `atlas-task-042`) | 원본 추적 (seed set은 `null`) |
+| `step_index` | 원본 trajectory 내 위치 (0-indexed) | 분해 순서 추적 (seed set은 `null`) |
+
+- 모든 GT는 **single-tool / single-step** — `correct_tool_id` 하나만 사용
+- MCP-Atlas 분해 엔트리: `origin_task_id` + `step_index`로 원본 trajectory 추적 가능
+- ~~`correct_tool_ids` / `correct_server_ids` multi-label 필드는 폐기~~ (ADR-0012)
 
 ### 선택 필드
 
@@ -72,7 +84,7 @@
 
 ## 어노테이션 규칙
 
-1. **하나의 쿼리에 반드시 하나의 `correct_tool_id`**: "둘 다 정답" 불허. 차선은 `alternative_tools`에 기록
+1. **모든 쿼리: 반드시 하나의 `correct_tool_id`** (ADR-0012). MCP-Atlas multi-step task는 per-step 분해 후 각각 single-tool GT로 변환. 차선은 `alternative_tools`에 기록
 2. **`correct_server_id`는 `correct_tool_id`에서 파생 가능하지만 명시적 기재**: Layer 1 독립 평가에 필요
 3. **difficulty 판정**:
    - "BM25만으로 찾을 수 있나?" → Easy
@@ -97,7 +109,7 @@ LLM (GPT-4o-mini) — Tool당 10개 쿼리 생성
     |
 품질 게이트 (아래 기준)
     |
-data/ground-truth/synthetic.jsonl에 저장
+data/ground_truth/synthetic.jsonl에 저장
 ```
 
 ### 품질 게이트 (Quality Gate)
@@ -119,18 +131,52 @@ data/ground-truth/synthetic.jsonl에 저장
 
 ---
 
-## 외부 GT 소스 — MCP-Atlas (ADR-0011)
+## 외부 GT 소스 — MCP-Atlas (ADR-0011, ADR-0012)
 
 ### MCP-Atlas (Scale AI)
 
 - **출처**: HuggingFace `ScaleAI/MCP-Atlas` (arxiv:2602.00933)
-- **규모**: 500 human-authored tasks, 36 servers, 220 tools
+- **규모**: 500 human-authored tasks, 36 servers, 307 tools
 - **품질**: Human-authored (자연어, tool 이름 미포함 → 자연스러운 Medium/Hard 난이도)
-- **변환 방법**: multi-step task → 첫 번째 tool call만 추출하여 single-step GT로 변환
-- **query_id 네이밍**: `gt-atlas-{number:03d}` (e.g., `gt-atlas-001` ~ `gt-atlas-500`)
+- **특성**: Multi-step task (평균 4.8 tool calls/task, min 3, max 17)
+- **task_type**: `multi_step` (전체 500개)
+
+### Per-Step 분해 전략 (ADR-0012)
+
+MCP-Atlas는 multi-step 벤치마크이지만, `find_best_tool`은 single-tool retrieval 시스템이다.
+MCP `tools/call` 프로토콜이 한 번에 하나의 tool만 호출하며, LLM이 task를 분해한 후 각 스텝마다 개별 tool discovery를 수행하는 것이 실제 사용 패턴이다. 따라서 **task-level 쿼리를 step-level로 분해**하여 single-tool GT로 변환한다.
+
+1. **선별**: 500 task 중 50~80개 선별 (MCP-Zero pool과 overlap하는 서버, 카테고리 균형)
+2. **보일러플레이트 blocklist 적용**: 초기화 호출 제거
+   - `filesystem_list_allowed_directories`, `cli-mcp-server_show_security_rules`, `desktop-commander_get_config` 등
+   - 변환 스크립트에서 `BOILERPLATE_TOOLS` 상수로 관리
+3. **Per-step query 생성**: 각 substantive tool call마다 LLM으로 단일 스텝 자연어 쿼리 생성
+4. **Human review**: 생성된 쿼리 전수 검토 (difficulty 재평가 포함)
+5. **서버/도구 ID 변환**: `github_search_repositories` → `github::search_repositories` (첫 번째 `_` 기준 분리)
+
+### 분해 품질 기준
+
+- 쿼리가 self-contained일 것 (이전 step에 대한 참조 없음)
+- tool name이나 server name이 쿼리에 포함되지 않을 것
+- difficulty 재평가: step-level 쿼리는 task-level보다 구체적이므로 easy 쪽으로 치우칠 수 있음 → 수동 보정
+
+### 평가 메트릭 (통일)
+
+| 메트릭 | 적용 GT | 의미 |
+|--------|---------|------|
+| Precision@1 | 전체 | 정확히 정답 1개 매칭 (North Star) |
+| Recall@K | 전체 | top-K에 정답 포함 여부 |
+| NDCG@5 | 전체 | 순위 품질 (alternative_tools로 graded relevance) |
+
+### 변환 메타데이터
+
+- **query_id 네이밍**: `gt-atlas-{task:03d}-s{step:02d}` (e.g., `gt-atlas-042-s00`, `gt-atlas-042-s01`)
 - **source 필드**: `external_mcp_atlas`
-- **검증 규칙**: `manually_verified=True`, `author="scale_ai"`
-- **변환 스크립트**: `scripts/convert_mcp_atlas.py` (parquet → JSONL)
+- **task_type**: `single_step` (분해 후 모든 엔트리)
+- **origin_task_id**: 원본 MCP-Atlas task ID (e.g., `atlas-task-042`)
+- **step_index**: 원본 trajectory 내 위치 (0-indexed)
+- **검증 규칙**: `manually_verified=True` (Human review 후), `author="scale_ai+llm_decomposed"`
+- **변환 스크립트**: `scripts/convert_mcp_atlas.py` (parquet → per-step JSONL)
 - **저장 위치**: 원본 `data/external/mcp-atlas/`, 변환 후 `data/ground_truth/mcp_atlas.jsonl`
 
 ### GT 통합 전략
@@ -138,9 +184,11 @@ data/ground-truth/synthetic.jsonl에 저장
 | 소스 | 수량 | 역할 | source 필드 |
 |------|------|------|------------|
 | Self seed | 80 | 자체 도메인 특화 (A/B 서버 포함) | `manual_seed` |
-| MCP-Atlas | 500 | Primary human GT | `external_mcp_atlas` |
-| **합계** | **580** | **Primary GT** | — |
-| Synthetic | 838 | 보조 (MCP-Atlas와 겹치는 서버 GT는 대체) | `llm_synthetic` |
+| MCP-Atlas (per-step 분해) | 150~240 | 외부 human GT 기반 single-step 변환 | `external_mcp_atlas` |
+| **합계** | **~230~320** | **Primary GT (all single-step)** | — |
+| Synthetic | 838 | 보조 (필요 시 참고) | `llm_synthetic` |
+
+> **Note**: MCP-Atlas 500 task 중 50~80 task만 선별 분해. 통계적 충분성(Precision@1 ±10%p @ 95% CI)을 만족하는 최소 규모.
 
 ---
 
@@ -167,13 +215,13 @@ data/ground-truth/synthetic.jsonl에 저장
 
 ```
 data/
-+-- ground-truth/
++-- ground_truth/
 |   +-- seed_set.jsonl           # 수동 작성 80개
-|   +-- mcp_atlas.jsonl          # MCP-Atlas 변환 500개 (primary)
+|   +-- mcp_atlas.jsonl          # MCP-Atlas per-step 분해 ~150-240개 (primary)
 |   +-- synthetic.jsonl          # LLM 생성 + 품질 게이트 통과분 (보조)
 |   +-- quality_gate_report.json # 파일럿 검증 결과
 +-- external/                    # Git-ignored, 별도 다운로드
-|   +-- mcp-zero/                # MCP-Zero 308 servers (servers.json, embeddings/)
+|   +-- mcp-zero/                # MCP-Zero 308 servers (repo-local canonical input: servers.json)
 |   +-- mcp-atlas/               # MCP-Atlas 원본 (*.parquet)
 |   +-- README.md                # 다운로드 방법, 라이선스 정보
 +-- tool-pools/

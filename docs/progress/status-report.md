@@ -1,6 +1,6 @@
 # MCP Discovery Platform — 진행 현황 보고서
 
-> 최종 업데이트: 2026-03-28
+> 최종 업데이트: 2026-03-29
 > 브랜치: `main`
 
 ---
@@ -9,7 +9,7 @@
 
 외부 데이터셋 활용 결정: 자체 Synthetic GT 품질 문제 → 고품질 외부 데이터로 대체/보완.
 - **Tool Pool**: Smithery 8 servers → MCP-Zero 308 servers (2,797 tools)
-- **Ground Truth**: self seed 80 + MCP-Atlas 500 human-authored = 580 primary GT. Synthetic 838은 보조.
+- **Ground Truth**: self seed 80 + MCP-Atlas per-step 분해 ~150-240 = ~230-320 primary GT (all single-step, ADR-0012). Synthetic 838은 보조.
 - **Description 평가**: GEO 6D + Description Smells 4D 병행 (E7 비교)
 - 상세: `docs/handoff/external-data-strategy-20260328.md`, `docs/adr/0011-external-dataset-strategy.md`
 
@@ -20,8 +20,8 @@
 | 항목 | 현재 상태 |
 |------|-----------|
 | 완료된 Phase | Phase 0 ~ Phase 5 |
-| 다음 Phase | Phase 6 (Reranker) + 외부 데이터 통합 (MCP-Zero + MCP-Atlas) |
-| 테스트 | **233 passed**, 0 skipped |
+| 다음 Phase | Phase 6 통합/검증 + 외부 데이터 통합 정렬 (MCP-Zero + MCP-Atlas) |
+| 테스트 | **260 passed**, 0 skipped |
 | 커버리지 | **98.56%** (목표 80%+ 대폭 초과) |
 | Lint/Format | PASS (ruff check + ruff format) |
 | 외부 서비스 | Qdrant Docker 로컬 + Smithery API + OpenAI API 실제 연동 검증 완료 |
@@ -53,7 +53,7 @@
 | MCP 직접 연결 | `src/data/mcp_connector.py` | **100%** |
 | 서버 선별기 | `src/data/server_selector.py` | 100% |
 | 수집 스크립트 | `scripts/collect_data.py` | - |
-| 시드 데이터 | `data/raw/servers.jsonl` (3 서버, 58 도구) | - |
+| 시드 데이터 | `data/raw/servers.jsonl` (50행) | - |
 
 **통합 테스트로 검증된 항목** (`tests/integration/test_smithery_integration.py`):
 - 실제 Smithery Registry API (`https://registry.smithery.ai`)에 접속하여 검증
@@ -117,7 +117,7 @@
 **Seed Set 구성** (80개):
 - 8 카테고리 × 10개 = 80 엔트리
 - 난이도 분포: Easy 4 : Medium 4 : Hard 2
-- 5개 서버: `EthanHenrickson/math-mcp`, `@anthropic/claude-code`, `@smithery-ai/github`, `@anthropic/fetch-mcp`, `@anthropic/filesystem-mcp`
+- 8개 서버: `EthanHenrickson/math-mcp`, `arxiv`, `brave-search`, `clay-inc/clay-mcp`, `github`, `instagram`, `postgres`, `yahoo-finance`
 
 **Synthetic GT 구성** (838개, 2026-03-26 생성):
 - 8개 서버, 89개 도구 × ~10 쿼리 (일부 validation 실패로 skip)
@@ -158,6 +158,16 @@
 - `harness.py`: async 오케스트레이터, `strategy.search()` 1회/쿼리 호출, `compute_confidence()`로 신뢰도 추출
 - `asyncio_mode="auto"` 활용 — `@pytest.mark.asyncio` 불필요
 
+### Phase 5.5: 외부 데이터 + Reranker 스캐폴딩 — 부분 완료
+
+| 산출물 | 파일 | 상태 |
+|--------|------|------|
+| MCP-Zero import 스크립트 | `scripts/import_mcp_zero.py` | 파일 존재, canonical input 검증 필요 |
+| MCP-Atlas 변환 스크립트 | `scripts/convert_mcp_atlas.py` | 파일 존재, ADR-0012 per-step target state 미완료 |
+| Reranker ABC + Cohere 구현 | `src/reranking/base.py`, `src/reranking/cohere_reranker.py` | 파일 존재, 파이프라인 통합/테스트 미완료 |
+
+이 섹션은 "파일 존재"와 "Phase 완료"를 구분하기 위해 추가했다. 완료된 Phase는 여전히 0~5이며, 위 항목은 다음 작업의 부분 산출물이다.
+
 ---
 
 ## 인프라 현황
@@ -183,7 +193,7 @@
 ## 테스트 현황
 
 ```
-233 passed, 0 skipped
+260 passed, 0 skipped
 전체 커버리지: 98.56%
 ```
 
@@ -191,7 +201,7 @@
 
 ```
 tests/
-├── unit/                  # 단위 테스트 (159개) — 외부 서비스 불필요
+├── unit/                  # 단위 테스트 (~190개) — 외부 서비스 불필요
 │   ├── test_config.py
 │   ├── test_models.py
 │   ├── test_crawler.py

@@ -1,6 +1,6 @@
 # Architecture — 결정 사항, 기술 스택, 제약 조건
 
-> 최종 업데이트: 2026-03-22
+> 최종 업데이트: 2026-03-29
 > 다이어그램: `./architecture-diagrams.md`
 
 ---
@@ -13,12 +13,12 @@
 | **DP1** | MCP Tool(Bridge) + REST API 이중 노출 | 확정 | LLM → Bridge MCP (`find_best_tool` + `execute_tool`), Provider → REST. MetaMCP 활용 |
 | **DP2** | 2-Layer (서버 → Tool) 추천 단위 | 확정 | 서버 수준 capability 판단 + Tool 수준 정밀 매칭 |
 | **DP3** | Strategy Pattern — A/B/C 모두 구현 후 실험 결정 | 확정 | 우선순위: A(Sequential) → B(Parallel) → C(Taxonomy-gated) |
-| **DP4** | 임베딩: BGE-M3 vs OpenAI text-embedding-3-small | E2 실험 | voyage-code-2 사용 금지 (코드 특화, MCP description은 자연어) |
+| **DP4** | 임베딩: BGE-M3 vs OpenAI text-embedding-3-small vs text-embedding-3-large (MCP-Zero 제공, 3072D) | E2 실험 | voyage-code-2 사용 금지 (코드 특화, MCP description은 자연어). text-embedding-3-large는 MCP-Zero에 사전 계산 벡터 포함 (ADR-0011) |
 | **DP5** | Reranker: Cohere Rerank 3 + low-confidence LLM fallback | 방향 확정 | Cohere SOTA, free 1000 req/month. Confidence proxy: rank1-rank2 gap |
 | **DP6** | Confidence 분기: gap 기반 (threshold 0.15) | 확정 | calibration 모델 없이 직관적, 구현 단순 |
-| **DP7** | 데이터: Smithery 크롤링 + 직접 MCP 연결 하이브리드 | 확정 | 50~100 서버 큐레이션, GT: 수동 seed + LLM synthetic |
+| **DP7** | 데이터: MCP-Zero 308 servers (Pool) + MCP-Atlas per-step 분해 GT + 자체 seed 80 | **ADR-0011/0012으로 대체** | 기존 Smithery 8서버는 보조. GT: MCP-Atlas per-step ~150-240 + self seed 80 |
 | **DP8** | 배포: 로컬 FastAPI → Lambda + API Gateway | 확정 | 개발: Docker Qdrant (`localhost:6333`), 배포: Qdrant Cloud free tier (1GB ~ 40K tools). Bedrock KB $700/월 거부 |
-| **DP9** | 평가: 커스텀 하네스 + 11개 지표 | 확정 | Evaluator ABC 플러그인. Position bias 통제: Top-K 랜덤 셔플 |
+| **DP9** | 평가: 커스텀 하네스 + 11개 지표 | 확정 | Evaluator ABC 플러그인. Position bias: 별도 실험에서 검증 (현재 하네스는 fixed order) |
 
 ---
 
@@ -112,26 +112,30 @@
 
 | 하위 변인 | 값 범위 | 목적 |
 |-----------|---------|------|
-| Pool Size | 5 / 20 / 50 / 100 | 스케일 효과 측정 |
+| Pool Size | 5 / 20 / 50 / 100 / 200 / 308 | 스케일 효과 측정 (MCP-Zero 308 servers) |
 | Similarity Density | Low / Medium / High | 혼동 가능성 영향 측정 |
 | Domain Distribution | Single / Mixed | 도메인 다양성 효과 |
 | Distractor Ratio | 0% / 20% / 50% | 관련 없는 Tool 비율 영향 |
 
-### 변인 2: Description 품질 (핵심 독립 변인)
+### 변인 2: Description 품질 (핵심 독립 변인) — GEO 6D
 
-| 품질 차원 | 설명 |
-|-----------|------|
-| **Specificity** | 구체적 use case vs 모호한 일반 설명 |
-| **Disambiguation** | 유사 Tool과의 차이점 명시 여부 |
-| **Parameter description** | 입력 파라미터 상세 설명 여부 |
-| **Negative instructions** | "이 Tool은 X에 쓰면 안 됨" 명시 여부 |
+| GEO 차원 | 코드명 | 설명 | GEO 근거 |
+|----------|--------|------|----------|
+| **Clarity** | `clarity_score` | 첫 문장의 핵심 기능 명확도 + 구체적 범위 | Fluency Optimization |
+| **Disambiguation** | `disambiguation_score` | 유사 Tool과의 차별화 | — |
+| **Parameter Coverage** | `parameter_coverage_score` | 파라미터 타입/제약/예제 포함 여부 | — |
+| **Boundary** | `boundary_score` | 이 Tool이 NOT 하는 것 명확화 | — |
+| **Statistics** | `stats_score` | 수치/커버리지/성능 정보 포함 여부 | Statistics Addition |
+| **Precision** | `precision_score` | 표준/프로토콜/기술 용어 정확도 | Technical Terms |
+
+> 상세 정의: `docs/design/metrics-rubric.md` §4 참조. E7에서 GEO 6D vs Description Smells 4D 비교.
 
 ### 변인 3: Query 특성 (조작 변인)
 
 | 하위 변인 | 값 범위 |
 |-----------|---------|
 | Ambiguity | Low / Medium / High |
-| Complexity | Simple / Multi-step |
+| Complexity | Simple / Compound (쿼리 문장 복잡도, GT task_type과 무관 — 모든 GT는 single-step) |
 | Domain match | In-domain / Cross-domain |
 | Phrasing variation | Formal / Natural / Abbreviated |
 

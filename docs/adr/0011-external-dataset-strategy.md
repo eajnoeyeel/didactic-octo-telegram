@@ -11,7 +11,7 @@
 ## Decision
 
 1. **Tool Pool**: MCP-Zero 308 servers (2,797 tools) 기반으로 확장. 기존 Smithery 크롤링 데이터(8 servers)는 보조 소스로 유지.
-2. **Ground Truth**: MCP-Atlas 500 human-authored tasks + 자체 seed 80 = 580개 primary GT. Synthetic GT(838)는 보조 자료로 격하.
+2. **Ground Truth**: MCP-Atlas per-step 분해 ~150-240 single-step GT + 자체 seed 80 = ~230-320 primary GT (ADR-0012). Synthetic GT(838)는 보조 자료로 격하.
 3. **Description 품질 평가**: GEO Score 6차원 + Description Smells 4차원(Accuracy/Functionality/Completeness/Conciseness) 병행 비교.
 4. **Distractor 설계**: MCPAgentBench 방식(정답 + 비슷한 distractor 혼합) 참고하여 E6 ambiguity 평가 체계화.
 

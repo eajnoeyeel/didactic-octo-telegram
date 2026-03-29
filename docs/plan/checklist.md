@@ -1,6 +1,6 @@
 # 진행 체크리스트
 
-> 최종 업데이트: 2026-03-25
+> 최종 업데이트: 2026-03-29
 > 상세 구현 스펙: `docs/plan/implementation.md`
 > 타임라인: 2026-03-20 ~ 2026-04-26 (5주)
 
@@ -17,9 +17,11 @@
 ### OQ-2: Tool Pool 구성 (MCP-Zero + Smithery 보조) — ADR-0011
 - [ ] MCP-Zero 데이터셋 다운로드 → `data/external/mcp-zero/` (308 servers, 2,797 tools)
 - [ ] MCP-Atlas GT 다운로드 → `data/external/mcp-atlas/` (500 human-authored tasks)
-- [ ] `scripts/import_mcp_zero.py` 작성 (JSON → MCPServer/MCPTool 변환 + Qdrant 인덱싱)
-- [ ] `scripts/convert_mcp_atlas.py` 작성 (parquet → JSONL, 첫 번째 tool call 추출)
-- [ ] MCP-Atlas GT + self seed 80 병합 검증 (query_id 중복 없음, 580개 primary GT)
+- [x] `scripts/import_mcp_zero.py` 추가
+- [ ] `scripts/import_mcp_zero.py` canonical input contract 정리 + 실제 MCP-Zero 데이터 검증
+- [x] `scripts/convert_mcp_atlas.py` 추가
+- [ ] `scripts/convert_mcp_atlas.py`를 ADR-0012 target state(per-step single-tool GT 분해)로 완성
+- [ ] MCP-Atlas per-step GT + self seed 80 병합 검증 (query_id 중복 없음, ~230-320 primary GT)
 - [ ] Description Smells 4D vs GEO Score 6D 매핑 테이블 작성 (E7 비교용)
 - [ ] 4종 Pool 정의 (Base, High Similarity, Low Similarity, Description Quality) — MCP-Zero 308 servers에서 선별
 - [ ] Smithery API rate limit 확인 (보조 소스)
@@ -30,12 +32,12 @@
 - [ ] 각 서버 x 2 description 버전 (Version A: Poor, Version B: Good)
 - [ ] 실제 `tools/list` 연결 검증
 
-### OQ-4: Sequential 2-Layer 버그 수정
-- [ ] `sequential.py`를 진짜 2-Layer로 수정 (서버 인덱스 → 필터 → 툴 검색)
+### OQ-4: Sequential 2-Layer 버그 수정 — 부분 해결
+- [x] `sequential.py`를 진짜 2-Layer로 수정 (서버 인덱스 → 필터 → 툴 검색)
 - [ ] Server Classification Error Rate 별도 로깅 추가
 
 ### OQ-5: 2-Layer 아키텍처 유효성 검증 (E0 선행)
-- [ ] 1-Layer 파이프라인 구현 (`src/pipeline/flat.py`)
+- [x] 1-Layer 파이프라인 구현 (`src/pipeline/flat.py`)
 - [ ] E0 실행: 1-Layer vs 2-Layer Sequential vs 2-Layer Parallel
 - [ ] 판정: Precision@1 +5%p 이상 차이 → 2-Layer 유효
 - [ ] CTO 멘토링에서 결과 논의
@@ -81,14 +83,15 @@
 - [x] 검증 스크립트 작성 (`scripts/verify_ground_truth.py`)
 - [ ] 파일럿 검증: seed 20개로 파이프라인 테스트 (Phase 5 이후)
 
-## Phase 5: 평가 하네스 (Week 2)
-- [ ] `src/evaluation/evaluator.py` — Evaluator ABC
-- [ ] Precision@1, Recall@K, Latency, Confusion Rate, ECE, Spearman 구현
-- [ ] `src/evaluation/harness.py` — `evaluate(strategy, queries, gt) → Metrics`
-- [ ] 전체 메트릭 단위 테스트 + E2E 평가 흐름 테스트
+## Phase 5: 평가 하네스 (Week 2) — ✅ 완료 (2026-03-26)
+- [x] `src/evaluation/evaluator.py` — Evaluator ABC
+- [x] Precision@1, Recall@K, MRR, NDCG@5, Confusion Rate, ECE, Latency 구현 (7개 메트릭)
+- [x] `src/evaluation/harness.py` — `evaluate(strategy, queries, gt) → Metrics`
+- [x] 메트릭 단위 테스트 31개 + 하네스 통합 테스트 9개 (총 40개)
 
 ## Phase 6: Reranker (Week 2)
-- [ ] `src/reranking/base.py`, `cohere_reranker.py`, `llm_fallback.py`
+- [x] `src/reranking/base.py`, `cohere_reranker.py`
+- [ ] `src/reranking/llm_fallback.py`
 - [ ] Sequential + Parallel 전략에 Reranker 연결
 - [ ] 단위 테스트
 
@@ -135,7 +138,7 @@
 ## 실험
 
 ### E0: 1-Layer vs 2-Layer 아키텍처 검증 (Week 2 선행)
-- [ ] `src/pipeline/flat.py` 구현
+- [x] `src/pipeline/flat.py` 구현 (100% 커버리지)
 - [ ] E0-A/B/C 실행 (1-Layer, 2-Layer Sequential, 2-Layer Parallel)
 - [ ] 판정: +5%p 이상 → E1 진행. 결과 CTO 공유
 

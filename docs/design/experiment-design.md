@@ -1,6 +1,6 @@
 # 실험 설계 — Hub: E0-E7 요약 + 공유 방법론
 
-> 최종 업데이트: 2026-03-22
+> 최종 업데이트: 2026-03-29
 > 상세 스펙 (입력/출력/코드): `./experiment-details.md`
 
 ---
@@ -37,7 +37,7 @@
 | 임베딩 모델 | BGE-M3, OpenAI text-embedding-3-small, OpenAI text-embedding-3-large (MCP-Zero 제공, 3072D) | 인덱스 빌드 시 교체 |
 | Reranker | Cohere Rerank 3, Cohere + LLM fallback, LLM-as-Judge | Reranker 구현체 교체 |
 | Description 품질 | Version A (Poor), Version B (Good) | 자체 MCP 서버 A/B pair |
-| Tool Pool 크기 | 5, 20, 50, 100, 200, 308 서버 | `build_index.py --pool-size` (MCP-Zero 308 servers) |
+| Tool Pool 크기 | 5, 20, 50, 100, 200, 308 서버 | `build_index.py --pool-size` (서버 수 기준. 해당 서버의 tool 전체 포함) |
 | Tool Pool 유사도 | Low, Base, High similarity | Pool 정의 파일 교체 |
 
 ## 종속 변인 (Measured Variables)
@@ -54,7 +54,7 @@
 
 | 변인 | 고정값 (기본) |
 |------|-------------|
-| Ground Truth | MCP-Atlas 500 + self seed 80 (580개 primary GT, 동일 셋). Synthetic 838개는 보조 |
+| Ground Truth | MCP-Atlas per-step ~150-240 + self seed 80 (~230-320 primary, all single-step). Synthetic 838개는 보조 |
 | Query 순서 | 동일 (Position bias는 별도 실험) |
 | Reranker Top-K | K=10 (Reranker 비교 실험 제외) |
 | Confidence 임계값 | gap > 0.15 (Confidence 실험 제외) |
@@ -67,12 +67,13 @@
 | 소스 | 용도 | 규모 | 참조 |
 |------|------|------|------|
 | **MCP-Zero** | Tool Pool 확장 | 308 servers, 2,797 tools | arxiv:2506.01056 |
-| **MCP-Atlas** | Ground Truth 대체 (human-authored) | 500 tasks, 36 servers | arxiv:2602.00933 (Scale AI) |
+| **MCP-Atlas** | Ground Truth (human-authored, multi-step) | 500 tasks, 36 servers, 307 tools | arxiv:2602.00933 (Scale AI) |
 | **Description Smells** | E4 외부 검증, E7 비교 루브릭 | 4D x 18 카테고리 | arxiv:2602.18914 |
 | **MCPAgentBench** | E6 distractor 설계 참고 | 841 tasks, 20K+ tools | arxiv:2512.24565 |
 
 - MCP-Zero: text-embedding-3-large 벡터 포함 → E2에서 재임베딩 없이 비교 가능
-- MCP-Atlas: multi-step task → 첫 번째 tool call만 추출하여 single-step GT로 변환
+- MCP-Atlas: multi-step task → **per-step single-tool GT로 분해** (ADR-0012). 50~80 task 선별 후 각 substantive tool call마다 LLM으로 step-level query 생성 + Human review
+- 평가: 전체 GT에 대해 Precision@1 통일 적용 (Hit@K 폐기)
 - 저장 위치: `data/external/mcp-zero/`, `data/external/mcp-atlas/` (Git-ignored)
 
 ---
@@ -107,13 +108,14 @@ Phase 5 (OQ-1 해결 후):
 
 ## 타임라인
 
+> 2026-03-29 수정: 외부 데이터 통합(ADR-0011) 반영하여 일정 조정. 마감: 4/26.
+
 | 주차 | 기간 | 실험 | 산출물 |
 |------|------|------|--------|
-| Week 1 | 3/20 - 3/26 | Ground Truth 구축 (seed set) + 외부 데이터 통합 | seed_set.jsonl (80개) + MCP-Atlas 500개 변환 |
-| Week 2 | 3/27 - 4/2 | E1 (전략 비교) | 최적 전략 결정 |
-| Week 3 | 4/3 - 4/9 | E2 (임베딩) + E3 (Reranker) | 최적 파이프라인 확정 |
-| Week 4 | 4/10 - 4/16 | E4 (테제 검증) + E5 + E6 | evidence triangulation 결과 |
-| Week 5 | 4/17 - 4/25 | 보고서 작성 + Provider Analytics 데모 | 최종 제출물 |
+| Week 1-2 | 3/20 - 4/2 | Foundation (Phase 0-5) ✅ + 외부 데이터 통합 + E0 재실행 | seed_set.jsonl (80개), MCP-Zero 인덱싱, MCP-Atlas per-step 분해, E0 baseline |
+| Week 3 | 4/3 - 4/9 | E1 (전략 비교) + E2 (임베딩) | 최적 전략·임베딩 결정 |
+| Week 4 | 4/10 - 4/16 | E3 (Reranker) + E4 (테제 검증) + E5 + E6 | 최적 파이프라인 확정, evidence triangulation |
+| Week 5 | 4/17 - 4/25 | E7 (GEO 점수) + 보고서 작성 + Provider Analytics 데모 | 최종 제출물 |
 
 ---
 
@@ -148,7 +150,7 @@ Phase 5 (OQ-1 해결 후):
 
 ### Internal Validity
 - **Ground Truth 편향**: seed set 작성자 = 실험 설계자 → 특정 전략에 유리한 쿼리 가능
-  - 완화: MCP-Atlas 500 human-authored GT(외부 독립 작성)를 primary로 활용, self seed 80은 보조
+  - 완화: MCP-Atlas per-step 분해 GT(외부 human-authored 기반)를 primary로 활용, self seed 80은 보조
 - **A/B Description 차이 크기**: Version A를 너무 나쁘게 만들면 lift 과대 측정
   - 완화: Version A도 실제 Smithery 수준 description으로 설정
 
@@ -162,7 +164,8 @@ Phase 5 (OQ-1 해결 후):
 - **GEO 점수 validity (OQ-1)**: 점수 자체가 "품질"을 잘 반영하는지 미검증
   - 완화: E7에서 human agreement 측정 + Description Smells 4D와 비교 (외부 검증: +11.6%, p<0.001)
 - **Precision@1 한계**: multi-correct 케이스에서 하나만 정답 인정
-  - 완화: NDCG@5 병행, alternative_tools 활용
+  - 완화: NDCG@5 + `alternative_tools` graded relevance로 부분 정답 반영
+  - Per-step 분해(ADR-0012)로 모든 GT가 single-tool이므로 multi-correct 문제 자체가 완화됨
 
 ---
 
