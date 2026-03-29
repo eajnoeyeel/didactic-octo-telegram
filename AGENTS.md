@@ -1,83 +1,143 @@
-# Repository Instructions
+# CLAUDE.md
 
-Keep repository-wide rules here. Use a nearer `AGENTS.md` for directory-specific guidance, and use `.agents/skills/` only for repeatable workflows.
+> **이 파일은 규칙(conventions, constraints)과 참조 포인터만 둔다.** 상세 컨텍스트는 각 문서에 분리.
+> 매 세션마다 전체 로드되므로 prompt bloat 방지를 위해 간결하게 유지할 것.
+> 최종 업데이트: 2026-03-26
 
-## Working Order
+---
 
-1. Follow the user's request and the nearest applicable `AGENTS.md`.
-2. Treat current code, tests, and checked-in config as the source of truth.
-3. Treat `docs/` as secondary context. Many files are planning artifacts and may describe modules that do not exist yet.
-4. Treat `CLAUDE.md` and `.claude/` as legacy migration inputs, not active Codex instructions.
+## 메타 규칙
 
-If code and docs disagree, follow the current repository state and call out the drift.
+- **CLAUDE.md에는 규칙(conventions, constraints)과 참조 포인터만 기록한다.**
+- 상세 정보가 필요하면 해당 파일을 Read tool로 직접 읽는다.
+- CLAUDE.md 수정 시 200줄 이하를 유지한다.
 
-## Repository Map
+---
 
-- `src/`: main Python package. Current implementation is centered on `config.py`, `models.py`, `data/`, `embedding/`, `pipeline/`, and `retrieval/`.
-- `scripts/`: runnable entry points for crawling, indexing, and synthetic ground-truth generation.
-- `tests/unit/`: main active automated coverage.
-- `tests/integration/` and `tests/evaluation/`: sparse or placeholder at the moment.
-- `data/`: checked-in raw snapshots and ground-truth artifacts.
-- `docs/`: design, planning, research, and paper notes. Useful, but not authoritative over code.
-- `proxy_verification/`: separate MCP proxy prototype with its own local `AGENTS.md`.
+## 프로젝트 한줄 요약
 
-## Current Implementation Boundaries
+MCP Discovery Platform — a two-sided platform connecting LLM clients with MCP tool providers. LLM clients connect to a single Bridge MCP Server that routes queries to the best tool via a 2-stage retrieval pipeline (embedding search → reranker → confidence branching). Providers get analytics on why their tools are/aren't selected.
 
-Do not assume planned modules already exist.
+**North Star**: Precision@1 >= 50% (Pool 50, mixed domain)
 
-- Implemented now: `src/data/*`, `src/embedding/*`, `src/pipeline/{strategy,flat,sequential,confidence}.py`, `src/retrieval/qdrant_store.py`, `src/models.py`, `src/config.py`.
-- Not present yet in the main app: `src/api/`, `src/evaluation/`, `src/reranking/`, `src/analytics/`, `scripts/run_experiments.py`.
-- Several docs still refer to planned `parallel`, `taxonomy_gated`, rerankers, FastAPI routes, and experiment runners. Add those only when the user asks for them and when tests/doc updates land with the code.
+**Core Thesis**: "Higher description quality → higher tool selection rate" (validated via E4 A/B experiment)
 
-## Common Commands
+---
 
-```bash
-uv sync
-uv run ruff check src tests
-uv run pytest tests/unit -v
-uv run python scripts/collect_data.py --max-servers 20
-uv run python scripts/build_index.py --input data/raw/servers.jsonl
-uv run python scripts/generate_ground_truth.py --servers data/raw/servers.jsonl
-```
+## 상세 컨텍스트 참조 (Lazy Loading)
 
-## Coding Rules
+필요 시 아래 파일을 Read tool로 읽을 것:
 
-- Python target is 3.12.
-- Keep type hints on public functions and model boundaries.
-- In the main `src/` package, use async clients for I/O. Prefer `AsyncOpenAI`, `AsyncQdrantClient`, and `httpx.AsyncClient`.
-- Route new application settings through [`src/config.py`](/Users/iyeonjae/Desktop/shockwave/mcp-discovery/src/config.py) instead of scattering direct environment parsing across modules.
-- In the main project, tool IDs use `TOOL_ID_SEPARATOR = "::"`. Do not reintroduce `/`-based IDs from older planning docs.
-- In the main project, use `loguru` rather than `print()` or stdlib `logging`.
-- Prefer module-top imports, small pure helpers for transformations, and Pydantic v2 models at external boundaries.
-- Follow the existing Ruff-based style; do not add Black/isort-specific workflow assumptions.
+| 파일 | 내용 |
+|------|------|
+| `docs/context/project-overview.md` | 프로젝트 요약, North Star, 테제, 타임라인 |
+| `docs/design/architecture.md` | DP0-DP9 결정, 기술 스택, Provider 기능, 통제 변인 |
+| `docs/design/architecture-diagrams.md` | Mermaid 다이어그램 (파이프라인, 데이터 흐름, 모듈 의존관계) |
+| `docs/design/evaluation.md` | **평가 참조 허브** — 요약 + 하위 상세 문서 포인터 |
+| `docs/design/metrics-rubric.md` | 11개 지표 정의, 임계값 |
+| `docs/design/metrics-dashboard.md` | 대시보드 레이아웃, Metric Tree, Alert, Review Cadence |
+| `docs/design/experiment-design.md` | E0-E7 실험 허브 |
+| `docs/design/experiment-details.md` | 실험 상세 스펙 (조건 테이블, CLI, 출력 형식) |
+| `docs/design/ground-truth-design.md` | GT 스키마, 생성 전략 |
+| `docs/design/code-structure.md` | 계획된 디렉토리/파일 구조 |
+| `docs/plan/implementation.md` | **구현의 source of truth** (Phase 요약 + 상세 파일 포인터) |
+| `docs/plan/deferred.md` | 후순위 기능 + Phase 13 (Gated) |
+| `docs/plan/checklist.md` | 진행 체크리스트 |
+| `docs/mentoring/open-questions.md` | OQ-2~5 미결 사항 (OQ-1 해결됨, living document) |
+| `docs/CONVENTIONS.md` | papers/, research/ 문서 템플릿, 네이밍 규약 |
+| `proxy_verification/CLAUDE.md` | Proxy MCP 검증 작업 지침 (하위 문서 포인터 포함) |
+| `docs/progress/status-report.md` | **진행 현황 보고서** — Phase별 완료 현황, 테스트/커버리지, 백로그 |
 
-## Verification Expectations
+When code conflicts with design docs, **docs/ takes precedence**.
 
-Before handing off non-trivial code changes in the main project:
+---
 
-1. Run `uv run ruff check src tests`.
-2. Run the smallest relevant `pytest` scope for the files you changed.
-3. If you touched shared models, config, embedding, retrieval, or pipeline code, prefer the affected unit suites over no-op spot checks.
-4. Explicitly report any skipped or unrun checks, especially when API keys, Qdrant, or other external services are required.
-
-Useful targeted test groups:
+## Commands
 
 ```bash
-uv run pytest tests/unit/test_config.py tests/unit/test_models.py -v
-uv run pytest tests/unit/test_embedder.py tests/unit/test_qdrant_store.py -v
-uv run pytest tests/unit/test_flat_strategy.py tests/unit/test_sequential_strategy.py -v
-uv run pytest tests/unit/test_ground_truth.py -v
+# Dependencies
+uv sync                              # Install all deps
+
+# Run server
+uv run uvicorn src.api.main:app --reload
+
+# Tests
+uv run pytest tests/ -v              # All tests
+uv run pytest tests/unit/ -v         # Unit only
+uv run pytest tests/unit/test_config.py -v          # Single file
+uv run pytest tests/unit/test_config.py::test_name  # Single test
+uv run pytest tests/ --cov=src -v    # With coverage
+
+# Lint & format
+uv run ruff check src/ tests/
+uv run ruff format src/ tests/
+
+# Scripts
+uv run python scripts/collect_data.py
+uv run python scripts/build_index.py --pool-size 50
+uv run python scripts/generate_ground_truth.py
+uv run python scripts/verify_ground_truth.py   # GT 품질 검증 (통계/QualityGate/무결성)
+uv run python scripts/run_experiments.py --experiment E1
 ```
 
-If you change anything under `proxy_verification/`, also follow the local verification rules in [`proxy_verification/AGENTS.md`](/Users/iyeonjae/Desktop/shockwave/mcp-discovery/proxy_verification/AGENTS.md).
+---
 
-## Documentation Policy
+## Architecture
 
-- Update docs when shipped behavior, commands, file layout, or architecture claims changed.
-- Be explicit about implemented vs planned state.
-- Prefer small targeted corrections over broad rewrites of brainstorming material.
-- When editing `docs/papers/` or `docs/research/`, follow [`docs/CONVENTIONS.md`](/Users/iyeonjae/Desktop/shockwave/mcp-discovery/docs/CONVENTIONS.md).
+### Pipeline Flow
 
-## Skills
+```
+LLM → Bridge MCP Server (find_best_tool / execute_tool)
+  → Core Pipeline (PipelineStrategy ABC)
+    → Stage 1: Embedding search (Qdrant)
+    → Stage 2: Reranker (Cohere Rerank 3) + Confidence branching (gap > 0.15)
+```
 
-Use `.agents/skills/` for repeatable workflows such as review, debugging, verification, or experiment planning. Keep skill metadata explicit about when to use and when not to use a skill, and keep repo-wide rules in this file rather than duplicating them in every skill.
+### Three Search Strategies (all implement `PipelineStrategy` ABC)
+
+- **Sequential (A)**: Server index → filtered tool search → rerank. Simple but hard gate at layer 1.
+- **Parallel (B)**: Server + tool index in parallel → RRF score fusion → rerank. Robust to layer 1 misses.
+- **Taxonomy-gated (C)**: Intent classifier → category sub-index → rerank. Precise but fragile.
+
+### ABC Pattern (Mandatory)
+
+All pluggable components use abstract base classes — business logic depends on ABCs only:
+- `PipelineStrategy` — search strategies, swapped via `StrategyRegistry`
+- `Embedder` — BGE-M3, OpenAI text-embedding-3-small (voyage-code-2 prohibited)
+- `Reranker` — Cohere Rerank 3, LLM fallback
+- `Evaluator` — metric computation plugins
+
+### Key Data Models (Pydantic v2)
+
+- `MCPTool`: tool_id format is `server_id::tool_name` (TOOL_ID_SEPARATOR = "::", `/` ambiguous in Smithery qualifiedNames)
+- `MCPServer`: contains tools list
+- `SearchResult`: tool + score + rank + reason
+- `GroundTruth`: query + correct_server_id + correct_tool_id + difficulty + category
+
+### Experiment System (E0-E7)
+
+Experiments run sequentially with dependencies: E0 (1-Layer vs 2-Layer) → E1 (strategy comparison) → E2 (embedding) → E3 (reranker) → E4/E5/E6 (parallel: thesis validation, pool scale, pool similarity). Each experiment changes exactly one independent variable, controlled via `run_experiments.py --experiment E{n}`.
+
+---
+
+## Key Constraints
+
+- **Async only**: All I/O uses async/await (AsyncQdrantClient, AsyncOpenAI, httpx.AsyncClient). Never `requests`.
+- **Logging**: loguru only. No `print()`, no `import logging`.
+- **Testing**: pytest + pytest-asyncio with `asyncio_mode="auto"`. Integration tests guarded by `@pytest.mark.skipif(not os.getenv("API_KEY"))`.
+- **Qdrant IDs**: `uuid.uuid5(MCP_DISCOVERY_NAMESPACE, tool_id)` — deterministic, upsert-safe.
+- **Confidence branching**: gap-based threshold 0.15 (rank1 - rank2 score gap).
+- **Ground truth**: JSONL format in `data/ground_truth/`. Seed set is manually curated; synthetic is LLM-generated.
+- **`.env` 파일은 절대 커밋하지 않음**
+
+---
+
+## 코딩 컨벤션
+
+### 네이밍
+- 파일/변수: `snake_case`, 클래스: `PascalCase`, 상수: `UPPER_SNAKE_CASE`
+- tool_id: `"{server_id}::{tool_name}"`, query_id: `"gt-{category}-{number}"`
+
+### Git
+- 커밋 메시지: `feat: ...`, `fix: ...`, `test: ...`, `docs: ...`, `refactor: ...`
+- Phase 단위 커밋 권장
