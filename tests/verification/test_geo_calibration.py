@@ -226,14 +226,14 @@ class TestDimensionBreakdown:
             f"Expected precision >= 0.3, got {_dim(report, 'precision'):.4f}"
         )
 
-    async def test_postgres_boundary_high(self, analyzer: HeuristicAnalyzer) -> None:
-        """PostgreSQL description has 'Cannot', 'Not suitable' — boundary >= 0.3.
+    async def test_postgres_fluency_reasonable(self, analyzer: HeuristicAnalyzer) -> None:
+        """PostgreSQL description has good sentence structure — fluency >= 0.3.
 
-        Actual: boundary=0.60 ('Cannot execute' + 'Not suitable' = 2 neg_boundary hits).
+        Multiple complete sentences with connectors and high word diversity.
         """
         report = await analyzer.analyze("good::postgres_tool", _POSTGRES_DESC)
-        assert _dim(report, "boundary") >= 0.3, (
-            f"Expected boundary >= 0.3, got {_dim(report, 'boundary'):.4f}"
+        assert _dim(report, "fluency") >= 0.3, (
+            f"Expected fluency >= 0.3, got {_dim(report, 'fluency'):.4f}"
         )
 
     async def test_poor_search_all_dimensions_low(self, analyzer: HeuristicAnalyzer) -> None:

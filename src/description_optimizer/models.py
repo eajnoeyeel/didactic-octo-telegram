@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
 GEO_DIMENSIONS = frozenset(
-    {"clarity", "disambiguation", "parameter_coverage", "boundary", "stats", "precision"}
+    {"clarity", "disambiguation", "parameter_coverage", "fluency", "stats", "precision"}
 )
 
 
@@ -21,7 +21,7 @@ class DimensionScore(BaseModel):
     """Score for a single GEO dimension (0.0 to 1.0)."""
 
     dimension: Literal[
-        "clarity", "disambiguation", "parameter_coverage", "boundary", "stats", "precision"
+        "clarity", "disambiguation", "parameter_coverage", "fluency", "stats", "precision"
     ]
     score: float = Field(ge=0.0, le=1.0)
     explanation: str

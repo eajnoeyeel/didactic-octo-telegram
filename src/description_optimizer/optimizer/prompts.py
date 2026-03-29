@@ -4,7 +4,7 @@ GEO dimension definitions (from docs/design/metrics-rubric.md):
 - clarity: Purpose + when-to-use + specific scope
 - disambiguation: Contrast with similar tools
 - parameter_coverage: Input parameter docs
-- boundary: What the tool does NOT do
+- fluency: Sentence structure, connectors, readability
 - stats: Quantitative info (counts, latency, coverage)
 - precision: Technical terms, protocols, standards
 """
@@ -18,9 +18,8 @@ CRITICAL RULES:
 1. KEEP the original description text intact as the foundation.
 2. ONLY ADD information that is directly supported by the provided input_schema or original description.
 3. NEVER invent limitations, capabilities, or parameters not in the provided data.
-4. NEVER add phrases like "Does NOT handle X" unless X is explicitly stated in the original.
-5. If no input_schema is provided, do NOT mention specific parameter names or types.
-6. Return valid JSON with exactly two keys: "optimized_description" and "search_description"."""
+4. If no input_schema is provided, do NOT mention specific parameter names or types.
+5. Return valid JSON with exactly two keys: "optimized_description" and "search_description"."""
 
 
 def build_optimization_prompt(
@@ -47,7 +46,7 @@ def build_optimization_prompt(
         "clarity": "Add clear action verb at the start. Specify WHAT the tool does and WHEN to use it. Include specific data sources or scope.",
         "disambiguation": "Add contrast phrases: 'unlike X', 'specifically for Y', 'only handles Z'. Differentiate from similar tools.",
         "parameter_coverage": "Mention key input parameters with types or constraints. E.g., 'Accepts a `query` string and optional `limit` integer.'",
-        "boundary": "Add explicit limitations: 'Does NOT handle X', 'Cannot Y', 'Not suitable for Z'.",
+        "fluency": "Improve sentence structure: use complete sentences with clear subjects and verbs. Add transition words (e.g., 'Use this when...', 'It also supports...'). Aim for 2-3 well-formed sentences.",
         "stats": "Add quantitative information if known: coverage numbers, response times, limits. E.g., 'Searches across 10K+ repositories.'",
         "precision": "Use precise technical terms: protocol names, data formats, standards. E.g., 'via the PostgreSQL wire protocol'.",
     }
@@ -182,6 +181,7 @@ def _build_grounded_guidance(
 
     guidance_map = {
         "clarity": "Add a clear action verb at the start if missing. Specify WHEN to use this tool based on the original description.",
+        "fluency": "Improve sentence structure: use complete sentences, add transition words, ensure readability. Do NOT add new factual claims.",
         "precision": "Use precise technical terms that are already present or directly inferable from the original description.",
         "stats": "Include quantitative information ONLY if present in the original description.",
     }
@@ -218,15 +218,8 @@ def _build_grounded_guidance(
                 f"No sibling tools available — skip disambiguation to avoid generic contrast phrases."
             )
 
-    if "boundary" in weak_dimensions:
-        lines.append(
-            f"  - **boundary** ({dimension_scores.get('boundary', 0):.2f}): "
-            f"ONLY state limitations explicitly mentioned in the original description. "
-            f"Do NOT invent limitations."
-        )
-
     for dim in weak_dimensions:
-        if dim in guidance_map and dim not in ("parameter_coverage", "disambiguation", "boundary"):
+        if dim in guidance_map and dim not in ("parameter_coverage", "disambiguation"):
             lines.append(f"  - **{dim}** ({dimension_scores.get(dim, 0):.2f}): {guidance_map[dim]}")
 
     return "\n".join(lines) if lines else "  All dimensions are adequate — preserve the original."

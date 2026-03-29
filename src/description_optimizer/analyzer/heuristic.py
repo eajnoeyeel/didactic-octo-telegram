@@ -66,14 +66,11 @@ class HeuristicAnalyzer(DescriptionAnalyzer):
         r'`[^`]+`|"[^"]{2,}"',
     )
 
-    # --- Boundary patterns ---
-    _NEGATIVE_BOUNDARY: re.Pattern[str] = re.compile(
-        r"\b(not for|cannot|does not|will not|unable to|should not|won't|isn't|doesn't"
-        r"|not suitable|not designed|limitations?:?)\b",
-        re.IGNORECASE,
-    )
-    _LIMITATION_KEYWORDS: re.Pattern[str] = re.compile(
-        r"\b(limitation|caveat|restriction|constraint|warning)\b",
+    # --- Fluency patterns ---
+    _SENTENCE_ENDER: re.Pattern[str] = re.compile(r"[.!?]+")
+    _CONNECTOR_WORDS: re.Pattern[str] = re.compile(
+        r"\b(and|or|but|then|also|however|therefore|furthermore|additionally|moreover"
+        r"|because|since|while|when|if|although|thus|hence|so that|in order to)\b",
         re.IGNORECASE,
     )
 
@@ -108,7 +105,7 @@ class HeuristicAnalyzer(DescriptionAnalyzer):
             self._score_clarity(safe_desc),
             self._score_disambiguation(safe_desc),
             self._score_parameter_coverage(safe_desc),
-            self._score_boundary(safe_desc),
+            self._score_fluency(safe_desc),
             self._score_stats(safe_desc),
             self._score_precision(safe_desc),
         ]
@@ -225,27 +222,47 @@ class HeuristicAnalyzer(DescriptionAnalyzer):
             ),
         )
 
-    def _score_boundary(self, desc: str) -> DimensionScore:
+    def _score_fluency(self, desc: str) -> DimensionScore:
         score = 0.0
         reasons: list[str] = []
 
-        # Negative instructions — each +0.3, cap 0.7
-        neg_matches = self._NEGATIVE_BOUNDARY.findall(desc)
-        neg_contribution = _clamp(len(neg_matches) * 0.3, hi=0.7)
-        score += neg_contribution
-        if neg_matches:
-            reasons.append(f"negative_instructions={len(neg_matches)}")
+        # Split into sentences using sentence-ending punctuation
+        sentences = [s.strip() for s in self._SENTENCE_ENDER.split(desc) if s.strip()]
+        sentence_count = len(sentences)
 
-        # Limitation keywords — +0.3
-        if self._LIMITATION_KEYWORDS.search(desc):
+        # Sentence count: 2+ sentences — +0.3
+        if sentence_count >= 2:
             score += 0.3
-            reasons.append("limitation_keywords")
+            reasons.append(f"sentences={sentence_count}")
+
+        # Average sentence word length: 10-30 words ideal — +0.25
+        if sentences:
+            word_counts = [len(s.split()) for s in sentences]
+            avg_words = sum(word_counts) / len(word_counts)
+            if 10 <= avg_words <= 30:
+                score += 0.25
+                reasons.append(f"avg_sentence_len={avg_words:.1f}")
+
+        # Connector/transition words — +0.1 each, cap 0.25
+        connector_matches = self._CONNECTOR_WORDS.findall(desc)
+        connector_contribution = _clamp(len(connector_matches) * 0.1, hi=0.25)
+        score += connector_contribution
+        if connector_matches:
+            reasons.append(f"connectors={len(connector_matches)}")
+
+        # Word diversity: unique/total ratio >= 0.6 — +0.2
+        words = desc.lower().split()
+        if words:
+            diversity = len(set(words)) / len(words)
+            if diversity >= 0.6:
+                score += 0.2
+                reasons.append(f"diversity={diversity:.2f}")
 
         final = _clamp(score)
         return DimensionScore(
-            dimension="boundary",
+            dimension="fluency",
             score=final,
-            explanation=f"Boundary score {final:.2f}: {', '.join(reasons) or 'no signals'}",
+            explanation=f"Fluency score {final:.2f}: {', '.join(reasons) or 'no signals'}",
         )
 
     def _score_stats(self, desc: str) -> DimensionScore:

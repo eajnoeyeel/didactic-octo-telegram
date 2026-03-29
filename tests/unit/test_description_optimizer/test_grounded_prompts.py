@@ -112,8 +112,8 @@ def test_grounded_prompt_anti_hallucination_rules():
         tool_id="test::tool",
         input_schema=None,
         sibling_tools=[],
-        weak_dimensions=["boundary"],
-        dimension_scores={"boundary": 0.0, "clarity": 0.3},
+        weak_dimensions=["fluency"],
+        dimension_scores={"fluency": 0.0, "clarity": 0.3},
     )
     # Must contain anti-hallucination instruction
     lower = prompt.lower()

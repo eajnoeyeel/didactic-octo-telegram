@@ -53,18 +53,26 @@ class TestDisambiguationScoring:
         assert score.score <= 0.3
 
 
-class TestBoundaryScoring:
-    async def test_has_boundaries(self, analyzer: HeuristicAnalyzer) -> None:
-        desc = "Reads files from the local filesystem. Cannot access remote URLs. NOT for binary file parsing."  # noqa: E501
-        report = await analyzer.analyze("s::tool", desc)
-        score = next(s for s in report.dimension_scores if s.dimension == "boundary")
-        assert score.score >= 0.6
+class TestFluencyScoring:
+    async def test_high_fluency(self) -> None:
+        """Well-structured sentences with connectors score high."""
+        desc = (
+            "Searches the PostgreSQL database for records matching a query. "
+            "Use this tool when you need to retrieve structured data from tables. "
+            "It supports filtering by column values and returns results in JSON format."
+        )
+        analyzer = HeuristicAnalyzer()
+        report = await analyzer.analyze("test::tool", desc)
+        fluency = next(s for s in report.dimension_scores if s.dimension == "fluency")
+        assert fluency.score >= 0.5
 
-    async def test_no_boundaries(self, analyzer: HeuristicAnalyzer) -> None:
-        desc = "A file reading tool."
-        report = await analyzer.analyze("s::tool", desc)
-        score = next(s for s in report.dimension_scores if s.dimension == "boundary")
-        assert score.score <= 0.2
+    async def test_low_fluency(self) -> None:
+        """Single short fragment without connectors scores low."""
+        desc = "get data"
+        analyzer = HeuristicAnalyzer()
+        report = await analyzer.analyze("test::tool", desc)
+        fluency = next(s for s in report.dimension_scores if s.dimension == "fluency")
+        assert fluency.score <= 0.3
 
 
 class TestStatsScoring:

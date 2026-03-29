@@ -42,7 +42,7 @@ def sample_report() -> AnalysisReport:
             DimensionScore(dimension="clarity", score=0.4, explanation="weak"),
             DimensionScore(dimension="disambiguation", score=0.2, explanation="missing"),
             DimensionScore(dimension="parameter_coverage", score=0.3, explanation="weak"),
-            DimensionScore(dimension="boundary", score=0.1, explanation="missing"),
+            DimensionScore(dimension="fluency", score=0.1, explanation="missing"),
             DimensionScore(dimension="stats", score=0.0, explanation="none"),
             DimensionScore(dimension="precision", score=0.3, explanation="weak"),
         ],
@@ -90,15 +90,15 @@ class TestOptimize:
 
 class TestPromptBuilding:
     def test_optimization_prompt_contains_weak_dims(self) -> None:
-        weak = ["clarity", "boundary"]
+        weak = ["clarity", "fluency"]
         prompt = build_optimization_prompt(
             original="Search tool",
             tool_id="s::t",
             weak_dimensions=weak,
-            dimension_scores={"clarity": 0.3, "boundary": 0.1},
+            dimension_scores={"clarity": 0.3, "fluency": 0.1},
         )
         assert "clarity" in prompt
-        assert "boundary" in prompt
+        assert "fluency" in prompt
         assert "Search tool" in prompt
 
     def test_optimization_prompt_preserves_original(self) -> None:
@@ -146,7 +146,7 @@ def sample_report_for_context() -> AnalysisReport:
             DimensionScore(dimension="clarity", score=0.35, explanation="low"),
             DimensionScore(dimension="disambiguation", score=0.0, explanation="none"),
             DimensionScore(dimension="parameter_coverage", score=0.0, explanation="none"),
-            DimensionScore(dimension="boundary", score=0.0, explanation="none"),
+            DimensionScore(dimension="fluency", score=0.0, explanation="none"),
             DimensionScore(dimension="stats", score=0.0, explanation="none"),
             DimensionScore(dimension="precision", score=0.0, explanation="none"),
         ],

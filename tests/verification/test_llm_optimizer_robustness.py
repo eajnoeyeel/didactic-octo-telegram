@@ -12,7 +12,7 @@ ALL_DIMS = [
     "clarity",
     "disambiguation",
     "parameter_coverage",
-    "boundary",
+    "fluency",
     "stats",
     "precision",
 ]

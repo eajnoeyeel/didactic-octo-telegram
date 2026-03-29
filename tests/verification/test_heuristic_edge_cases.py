@@ -144,27 +144,25 @@ class TestMarkdownAndHTML:
 class TestDimensionIndependence:
     """Verify that individual dimensions score independently and correctly."""
 
-    async def test_high_clarity_low_boundary(self, analyzer: HeuristicAnalyzer) -> None:
-        """Clarity-rich description without boundary language: clarity > boundary."""
-        desc = (
-            "Searches the database for records matching a query. "
-            "Use when you need to retrieve data from the API."
-        )
+    async def test_high_clarity_low_fluency(self, analyzer: HeuristicAnalyzer) -> None:
+        """Clarity-rich but fragmented description: clarity > fluency."""
+        desc = "Search. Get. List. Use for the API."
         report = await analyzer.analyze("test::tool", desc)
         clarity = _dim(report, "clarity")
-        boundary = _dim(report, "boundary")
-        assert clarity > boundary
+        fluency = _dim(report, "fluency")
+        assert clarity > fluency
 
-    async def test_high_boundary_low_stats(self, analyzer: HeuristicAnalyzer) -> None:
-        """A description with boundary language but no numeric stats: boundary > stats."""
+    async def test_high_fluency_low_stats(self, analyzer: HeuristicAnalyzer) -> None:
+        """Well-written prose without numbers: fluency > stats."""
         desc = (
-            "Manages files. Cannot delete system files. "
-            "Does not support binary formats. Will not modify permissions."
+            "Manages files and organizes them into directories. "
+            "Use this tool when you need to restructure your project layout, "
+            "because it handles renaming and moving files automatically."
         )
         report = await analyzer.analyze("test::tool", desc)
-        boundary = _dim(report, "boundary")
+        fluency = _dim(report, "fluency")
         stats = _dim(report, "stats")
-        assert boundary > stats
+        assert fluency > stats
 
     async def test_stats_only(self, analyzer: HeuristicAnalyzer) -> None:
         """A description with only numeric stats content: stats dimension >= 0.5."""

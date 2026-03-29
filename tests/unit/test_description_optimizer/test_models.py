@@ -30,7 +30,7 @@ class TestDimensionScore:
             "clarity",
             "disambiguation",
             "parameter_coverage",
-            "boundary",
+            "fluency",
             "stats",
             "precision",
         ]
@@ -49,7 +49,7 @@ class TestAnalysisReport:
             DimensionScore(dimension="clarity", score=0.6, explanation="ok"),
             DimensionScore(dimension="disambiguation", score=0.8, explanation="good"),
             DimensionScore(dimension="parameter_coverage", score=0.4, explanation="weak"),
-            DimensionScore(dimension="boundary", score=0.2, explanation="missing"),
+            DimensionScore(dimension="fluency", score=0.2, explanation="missing"),
             DimensionScore(dimension="stats", score=0.0, explanation="none"),
             DimensionScore(dimension="precision", score=0.5, explanation="partial"),
         ]
@@ -66,7 +66,7 @@ class TestAnalysisReport:
             DimensionScore(dimension="clarity", score=0.8, explanation="good"),
             DimensionScore(dimension="disambiguation", score=0.3, explanation="weak"),
             DimensionScore(dimension="parameter_coverage", score=0.7, explanation="ok"),
-            DimensionScore(dimension="boundary", score=0.1, explanation="bad"),
+            DimensionScore(dimension="fluency", score=0.1, explanation="bad"),
             DimensionScore(dimension="stats", score=0.6, explanation="ok"),
             DimensionScore(dimension="precision", score=0.5, explanation="ok"),
         ]
@@ -76,7 +76,7 @@ class TestAnalysisReport:
             dimension_scores=scores,
         )
         weak = report.weak_dimensions(threshold=0.5)
-        assert set(weak) == {"disambiguation", "boundary"}
+        assert set(weak) == {"disambiguation", "fluency"}
 
     def test_requires_six_dimensions(self) -> None:
         scores = [DimensionScore(dimension="clarity", score=0.5, explanation="test")]
