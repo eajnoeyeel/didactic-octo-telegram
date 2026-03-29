@@ -162,9 +162,9 @@ class TestOptimizeWithContext:
         mock_client = AsyncMock()
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = (
-            '{"optimized_description": "improved", "search_description": "search"}'
-        )
+        mock_response.choices[
+            0
+        ].message.content = '{"optimized_description": "improved", "search_description": "search"}'
         mock_client.chat.completions.create.return_value = mock_response
 
         optimizer = LLMDescriptionOptimizer(client=mock_client)
@@ -185,9 +185,9 @@ class TestOptimizeWithContext:
         mock_client = AsyncMock()
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = (
-            '{"optimized_description": "improved", "search_description": "search"}'
-        )
+        mock_response.choices[
+            0
+        ].message.content = '{"optimized_description": "improved", "search_description": "search"}'
         mock_client.chat.completions.create.return_value = mock_response
 
         optimizer = LLMDescriptionOptimizer(client=mock_client)

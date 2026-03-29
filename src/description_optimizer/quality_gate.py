@@ -121,9 +121,7 @@ class QualityGate:
             similarity=similarity,
         )
 
-    def check_hallucinated_params(
-        self, optimized: str, input_schema: dict | None
-    ) -> GateResult:
+    def check_hallucinated_params(self, optimized: str, input_schema: dict | None) -> GateResult:
         """Check if optimized description mentions parameters not in the actual schema.
 
         Args:
@@ -151,8 +149,20 @@ class QualityGate:
 
         # Filter: only flag words that look like parameter names (lowercase, not common words)
         common_words = {
-            "the", "a", "an", "is", "are", "to", "for", "and", "or",
-            "not", "true", "false", "null", "none",
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "to",
+            "for",
+            "and",
+            "or",
+            "not",
+            "true",
+            "false",
+            "null",
+            "none",
         }
         candidate_params = {p for p in mentioned_params if p.lower() not in common_words}
 

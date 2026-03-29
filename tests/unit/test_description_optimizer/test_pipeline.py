@@ -181,8 +181,7 @@ def _make_report_with_tool_id(tool_id: str, desc: str, geo: float = 0.3) -> Anal
         tool_id=tool_id,
         original_description=desc,
         dimension_scores=[
-            DimensionScore(dimension=d, score=geo, explanation="test")
-            for d in ALL_DIMS
+            DimensionScore(dimension=d, score=geo, explanation="test") for d in ALL_DIMS
         ],
     )
 
@@ -227,7 +226,10 @@ async def test_run_with_tool_passes_context_to_optimizer() -> None:
     )
 
     pipeline = OptimizationPipeline(
-        analyzer=analyzer, optimizer=optimizer, embedder=embedder, gate=gate,
+        analyzer=analyzer,
+        optimizer=optimizer,
+        embedder=embedder,
+        gate=gate,
     )
 
     result = await pipeline.run_with_tool(tool, sibling_tools=sibling_tools)
@@ -274,7 +276,10 @@ async def test_pipeline_rejects_hallucinated_params() -> None:
     gate = QualityGate(min_similarity=0.0)  # Relax similarity to isolate hallucination gate
 
     pipeline = OptimizationPipeline(
-        analyzer=analyzer, optimizer=optimizer, embedder=embedder, gate=gate,
+        analyzer=analyzer,
+        optimizer=optimizer,
+        embedder=embedder,
+        gate=gate,
     )
 
     result = await pipeline.run_with_tool(tool, sibling_tools=[])
@@ -311,7 +316,10 @@ async def test_run_with_tool_batch() -> None:
     )
 
     pipeline = OptimizationPipeline(
-        analyzer=analyzer, optimizer=optimizer, embedder=embedder, gate=gate,
+        analyzer=analyzer,
+        optimizer=optimizer,
+        embedder=embedder,
+        gate=gate,
     )
 
     results = await pipeline.run_batch_with_tools([(tool, [])])

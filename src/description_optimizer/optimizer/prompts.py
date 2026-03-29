@@ -135,9 +135,7 @@ def build_grounded_prompt(
         )
 
     # Scores
-    scores_text = "\n".join(
-        f"  - {dim}: {score:.2f}" for dim, score in dimension_scores.items()
-    )
+    scores_text = "\n".join(f"  - {dim}: {score:.2f}" for dim, score in dimension_scores.items())
     sections.append(f"**Current GEO Scores** (0.0-1.0):\n{scores_text}\n")
 
     # Grounded improvement guidance
@@ -229,9 +227,7 @@ def _build_grounded_guidance(
 
     for dim in weak_dimensions:
         if dim in guidance_map and dim not in ("parameter_coverage", "disambiguation", "boundary"):
-            lines.append(
-                f"  - **{dim}** ({dimension_scores.get(dim, 0):.2f}): {guidance_map[dim]}"
-            )
+            lines.append(f"  - **{dim}** ({dimension_scores.get(dim, 0):.2f}): {guidance_map[dim]}")
 
     return "\n".join(lines) if lines else "  All dimensions are adequate — preserve the original."
 
