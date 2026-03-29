@@ -143,3 +143,44 @@ def test_grounded_prompt_augmentation_instruction():
     )
     lower = prompt.lower()
     assert "preserve" in lower or "keep" in lower or "augment" in lower
+
+
+def test_query_aware_prompt_includes_queries():
+    """Query-aware prompt includes relevant search queries."""
+    from description_optimizer.models import OptimizationContext
+    from description_optimizer.optimizer.prompts import build_query_aware_prompt
+
+    context = OptimizationContext(
+        tool_id="slack::send_message",
+        original_description="Send a message",
+        input_schema={"type": "object", "properties": {"channel": {"type": "string"}}},
+    )
+    prompt = build_query_aware_prompt(
+        context, relevant_queries=["send a message on slack", "post to a channel"]
+    )
+    assert "send a message on slack" in prompt
+    assert "post to a channel" in prompt
+
+
+def test_query_aware_prompt_includes_schema():
+    """Query-aware prompt includes input_schema when available."""
+    from description_optimizer.models import OptimizationContext
+    from description_optimizer.optimizer.prompts import build_query_aware_prompt
+
+    context = OptimizationContext(
+        tool_id="test::tool",
+        original_description="Do something",
+        input_schema={"type": "object", "properties": {"query": {"type": "string"}}},
+    )
+    prompt = build_query_aware_prompt(context, relevant_queries=[])
+    assert "query" in prompt
+
+
+def test_query_aware_prompt_anti_hallucination():
+    """Query-aware prompt includes anti-hallucination rules."""
+    from description_optimizer.models import OptimizationContext
+    from description_optimizer.optimizer.prompts import build_query_aware_prompt
+
+    context = OptimizationContext(tool_id="test::tool", original_description="Do something")
+    prompt = build_query_aware_prompt(context, relevant_queries=["find test tool"])
+    assert "NEVER" in prompt or "never" in prompt.lower()

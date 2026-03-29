@@ -9,7 +9,13 @@ GEO dimension definitions (from docs/design/metrics-rubric.md):
 - precision: Technical terms, protocols, standards
 """
 
+from __future__ import annotations
+
 import json
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from description_optimizer.models import OptimizationContext
 
 SYSTEM_PROMPT = """You are a technical writer specializing in MCP (Model Context Protocol) tool descriptions.
 Your goal is to AUGMENT tool descriptions so they are more discoverable by LLM-based search systems.
@@ -247,3 +253,61 @@ Generate a dense, keyword-rich version (30-80 words) that includes:
 - Action verbs describing what the tool does
 
 Return just the search description text, no JSON."""
+
+
+def build_query_aware_prompt(
+    context: "OptimizationContext",
+    relevant_queries: list[str] | None = None,
+) -> str:
+    """Build optimization prompt focused on retrieval discoverability.
+
+    Instead of "improve GEO dimension scores", tells the optimizer:
+    "Make this tool findable for these search queries."
+    """
+    queries = relevant_queries or []
+
+    parts = [
+        "You are optimizing an MCP tool description for search discoverability.",
+        "",
+        f"**Tool ID:** {context.tool_id}",
+        f"**Original Description:** {context.original_description}",
+    ]
+
+    if context.input_schema:
+        parts.append(
+            f"\n**Input Schema** (factual ground truth):\n"
+            f"```json\n{json.dumps(context.input_schema, indent=2)}\n```"
+        )
+
+    if context.sibling_tools:
+        parts.append("\n**Other tools on this server** (for disambiguation):")
+        for t in context.sibling_tools[:5]:
+            parts.append(f"- {t.get('tool_name', '')}: {t.get('description', '')[:100]}")
+
+    if queries:
+        parts.append("\n**Search queries that should find this tool:**")
+        for q in queries[:10]:
+            parts.append(f'- "{q}"')
+        parts.append(
+            "\nMake the description naturally match these search intents. "
+            "A user typing any of these queries should find this tool first."
+        )
+
+    parts.extend(
+        [
+            "\n## Rules",
+            "1. KEEP the original description text intact — AUGMENT, do not replace",
+            "2. ONLY add information from the original description or input_schema",
+            "3. NEVER invent limitations, capabilities, or parameters not in the provided data",
+            "4. Make the description naturally match the search queries above",
+            "5. Include actual parameter names from the schema (with backticks) if available",
+            "6. If sibling tools exist, briefly clarify what makes this tool different",
+            "",
+            "## Output Format",
+            'Return JSON: {"optimized_description": "...", "search_description": "..."}',
+            "- optimized_description: 50-200 words, human+machine readable",
+            "- search_description: 30-80 words, keyword-dense for embedding search",
+        ]
+    )
+
+    return "\n".join(parts)
