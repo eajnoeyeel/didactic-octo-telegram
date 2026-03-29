@@ -5,7 +5,7 @@
 ## 기본 정보
 
 - 논문: [StableToolBench: Towards Stable Large-Scale Benchmarking on Tool Learning of Large Language Models](https://arxiv.org/abs/2403.07714)
-- 제출일: 2024-03-12
+- 제출일: 2024-03-12 (현재 v5, 2025-03-05로 업데이트됨)
 - 저자: Zhicheng Guo 외
 
 ## 무엇을 해결하려는가

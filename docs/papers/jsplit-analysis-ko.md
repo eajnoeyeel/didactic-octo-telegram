@@ -12,9 +12,9 @@
 ## 핵심 아이디어
 
 - 도구를 사전 정의된 taxonomy(카테고리 체계)로 분류한다.
-- 쿼리가 들어오면 먼저 intent classifier가 해당 쿼리의 카테고리를 판별한다.
+- 쿼리가 들어오면 먼저 LLM 기반 분류 프롬프트가 해당 쿼리의 카테고리를 판별한다(전용 intent classifier가 아닌 LLM 프롬프트 방식).
 - 판별된 카테고리에 해당하는 서브 인덱스(sub-index)만 검색하여 검색 범위를 대폭 축소한다.
-- 이를 통해 latency를 줄이면서 정밀도를 유지하거나 향상시킨다.
+- 이를 통해 토큰 비용을 줄이면서 도구 선택 정확도를 유지하거나 향상시킨다.
 
 ## 방법론
 
@@ -22,8 +22,8 @@
 
 ## 주요 결과
 
-- Latency를 핵심 metric으로 보고하며, taxonomy-gated 접근법의 검색 시간 절감 효과를 실증
-- 카테고리 분류 정확도가 전체 파이프라인 성능의 핵심 병목임을 확인
+- 토큰 비용 절감과 도구 선택 정확도를 핵심 metric으로 보고하며, taxonomy-gated 접근법의 프롬프트 축소 효과를 실증
+- 카테고리 분류의 정확성이 전체 파이프라인 성능에 영향을 미침을 확인
 
 ## 장점
 
@@ -40,15 +40,15 @@
 
 MCP Discovery Platform의 Strategy C (Taxonomy-Gated) 전략의 직접적인 이론적 근거이다. 현재 아키텍처(architecture.md)에서 3가지 검색 전략(A: Sequential, B: Parallel, C: Taxonomy-Gated)을 비교하도록 설계되어 있으며, Strategy C가 바로 JSPLIT 논문의 접근법에 기반한다.
 
-또한 latency를 핵심 metric으로 강조하는 JSPLIT의 관점은 우리 metrics-rubric.md의 Health Metric #6 (Latency p50/p95/p99)의 직접적인 논문 근거이다.
+JSPLIT의 토큰 비용 절감 관점은 우리 아키텍처의 효율성 설계에 참고가 된다. 다만 Latency p50/p95/p99(Metric #6)는 JSPLIT 논문이 직접 다루는 지표가 아니며, 프로젝트 자체 설계이다.
 
 ## 적용 포인트
 
 - **Strategy C (Taxonomy-Gated)**: JSPLIT의 taxonomy-gated retrieval을 MCP 서버/도구 카테고리에 적용. CTO 확인 후 구현 예정
-- **Latency p50/p95/p99 (Metric #6)**: JSPLIT의 latency 중심 평가 방법론을 참고하여 각 레이어별 응답 시간 측정
-- **Intent Classifier**: 쿼리 카테고리 판별기 설계 시 JSPLIT의 접근법 참고
+- **토큰 비용 절감**: JSPLIT의 taxonomy-gated 접근이 프롬프트 크기를 줄여 비용 효율성을 높이는 방식 참고. Latency p50/p95/p99(Metric #6)는 논문이 직접 보고하는 지표가 아니라 프로젝트 자체 설계임에 유의
+- **LLM 기반 카테고리 분류**: 쿼리 카테고리 판별 시 JSPLIT의 LLM 프롬프트 기반 분류 방식 참고 (전용 intent classifier가 아닌 LLM 분류)
 - **검색 전략 비교 실험**: Strategy A/B/C의 latency + precision 트레이드오프 분석
 
 ## 관련 research 문서
 
-- [evaluation-metrics.md](../research/evaluation-metrics.md) — Latency p50/p95/p99 지표의 논문 근거
+- [evaluation-metrics.md](../research/evaluation-metrics.md) — 토큰 비용 절감 및 검색 전략 비교 참고

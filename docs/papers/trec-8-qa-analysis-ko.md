@@ -42,11 +42,11 @@
 
 MCP Discovery Platform의 Layer 1 서버 추천 품질을 평가하는 MRR (Metric #11)의 직접적인 원류이다. Recall@K가 "정답 서버가 Top-K에 있는가"를 측정한다면, MRR은 "정답 서버가 몇 번째인가"를 측정하여 Sequential 전략에서 상위 서버부터 Tool 검색하는 구조의 실제 성능을 더 정확히 반영한다.
 
-evaluation-metrics.md에서 "Voorhees (TREC-8 QA Track, 1999)"를 MRR의 논문 근거로 직접 인용하고 있으며, metrics-rubric.md에서 MRR >= 0.80 목표를 설정하고 있다.
+evaluation-metrics.md에서 "Voorhees (TREC-8 QA Track, 1999)"를 MRR의 논문 근거로 직접 인용하고 있으며, metrics-rubric.md에서 MRR >= 0.80 목표를 설정하고 있다. 이 목표값(0.80)은 TREC-8 논문이 제시한 것이 아니라 프로젝트 자체 설계임.
 
 ## 적용 포인트
 
-- **MRR (Metric #11)**: Layer 1 서버 추천에서 정답 서버의 순위 품질 측정. 목표 >= 0.80
+- **MRR (Metric #11)**: Layer 1 서버 추천에서 정답 서버의 순위 품질 측정. 목표 >= 0.80 (프로젝트 자체 설정)
 - **Server Recall@K와의 보완**: Recall@K(있냐 없냐) + MRR(얼마나 앞에 있냐)을 함께 보고하여 Layer 1 성능을 다각도로 평가
 - **Strategy 비교**: Sequential(A) vs Parallel(B) 전략 비교 시 MRR 차이가 핵심 판단 기준
 - **Dashboard**: MRR 전략별 Bar chart로 시각화

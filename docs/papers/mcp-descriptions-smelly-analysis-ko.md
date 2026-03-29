@@ -54,10 +54,11 @@ MCP 도구 설명(description)의 품질이 실제로 어떤 수준인지 대규
 - "Length/Completeness"가 다른 차원들의 메타 차원처럼 작동할 수 있음 (독립성 문제)
 - LLM-as-Jury 방식이 특정 LLM 모델에 의존적일 수 있음
 - 856개 도구가 MCP 생태계 전체를 대표하는지에 대한 일반화 가능성
+- 설명 augmentation의 비용 트레이드오프: 실행 단계가 67.46% 증가하고, 일부 케이스에서 16.67% 성능 하락이 발생. 설명 개선이 항상 전체 성능 향상으로 이어지지는 않을 수 있음
 
 ## 프로젝트 시사점
 
-MCP Discovery Platform의 DQS(Description Quality Score) 설계에 가장 직접적인 근거를 제공하는 핵심 논문. 97.1% 결함율은 품질 점수 시스템의 필요성을 강력히 뒷받침하며, 6가지 차원 rubric은 우리 5-차원 DQS의 기반이 됨. 특히 Purpose(56% 실패)와 Limitations(89.3% 부재) 수치는 가중치 설계의 핵심 근거로 활용.
+MCP Discovery Platform의 DQS(Description Quality Score) 설계에 가장 직접적인 근거를 제공하는 핵심 논문. 97.1% 결함율은 품질 점수 시스템의 필요성을 강력히 뒷받침하며, 6가지 차원 rubric은 우리 5-차원 DQS의 기반이 됨. 특히 Purpose(56% 실패)와 Limitations(89.3% 부재) 수치는 가중치 설계 방향의 참고로 활용. 다만 augmentation의 비용 트레이드오프(실행 단계 증가, 일부 성능 하락)도 고려해야 하며, DQS 개선이 무조건적 성능 향상을 보장하지는 않음에 유의.
 
 ## 적용 포인트
 
