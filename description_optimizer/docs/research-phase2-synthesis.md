@@ -262,13 +262,13 @@ Phase 4: 검증 (end-to-end)
 - `stats` → GEO +37%, 앵커 역할
 - `precision` → MCP 논문: 기술 용어가 임베딩 공간 분리에 핵심
 
-### 사용자와 논의할 미결 질문
+### 결정 사항 (2026-03-29)
 
-1. **RAGAS Faithfulness 비용 수용 가능한가?** 평가당 2 LLM 호출(~$0.002). 861개 도구 전체 ≈ $1.72. 30개 샘플만이면 $0.06.
-2. **doc2query 쿼리 생성 방법?** ground truth 활용 vs LLM으로 합성 생성 vs 둘 다?
-3. **P@1 검증의 빈도?** 매 최적화마다 vs 배치 단위 vs 최종 1회?
-4. **boundary 차원을 완전 제거할 것인가, 아니면 가중치만 0으로?** (기존 테스트 호환성)
-5. **fluency 측정 방법?** perplexity 점수 vs LLM-as-Judge vs 문장 복잡도 휴리스틱?
+1. **RAGAS Faithfulness 비용 수용** — $0.002/평가 허용
+2. **doc2query 쿼리 생성** — Ground truth 불완전하므로 LLM 합성 시 품질 관리 주의. 기존 GT 활용 + 신중한 LLM 합성 병행.
+3. **P@1 검증 빈도** — 배치 단위 검증, 최고 성능 방향
+4. **boundary 차원 완전 제거** — 코드에서 삭제 (가중치 0이 아님)
+5. **fluency 측정** — 최적화-평가 모델 분리 필수 (GPT-4o-mini로 최적화 시 다른 모델로 평가)
 
 ---
 
