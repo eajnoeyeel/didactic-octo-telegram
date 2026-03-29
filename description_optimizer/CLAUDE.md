@@ -34,7 +34,7 @@ Description Optimizer — Provider가 MCP 서버/도구를 등록할 때 descrip
 - doc2query 쿼리 인식 최적화 프롬프트 (`build_query_aware_prompt`)
 - P@1 A/B 검색 평가 스크립트 (`scripts/run_retrieval_ab_eval.py`)
 
-**다음 단계:** 새 차원으로 A/B 비교 재실행 → P@1 end-to-end 평가 → 결과 분석
+**다음 단계:** ~~A/B 비교 재실행~~ (완료) → P@1 end-to-end 평가 → RAGAS 파이프라인 통합
 
 ---
 
@@ -97,9 +97,10 @@ Description Optimizer Pipeline
 
 ## 미해결 과제
 
-1. **P@1 end-to-end 검증**: 새 fluency 차원 + RAGAS 게이트로 최적화 후 P@1 비교 실행 필요
-2. **fluency 측정 고도화**: 현재 휴리스틱(문장 수, 연결어). 향후 LLM-as-Judge(별도 모델) 검토
-3. **doc2query 쿼리 생성**: ground truth 불완전 → LLM 합성 시 품질 관리 필요
+1. **P@1 end-to-end 검증**: `scripts/run_retrieval_ab_eval.py` 실행 — 프록시(GEO)가 아닌 실제 검색 성능 측정
+2. **RAGAS faithfulness 파이프라인 통합**: 현재 gate만 구현됨, 최적화 루프에 check_faithfulness 통합 필요
+3. **disambiguation 개선**: regex 대조 문구 → sibling tools 간 임베딩 거리 기반 측정
+4. **fluency 측정 고도화**: 현재 휴리스틱(문장 수, 연결어). 향후 LLM-as-Judge(별도 모델) 검토
 
 ---
 

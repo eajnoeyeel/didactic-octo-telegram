@@ -242,7 +242,7 @@ async def phase_report():
 
 def _write_report(f, results: list[dict]) -> None:
     """Write the full comparison report to a file handle."""
-    dims = ["clarity", "disambiguation", "parameter_coverage", "boundary", "stats", "precision"]
+    dims = ["clarity", "disambiguation", "parameter_coverage", "fluency", "stats", "precision"]
 
     f.write("# Description Optimizer 비교 검증 리포트\n\n")
     f.write("> 생성 시각: 스크립트 실행 시점\n")

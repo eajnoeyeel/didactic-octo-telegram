@@ -1,9 +1,10 @@
 # Grounded vs Ungrounded A/B 비교 보고서 + 연구 방향
 
-> **Date:** 2026-03-29
+> **Date:** 2026-03-29 (fluency 기반 재실행)
 > **Branch:** `feat/description-optimizer`
 > **데이터:** `data/verification/grounded_optimization_results.jsonl`, `data/verification/optimization_results.jsonl`
 > **스크립트:** `scripts/run_grounded_ab_comparison.py`
+> **차원:** clarity, disambiguation, parameter_coverage, **fluency** (boundary 제거), stats, precision
 
 ---
 
@@ -16,8 +17,14 @@
 ### 조건
 | 조건 | 설명 |
 |------|------|
-| **Ungrounded** (기존) | 원본 description만으로 LLM 최적화. input_schema 미제공. |
-| **Grounded** (신규) | input_schema + sibling tools + anti-hallucination 규칙 적용 |
+| **Ungrounded** (baseline) | `pipeline.run()` — 원본 description만으로 LLM 최적화. context 미제공. |
+| **Grounded** (new) | `pipeline.run_with_tool()` — input_schema + sibling tools + anti-hallucination 규칙 적용 |
+
+### Phase 2 변경사항 (이전 실행 대비)
+1. **boundary 차원 완전 제거 → fluency 차원으로 교체** (GEO 연구 미지지, 95% 환각 원인)
+2. RAGAS faithfulness 게이트 추가 (주장별 이진 검증)
+3. doc2query 쿼리 인식 최적화 프롬프트 추가
+4. 양쪽 모두 동일 파이프라인에서 fresh re-run (기존 캐시 결과 사용 안 함)
 
 ### Grounded 최적화에 추가된 것
 1. `OptimizationContext` — `input_schema`, `sibling_tools` 포함
@@ -28,79 +35,55 @@
 
 ---
 
-## 2. 결과 요약
+## 2. 결과 요약 (fluency 기반, 2026-03-29)
 
 ### 2.1 전체 지표
 
 | 지표 | Ungrounded | Grounded | 차이 | 비고 |
 |------|-----------|----------|------|------|
-| 성공률 | 22/30 (73%) | **26/30 (87%)** | +14%p | Grounded가 더 많은 tool 최적화 |
-| 평균 GEO 향상 | **+0.1792** | +0.1420 | -0.0372 | Ungrounded가 수치상 높음 |
-| Gate 거부 | 8건 | **4건** | -50% | Grounded가 더 적은 품질 위반 |
-| Stats 퇴보 건수 | 3건 | **0건** | -100% | Grounded가 기존 정보 완전 보존 |
-| Boundary 환각 의심 | **21/22 (95%)** | 2/26 (8%) | -87%p | 핵심 차이 |
+| 성공률 | 17/30 (57%) | **21/30 (70%)** | +13%p | Grounded가 더 많은 tool 최적화 |
+| 평균 GEO 향상 | +0.1603 | **+0.1861** | **+0.0258** | **Grounded가 이제 수치에서도 승리** |
+| Gate 거부 | **13건** | 9건 | -31% | Grounded가 더 적은 품질 위반 |
+| Per-tool 승부 | 3승 | **11승** (1 tie) | — | Grounded 압도적 |
 
 ### 2.2 차원별 Delta (성공 건 기준)
 
-| Dimension | Ungrounded Before→After (Delta) | Grounded Before→After (Delta) | 승자 |
-|-----------|------|------|------|
-| clarity | 0.5159→0.5773 (+0.0614) | 0.5308→0.7442 (**+0.2135**) | **Grounded** |
-| disambiguation | 0.0545→0.4727 (**+0.4182**) | 0.0462→0.3462 (+0.3000) | Ungrounded |
-| parameter_coverage | 0.1614→0.4000 (+0.2386) | 0.1538→0.4077 (**+0.2538**) | **Grounded** |
-| boundary | 0.0273→0.4136 (**+0.3864**) | 0.0231→0.0462 (+0.0231) | Ungrounded |
-| stats | 0.0795→0.0273 (-0.0523) | 0.1019→0.1288 (**+0.0269**) | **Grounded** |
-| precision | 0.1932→0.2159 (+0.0227) | 0.1808→0.2154 (**+0.0346**) | **Grounded** |
+| Dimension | Ungrounded Delta | Grounded Delta | 승자 |
+|-----------|------:|------:|------|
+| clarity | +0.1706 | **+0.2071** | **Grounded** |
+| disambiguation | **+0.4059** | +0.3000 | Ungrounded |
+| parameter_coverage | +0.1029 | **+0.2429** | **Grounded** |
+| fluency | +0.2735 | **+0.2929** | **Grounded** |
+| stats | +0.0000 | **+0.0238** | **Grounded** |
+| precision | +0.0088 | **+0.0500** | **Grounded** |
 
-**Grounded 4승, Ungrounded 2승.** 단, Ungrounded의 2승(boundary, disambiguation)은 환각에 의한 것.
+**Grounded 5승, Ungrounded 1승.** Ungrounded는 disambiguation에서만 승리.
 
-### 2.3 Per-Tool Head-to-Head (21개 공통 성공)
+### 2.3 Per-Tool Head-to-Head (15개 공통 성공)
 
 | 결과 | 건수 |
 |------|------|
-| Grounded 승 | 8 |
-| Ungrounded 승 | 12 |
+| Grounded 승 | **11** |
+| Ungrounded 승 | 3 |
 | Tie | 1 |
 
-**Ungrounded가 per-tool에서도 12:8로 이김.** 그러나 이 차이의 대부분이 boundary 환각에서 비롯됨.
+**Grounded가 per-tool에서 11:3으로 압도적 승리.** 이전 (boundary 포함 시) 8:12 역전에서 완전 뒤집힘.
 
 ---
 
-## 3. 핵심 발견: Goodhart's Law 확인
+## 3. 핵심 발견: boundary 제거로 Goodhart's Law 해결
 
-### 3.1 Boundary 차원이 GEO 차이의 원인
+### 3.1 이전 결과와 비교
 
-GEO 차이 -0.0372 중 boundary 차원 기여도:
-- Ungrounded boundary delta: +0.3864
-- Grounded boundary delta: +0.0231
-- **차이: 0.3633** (GEO는 6차원 기하평균이므로 이 한 차원이 전체에 큰 영향)
+| 지표 | 이전 (boundary 포함) | 현재 (fluency 기반) | 변화 |
+|------|---------------------|--------------------| -----|
+| GEO 향상 차이 | Ungrounded +0.0372 | **Grounded +0.0258** | **역전** |
+| Per-tool 승부 | UG 12:8 GR | **GR 11:3 UG** | **역전** |
+| 차원별 승부 | GR 4:2 UG | **GR 5:1 UG** | 개선 |
 
-**21/22 (95%)의 ungrounded 성공 건에서 boundary가 0.2 이상 급등** — 거의 전부 환각.
+**boundary 차원 제거만으로 Goodhart 문제가 해결됨.** 이전에 ungrounded가 이겼던 이유(boundary 환각 +0.3864)가 사라졌고, grounded의 실질적 품질 우위가 드러남.
 
-### 3.2 환각 사례 (Ungrounded)
-
-```
-# EthanHenrickson/math-mcp::arccos
-"does not handle complex numbers or inputs outside the range of -1 to 1"
-→ arccos의 수학적 정의역을 추측으로 서술. input_schema에는 이 정보 없음.
-
-# Sallvainian/ngss-mcp::search_standards
-"does not handle non-NGSS content"
-→ 실제 API 동작 모른 채 제한사항 날조.
-
-# aryankeluskar/polymarket-mcp::get_trades
-"does not handle trades from other markets or platforms"
-→ 근거 없는 제한사항 추가.
-
-# slack::SLACK_LEAVE_A_CONVERSATION
-boundary: 0.00 → 0.70 (+0.70)
-→ 가장 극단적인 환각 케이스. 0점에서 0.7점으로.
-
-# slack::SLACK_DELETE_A_COMMENT_ON_A_FILE
-"It does not handle comments on channels or direct messages."
-→ 원본에 없는 제한사항. 사실 여부 불명.
-```
-
-### 3.3 Grounded가 환각을 방지하는 메커니즘
+### 3.2 Grounded가 환각을 방지하는 메커니즘
 
 1. **Anti-hallucination SYSTEM_PROMPT**: "NEVER invent parameters, limitations, or capabilities not in the provided schema"
 2. **Hallucination Detection Gate**: optimized text에서 backtick 파라미터 추출 → input_schema의 properties와 교차 검증 → 불일치 시 reject
@@ -109,46 +92,39 @@ boundary: 0.00 → 0.70 (+0.70)
 
 ---
 
-## 4. 미해결 문제: GEO Scorer의 구조적 한계
+## 4. Gate 거부 분석
 
-### 4.1 문제 정의
+### 4.1 Grounded 거부 (9건)
+| Tool | 거부 사유 |
+|------|----------|
+| `math-mcp::max` | Similarity 0.744 < 0.75 |
+| `GOOGLESUPER_EVENTS_INSTANCES` | Similarity 0.710 < 0.75 |
+| `download_paper` | InfoPreservation (숫자 손실) |
+| `github::create_or_update_file` | **Hallucination gate**: 날조된 파라미터 탐지 |
+| `market_screen` | GEO 감소 + InfoPreservation |
+| `brave_news_search` | GEO 감소 + InfoPreservation |
+| `get_vulnerable_practice_labs` | GEO 감소 + InfoPreservation |
+| `aws___search_doc` | **Hallucination gate**: 날조된 파라미터 탐지 |
+| `indicators_run_custom` | GEO 감소 + InfoPreservation |
 
-현재 GEO scorer(HeuristicAnalyzer)는 **regex 기반 패턴 매칭**으로 각 차원을 측정합니다:
+### 4.2 Ungrounded 거부 (13건)
+Similarity(4), InfoPreservation(4), GEO 감소(3), 복합(2).
+**Ungrounded가 4건 더 많이 거부됨** — context 없이 최적화하면 원본과의 의미 유사도 및 정보 보존이 더 어려움.
 
-```
-boundary: "does not", "cannot", "limit", "only" 등의 패턴 → 점수 부여
-disambiguation: "unlike", "in contrast", "as opposed to" 패턴 → 점수 부여
-```
+### 4.3 남은 구조적 문제
 
-이로 인해:
-- 날조된 제한사항도 boundary 점수를 받음 (사실 여부 미검증)
-- 의미 없는 "Unlike other tools..." 문구도 disambiguation 점수를 받음
-- **GEO 점수가 실제 설명 품질의 신뢰할 수 있는 지표가 아님**
-
-### 4.2 순환 검증 구조 (변하지 않은 문제)
-
+순환 검증 구조는 여전히 존재:
 ```
 HeuristicAnalyzer → "이 차원이 약함" → LLM Optimizer → "패턴 문구 삽입" → HeuristicAnalyzer → "점수 올랐음!"
 ```
 
-Grounded 최적화로 **환각은 제거**했지만, **평가 체계 자체의 순환 검증 구조**는 여전히 존재합니다.
+boundary 제거로 가장 큰 환각 원인은 해결했지만, disambiguation의 regex 패턴("unlike", "in contrast")도 여전히 게이밍 가능. 향후 임베딩 거리 기반 측정으로 전환 필요.
 
-### 4.3 앞으로 풀어야 할 질문들
+### 4.4 다음 단계
 
-1. **Heuristic scoring을 어떻게 개선할 것인가?**
-   - boundary/disambiguation에 사실 검증(factual grounding) 로직 추가?
-   - LLM-as-Judge 방식으로 전환?
-   - Heuristic + LLM 하이브리드?
-
-2. **Description quality → Tool selection accuracy 인과 관계 검증은 어떻게?**
-   - 현재 GEO는 프록시 메트릭. North Star는 Precision@1.
-   - 최적화된 설명으로 실제 Qdrant 인덱스를 구축하고 검색 정확도를 비교해야 함.
-   - `scripts/run_selection_eval.py`가 scaffold만 존재.
-
-3. **어떤 차원이 실제로 tool selection에 기여하는가?**
-   - clarity가 높으면 embedding similarity가 올라가는가?
-   - parameter_coverage가 tool 구분에 도움이 되는가?
-   - 이 인과관계를 실험적으로 밝혀야 함.
+1. **P@1 end-to-end 검증**: `scripts/run_retrieval_ab_eval.py` 실행 — GEO 프록시가 아닌 실제 검색 성능 측정
+2. **disambiguation 개선**: regex 대조 문구 → sibling tools 간 임베딩 거리로 측정
+3. **RAGAS faithfulness 파이프라인 통합**: 현재 gate만 구현됨, 최적화 루프에 통합 필요
 
 ---
 
