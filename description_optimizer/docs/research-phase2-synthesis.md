@@ -201,6 +201,8 @@
 
 ---
 
+> **2026-03-30 업데이트:** 아래 추천안으로 구현된 grounded optimization의 P@1 A/B 결과, δP@1 = -0.069 (검색 성능 저하). 근본원인: retrieval 경로 불일치 + GEO 보상 왜곡. 추가 필요 조치: (1) `search_description`을 retrieval 전용 경로에 연결, (2) GEO를 diagnostic metric으로 격하, (3) disambiguation 재설계. 상세: `docs/analysis/description-optimizer-root-cause-analysis.md`
+
 ## 전체 종합 및 추천
 
 ### 근거 기반 선택지
@@ -238,7 +240,7 @@ Phase 4: 검증 (end-to-end)
 ```
 
 **왜 이 접근법인가:**
-1. **RAGAS Faithfulness가 Goodhart 문제를 직접 해결** — regex 대신 주장별 이진 검증으로 환각을 탐지
+1. **RAGAS Faithfulness가 환각 문제를 직접 해결** — regex 대신 주장별 이진 검증. 단, Goodhart 문제의 완전 해결에는 retrieval 경로 정렬(`search_description` 사용)이 추가로 필요.
 2. **doc2query가 검색 성능에 직접 기여** — 예상 쿼리에 맞춘 최적화로 의미적 정렬 강화
 3. **P@1이 궁극적 검증** — 프록시가 아닌 실제 목표 측정
 4. **다중 게이트가 단일 메트릭 게이밍 방지** — RLHF 앙상블 원리 적용
@@ -269,6 +271,13 @@ Phase 4: 검증 (end-to-end)
 3. **P@1 검증 빈도** — 배치 단위 검증, 최고 성능 방향
 4. **boundary 차원 완전 제거** — 코드에서 삭제 (가중치 0이 아님)
 5. **fluency 측정** — 최적화-평가 모델 분리 필수 (GPT-4o-mini로 최적화 시 다른 모델로 평가)
+
+### 추가 결정 사항 (2026-03-30, 근본원인 분석 이후)
+
+6. **`search_description`이 retrieval 전용 텍스트** — 평가와 실서비스 모두에서 임베딩 대상은 `search_description`
+7. **GEO는 diagnostic metric으로만 사용** — hard gate에서 제외
+8. **3-way A/B 평가 전환** — original vs optimized_description vs search_description 비교
+9. **disambiguation 재설계** — sibling 이름 나열(contrast phrasing) → target-only qualifier 중심
 
 ---
 
