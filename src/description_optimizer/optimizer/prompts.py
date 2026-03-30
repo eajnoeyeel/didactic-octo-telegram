@@ -50,7 +50,7 @@ def build_optimization_prompt(
 
     dimension_guidance = {
         "clarity": "Add clear action verb at the start. Specify WHAT the tool does and WHEN to use it. Include specific data sources or scope.",
-        "disambiguation": "Add contrast phrases: 'unlike X', 'specifically for Y', 'only handles Z'. Differentiate from similar tools.",
+        "disambiguation": "Clarify what makes THIS tool unique: its specific action, target data type, or domain. Do NOT mention or compare with other tools by name.",
         "parameter_coverage": "Mention key input parameters with types or constraints. E.g., 'Accepts a `query` string and optional `limit` integer.'",
         "fluency": "Improve sentence structure: use complete sentences with clear subjects and verbs. Add transition words (e.g., 'Use this when...', 'It also supports...'). Aim for 2-3 well-formed sentences.",
         "stats": "Add quantitative information if known: coverage numbers, response times, limits. E.g., 'Searches across 10K+ repositories.'",
@@ -127,18 +127,6 @@ def build_grounded_prompt(
             f"```json\n{schema_text}\n```\n"
         )
 
-    # Sibling tools section — only if available
-    if sibling_tools:
-        sibling_lines = []
-        for st in sibling_tools[:8]:
-            desc_preview = (st.get("description") or "")[:120]
-            sibling_lines.append(f"- {st['tool_name']}: {desc_preview}")
-        siblings_text = "\n".join(sibling_lines)
-        sections.append(
-            f"**Other tools on this server** (use for disambiguation — "
-            f"explain how THIS tool differs):\n{siblings_text}\n"
-        )
-
     # Scores
     scores_text = "\n".join(f"  - {dim}: {score:.2f}" for dim, score in dimension_scores.items())
     sections.append(f"**Current GEO Scores** (0.0-1.0):\n{scores_text}\n")
@@ -211,18 +199,12 @@ def _build_grounded_guidance(
             )
 
     if "disambiguation" in weak_dimensions:
-        if sibling_tools:
-            names = ", ".join(st["tool_name"] for st in sibling_tools[:5])
-            lines.append(
-                f"  - **disambiguation** ({dimension_scores.get('disambiguation', 0):.2f}): "
-                f"Differentiate from these sibling tools: {names}. "
-                f"State what THIS tool does that they don't."
-            )
-        else:
-            lines.append(
-                f"  - **disambiguation** ({dimension_scores.get('disambiguation', 0):.2f}): "
-                f"No sibling tools available — skip disambiguation to avoid generic contrast phrases."
-            )
+        lines.append(
+            f"  - **disambiguation** ({dimension_scores.get('disambiguation', 0):.2f}): "
+            f"Clarify what makes THIS tool unique — its specific action, target data type, "
+            f"or domain scope. Use phrases like 'specifically handles [action] for [domain]'. "
+            f"Do NOT mention other tools by name or compare with siblings."
+        )
 
     for dim in weak_dimensions:
         if dim in guidance_map and dim not in ("parameter_coverage", "disambiguation"):
@@ -280,9 +262,10 @@ def build_query_aware_prompt(
         )
 
     if context.sibling_tools:
-        parts.append("\n**Other tools on this server** (for disambiguation):")
-        for t in context.sibling_tools[:5]:
-            parts.append(f"- {t.get('tool_name', '')}: {t.get('description', '')[:100]}")
+        parts.append(
+            f"\nThis server has {len(context.sibling_tools)} other tools. "
+            f"Focus on what makes THIS tool unique without naming the others."
+        )
 
     if queries:
         parts.append("\n**Search queries that should find this tool:**")

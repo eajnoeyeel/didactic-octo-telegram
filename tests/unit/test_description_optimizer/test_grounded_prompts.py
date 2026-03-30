@@ -89,7 +89,8 @@ def test_grounded_prompt_includes_input_schema():
     assert "File ID" in prompt
 
 
-def test_grounded_prompt_includes_sibling_tools():
+def test_grounded_prompt_sibling_tools_no_names_listed():
+    """Sibling tool names must NOT appear in the prompt to prevent embedding contamination."""
     siblings = [
         {"tool_name": "add_comment", "description": "Adds a comment."},
         {"tool_name": "get_file", "description": "Gets file info."},
@@ -102,8 +103,10 @@ def test_grounded_prompt_includes_sibling_tools():
         weak_dimensions=["disambiguation"],
         dimension_scores={"disambiguation": 0.1, "clarity": 0.5},
     )
-    assert "add_comment" in prompt
-    assert "get_file" in prompt
+    # Sibling names must NOT be listed — they contaminate embeddings
+    assert "add_comment" not in prompt
+    assert "get_file" not in prompt
+    assert "Other tools on this server" not in prompt
 
 
 def test_grounded_prompt_anti_hallucination_rules():
