@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 from qdrant_client import AsyncQdrantClient
 
-from models import MCPTool, SearchResult
-from retrieval.qdrant_store import QdrantStore
+from src.models import MCPTool, SearchResult
+from src.retrieval.qdrant_store import QdrantStore
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 

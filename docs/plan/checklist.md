@@ -1,6 +1,6 @@
 # 진행 체크리스트
 
-> 최종 업데이트: 2026-03-29
+> 최종 업데이트: 2026-03-30
 > 상세 구현 스펙: `docs/plan/implementation.md`
 > 타임라인: 2026-03-20 ~ 2026-04-26 (5주)
 
@@ -14,14 +14,15 @@
 
 ## 미결 Blockers
 
-### OQ-2: Tool Pool 구성 (MCP-Zero + Smithery 보조) — ADR-0011
-- [ ] MCP-Zero 데이터셋 다운로드 → `data/external/mcp-zero/` (308 servers, 2,797 tools)
-- [ ] MCP-Atlas GT 다운로드 → `data/external/mcp-atlas/` (500 human-authored tasks)
-- [x] `scripts/import_mcp_zero.py` 추가
-- [ ] `scripts/import_mcp_zero.py` canonical input contract 정리 + 실제 MCP-Zero 데이터 검증
-- [x] `scripts/convert_mcp_atlas.py` 추가
-- [ ] `scripts/convert_mcp_atlas.py`를 ADR-0012 target state(per-step single-tool GT 분해)로 완성
-- [ ] MCP-Atlas per-step GT + self seed 80 병합 검증 (query_id 중복 없음, ~230-320 primary GT)
+### OQ-2: Tool Pool 구성 (MCP-Zero + Smithery 보조) — ADR-0011 — 핵심 완료 (2026-03-30)
+- [x] MCP-Zero 데이터셋 다운로드 → `data/external/mcp-zero/servers.json` (308 servers, 2,797 tools)
+- [x] MCP-Atlas GT 다운로드 → `data/external/mcp-atlas/MCP-Atlas.parquet` (500 human-authored tasks)
+- [x] `scripts/import_mcp_zero.py` 검증된 스키마로 재작성 + 25 unit tests
+- [x] `scripts/import_mcp_zero.py` 실행 → 308 servers, 2,797 tools 변환 완료
+- [x] `scripts/convert_mcp_atlas.py` ADR-0012 per-step 분해 완성 + 17 unit tests
+- [x] `scripts/convert_mcp_atlas.py` 실행 → 394 per-step GT entries (80 tasks, 35 servers)
+- [x] MCP-Atlas per-step GT + self seed 80 병합 검증 (194 covered, query_id 중복 없음)
+- [x] `scripts/run_e0.py` 업데이트 → MCP-Zero pool + 다중 GT 소스 지원
 - [ ] Description Smells 4D vs GEO Score 6D 매핑 테이블 작성 (E7 비교용)
 - [ ] 4종 Pool 정의 (Base, High Similarity, Low Similarity, Description Quality) — MCP-Zero 308 servers에서 선별
 - [ ] Smithery API rate limit 확인 (보조 소스)
