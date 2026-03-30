@@ -63,7 +63,9 @@ async def load_optimized(opt_path: Path) -> dict[str, str]:
     with open(opt_path) as f:
         for line in f:
             entry = json.loads(line.strip())
-            if entry.get("status") == "success":
+            if not line.strip():
+                continue
+            if entry.get("status") == "success" and entry.get("optimized_description"):
                 optimized[entry["tool_id"]] = entry["optimized_description"]
     return optimized
 
@@ -179,6 +181,10 @@ async def main(args: argparse.Namespace) -> None:
     # 3-way 비교 리포트
     shared_tools = (
         set(scores_original.keys()) & set(scores_search.keys()) & set(scores_optimized.keys())
+    )
+    logger.info(
+        f"Shared tools: {len(shared_tools)} "
+        f"(orig={len(scores_original)}, search={len(scores_search)}, opt={len(scores_optimized)})"
     )
 
     def _aggregate(scores: dict[str, dict], tools: set[str]) -> tuple[float, float]:
