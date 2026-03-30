@@ -136,60 +136,85 @@ async def main(args: argparse.Namespace) -> None:
         tool_store = QdrantStore(
             client=qdrant_client, collection_name=settings.qdrant_collection_name
         )
-        server_store = QdrantStore(client=qdrant_client, collection_name="mcp_servers")
+
+        flat_result = None
+        seq_result = None
 
         # --- Strategy A: FlatStrategy (1-layer) ---
-        flat = FlatStrategy(embedder=embedder, tool_store=tool_store)
-        logger.info("Running FlatStrategy (1-layer)...")
-        flat_result = await evaluate(flat, entries, top_k=args.top_k)
+        if args.strategy in ("flat", "both"):
+            flat = FlatStrategy(embedder=embedder, tool_store=tool_store)
+            logger.info("Running FlatStrategy (1-layer)...")
+            flat_result = await evaluate(flat, entries, top_k=args.top_k)
 
         # --- Strategy B: SequentialStrategy (2-layer) ---
-        seq = SequentialStrategy(
-            embedder=embedder,
-            tool_store=tool_store,
-            server_store=server_store,
-            top_k_servers=5,
-        )
-        logger.info("Running SequentialStrategy (2-layer)...")
-        seq_result = await evaluate(seq, entries, top_k=args.top_k)
+        if args.strategy in ("sequential", "both"):
+            server_store = QdrantStore(client=qdrant_client, collection_name="mcp_servers")
+            seq = SequentialStrategy(
+                embedder=embedder,
+                tool_store=tool_store,
+                server_store=server_store,
+                top_k_servers=5,
+            )
+            logger.info("Running SequentialStrategy (2-layer)...")
+            seq_result = await evaluate(seq, entries, top_k=args.top_k)
 
     finally:
         await qdrant_client.close()
 
     # --- Print results ---
     header = (
-        f"\n{'=' * 60}\nE0 EXPERIMENT RESULTS  (n={len(entries)}, top_k={args.top_k})\n{'=' * 60}"
+        f"\n{'=' * 60}\n"
+        f"E0 EXPERIMENT RESULTS  (n={len(entries)}, top_k={args.top_k}, strategy={args.strategy})\n"
+        f"{'=' * 60}"
     )
 
-    def row(metric: str, f: float | None, s: float | None, delta: bool = True) -> str:
-        f_str = f"{f:>14.3f}" if f is not None else f"{'N/A':>14}"
-        s_str = f"{s:>20.3f}" if s is not None else f"{'N/A':>20}"
-        d = ""
-        if delta and f is not None and s is not None:
-            d = f" {s - f:>+8.3f}"
-        return f"{metric:<20} {f_str} {s_str}{d}"
+    lines = [header]
 
-    def row_ms(metric: str, f: float, s: float) -> str:
-        return f"{metric:<20} {f:>14.1f} {s:>20.1f}"
+    if flat_result and seq_result:
+        lines.append(f"{'Metric':<20} {'Flat':>14} {'Sequential':>14} {'Delta':>8}")
+        lines.append(f"{'-' * 20} {'-' * 14} {'-' * 14} {'-' * 8}")
+        for metric in ["precision_at_1", "recall_at_k", "mrr", "ndcg_at_5"]:
+            f_val = getattr(flat_result, metric)
+            s_val = getattr(seq_result, metric)
+            delta = f" {s_val - f_val:>+.3f}" if f_val is not None and s_val is not None else ""
+            lines.append(f"{metric:<20} {f_val:>14.3f} {s_val:>14.3f}{delta}")
+        for metric in ["confusion_rate", "ece"]:
+            f_val = getattr(flat_result, metric)
+            s_val = getattr(seq_result, metric)
+            lines.append(f"{metric:<20} {f_val:>14.3f} {s_val:>14.3f}")
+        lines.append(
+            f"{'latency_mean (ms)':<20} "
+            f"{flat_result.latency_mean:>14.1f} {seq_result.latency_mean:>14.1f}"
+        )
+    else:
+        result = flat_result or seq_result
+        name = "Flat" if flat_result else "Sequential"
+        lines.append(f"Strategy: {name}")
+        lines.append(f"{'Metric':<20} {'Value':>14}")
+        lines.append(f"{'-' * 20} {'-' * 14}")
+        for metric in [
+            "precision_at_1",
+            "recall_at_k",
+            "mrr",
+            "ndcg_at_5",
+            "confusion_rate",
+            "ece",
+        ]:
+            val = getattr(result, metric)
+            lines.append(
+                f"{metric:<20} {val:>14.3f}" if val is not None else f"{metric:<20} {'N/A':>14}"
+            )
+        lines.append(f"{'latency_mean (ms)':<20} {result.latency_mean:>14.1f}")
+        lines.append(f"{'latency_p50 (ms)':<20} {result.latency_p50:>14.1f}")
+        lines.append(f"{'latency_p95 (ms)':<20} {result.latency_p95:>14.1f}")
 
-    rows = [
-        f"{'Metric':<20} {'FlatStrategy':>14} {'SequentialStrategy':>20} {'Delta':>8}",
-        f"{'-' * 20} {'-' * 14} {'-' * 20} {'-' * 8}",
-        row("Precision@1", flat_result.precision_at_1, seq_result.precision_at_1),
-        row("Recall@K", flat_result.recall_at_k, seq_result.recall_at_k),
-        row("MRR", flat_result.mrr, seq_result.mrr),
-        row("NDCG@5", flat_result.ndcg_at_5, seq_result.ndcg_at_5),
-        row("Confusion Rate", flat_result.confusion_rate, seq_result.confusion_rate, delta=False),
-        row("ECE", flat_result.ece, seq_result.ece, delta=False),
-        row_ms("Latency p50 (ms)", flat_result.latency_p50, seq_result.latency_p50),
-        row_ms("Latency mean (ms)", flat_result.latency_mean, seq_result.latency_mean),
-    ]
-    output = header + "\n" + "\n".join(rows) + "\n"
+    output = "\n".join(lines) + "\n"
     logger.info(output)
 
     # --- Save log ---
     EVAL_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with EVAL_LOG_PATH.open("w") as f:
+    with EVAL_LOG_PATH.open("a") as f:
+        f.write(f"\n--- Run: {args.strategy} ---\n")
         f.write(output)
         f.write(
             f"\nPool: MCP-Zero ({len(pool_server_ids)} servers)\n"
@@ -203,5 +228,12 @@ async def main(args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="E0: 1-Layer vs 2-Layer experiment")
     parser.add_argument("--top-k", type=int, default=10)
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        choices=["flat", "sequential", "both"],
+        default="both",
+        help="Which strategy to run (default: both)",
+    )
     args = parser.parse_args()
     asyncio.run(main(args))
