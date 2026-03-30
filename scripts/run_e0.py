@@ -50,8 +50,8 @@ E0_EMBEDDING_MODEL = "text-embedding-3-large"
 E0_EMBEDDING_DIMENSION = 3072
 
 
-def _load_pool_server_ids(pool_path: Path) -> set[str]:
-    """Load server IDs from the MCP-Zero pool JSONL file."""
+def _load_pool_server_ids(pool_path: Path, pool_size: int | None = None) -> list[str]:
+    """Load server IDs from MCP-Zero pool JSONL, optionally taking first N (alphabetical)."""
     if not pool_path.exists():
         raise FileNotFoundError(f"Pool file not found: {pool_path}")
     server_ids: set[str] = set()
@@ -60,13 +60,24 @@ def _load_pool_server_ids(pool_path: Path) -> set[str]:
         if not line:
             continue
         server_ids.add(json.loads(line)["server_id"])
-    logger.info(f"Pool: {len(server_ids)} servers loaded from {pool_path}")
-    return server_ids
+
+    sorted_ids = sorted(server_ids)
+    if pool_size is not None:
+        sorted_ids = sorted_ids[:pool_size]
+
+    logger.info(
+        f"Pool: {len(sorted_ids)} servers"
+        + (f" (subset of {len(server_ids)})" if pool_size is not None else "")
+        + f" loaded from {pool_path}"
+    )
+    return sorted_ids
 
 
-def _load_and_filter_gt(pool_server_ids: set[str]) -> list:
+def _load_and_filter_gt(pool_server_ids: list[str]) -> list:
     """Load GT from multiple sources, filter to servers in pool, log breakdown."""
     from models import GroundTruthEntry
+
+    pool_set = set(pool_server_ids)
 
     gt_paths: list[Path] = []
     source_counts: dict[str, dict[str, int]] = {}
@@ -76,7 +87,7 @@ def _load_and_filter_gt(pool_server_ids: set[str]) -> list:
             gt_paths.append(path)
             entries = load_ground_truth(path)
             total = len(entries)
-            covered = sum(1 for e in entries if e.correct_server_id in pool_server_ids)
+            covered = sum(1 for e in entries if e.correct_server_id in pool_set)
             source_counts[label] = {"total": total, "covered": covered}
         else:
             logger.warning(f"GT file not found, skipping: {path}")
@@ -89,7 +100,7 @@ def _load_and_filter_gt(pool_server_ids: set[str]) -> list:
     all_entries: list[GroundTruthEntry] = merge_ground_truth(*gt_paths)
 
     # Filter to entries whose correct_server_id exists in the MCP-Zero pool
-    filtered = [e for e in all_entries if e.correct_server_id in pool_server_ids]
+    filtered = [e for e in all_entries if e.correct_server_id in pool_set]
 
     # Log source breakdown
     logger.info("--- GT Source Breakdown ---")
