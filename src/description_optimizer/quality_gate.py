@@ -1,10 +1,12 @@
 """Quality Gate for description optimization.
 
 Validates that optimization:
-1. Does not degrade GEO Score (no-regression)
-2. Preserves semantic similarity with the original (cosine >= threshold)
+1. Preserves semantic similarity with the original (cosine >= threshold)
+2. Does not hallucinate parameters absent from the input schema
+3. Preserves key information (numbers, technical terms) from the original
+4. GEO Score change is recorded as diagnostic (not blocking by default)
 
-Both checks must pass for the optimization to be accepted.
+All blocking checks must pass for the optimization to be accepted.
 """
 
 import re
@@ -69,7 +71,7 @@ class QualityGate:
     def __init__(
         self,
         min_similarity: float = 0.85,
-        allow_geo_decrease: bool = False,
+        allow_geo_decrease: bool = True,
     ) -> None:
         self._min_similarity = min_similarity
         self._allow_geo_decrease = allow_geo_decrease
@@ -77,7 +79,7 @@ class QualityGate:
     def check_geo_score(self, before: AnalysisReport, after: AnalysisReport) -> GateResult:
         """Check that GEO score did not decrease after optimization."""
         if self._allow_geo_decrease:
-            return GateResult(passed=True, reason="GEO decrease allowed by config")
+            return GateResult(passed=True, reason="GEO is diagnostic only — decrease allowed")
 
         if after.geo_score < before.geo_score:
             return GateResult(

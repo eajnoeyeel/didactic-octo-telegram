@@ -9,6 +9,7 @@ from description_optimizer.quality_gate import QualityGate
 
 @pytest.fixture
 def gate() -> QualityGate:
+    # Non-default strict mode: allow_geo_decrease=False for testing GEO blocking behavior
     return QualityGate(
         min_similarity=0.85,
         allow_geo_decrease=False,
@@ -83,6 +84,37 @@ class TestGeoScoreGate:
         result = gate.check_geo_score(before, after)
         assert result.passed is False
         assert "decreased" in result.reason.lower()
+
+    def test_default_allows_geo_decrease(self) -> None:
+        """Default QualityGate allows GEO decrease (diagnostic only)."""
+        default_gate = QualityGate(min_similarity=0.85)
+        before = _make_report(
+            "s::t",
+            "old",
+            {
+                "clarity": 0.7,
+                "disambiguation": 0.6,
+                "parameter_coverage": 0.5,
+                "fluency": 0.4,
+                "stats": 0.3,
+                "precision": 0.5,
+            },
+        )
+        after = _make_report(
+            "s::t",
+            "new",
+            {
+                "clarity": 0.3,
+                "disambiguation": 0.2,
+                "parameter_coverage": 0.3,
+                "fluency": 0.1,
+                "stats": 0.0,
+                "precision": 0.2,
+            },
+        )
+        result = default_gate.check_geo_score(before, after)
+        assert result.passed is True
+        assert "diagnostic" in result.reason.lower()
 
     def test_pass_when_equal(self, gate: QualityGate) -> None:
         scores = {
@@ -179,6 +211,45 @@ class TestFullGate:
         vec_b = np.array([0.95, 0.1, 0.05])
         result = gate.evaluate(before, after, vec_a, vec_b)
         assert result.passed is False
+
+
+class TestFullEvaluateGEODiagnostic:
+    """Test that evaluate() passes with default settings even when GEO decreases."""
+
+    def test_evaluate_passes_with_geo_decrease_default(self) -> None:
+        """Default gate treats GEO as diagnostic — evaluate passes despite GEO drop."""
+        default_gate = QualityGate(min_similarity=0.85)
+        before = _make_report(
+            "s::t",
+            "old",
+            {
+                "clarity": 0.7,
+                "disambiguation": 0.6,
+                "parameter_coverage": 0.5,
+                "fluency": 0.4,
+                "stats": 0.3,
+                "precision": 0.5,
+            },
+        )
+        after = _make_report(
+            "s::t",
+            "new",
+            {
+                "clarity": 0.3,
+                "disambiguation": 0.2,
+                "parameter_coverage": 0.3,
+                "fluency": 0.1,
+                "stats": 0.0,
+                "precision": 0.2,
+            },
+        )
+        # High-similarity vectors so similarity gate passes
+        vec_a = np.array([1.0, 0.0, 0.0])
+        vec_b = np.array([0.95, 0.1, 0.05])
+        result = default_gate.evaluate(before, after, vec_a, vec_b)
+        assert result.passed is True
+        assert result.geo_result.passed is True
+        assert "diagnostic" in result.geo_result.reason.lower()
 
 
 class TestHallucinationGate:
