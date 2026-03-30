@@ -1,0 +1,435 @@
+{
+  "n_tools": 36,
+  "n_queries": 39,
+  "condition_a": {
+    "name": "original",
+    "p_at_1": 0.5416666666666666,
+    "mrr": 0.6372247482171683
+  },
+  "condition_b": {
+    "name": "search_description",
+    "p_at_1": 0.375,
+    "mrr": 0.5080113718645094
+  },
+  "condition_c": {
+    "name": "optimized_description",
+    "p_at_1": 0.375,
+    "mrr": 0.5401568179713636
+  },
+  "delta_search_vs_orig": {
+    "p_at_1": -0.16666666666666663,
+    "mrr": -0.12921337635265895
+  },
+  "delta_optimized_vs_orig": {
+    "p_at_1": -0.16666666666666663,
+    "mrr": -0.09706793024580473
+  },
+  "per_tool_search_vs_orig": {
+    "improved": 3,
+    "degraded": 9,
+    "same": 24
+  },
+  "per_tool_optimized_vs_orig": {
+    "improved": 2,
+    "degraded": 8,
+    "same": 26
+  },
+  "per_tool_details": {
+    "EthanHenrickson/math-mcp::add": {
+      "original_p1": 1.0,
+      "search_p1": 1.0,
+      "optimized_p1": 1.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 1.0,
+      "search_mrr": 1.0,
+      "optimized_mrr": 1.0,
+      "n_queries": 1
+    },
+    "EthanHenrickson/math-mcp::degreesToRadians": {
+      "original_p1": 1.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": -1.0,
+      "delta_optimized_p1": -1.0,
+      "original_mrr": 1.0,
+      "search_mrr": 0.5,
+      "optimized_mrr": 0.5,
+      "n_queries": 1
+    },
+    "EthanHenrickson/math-mcp::division": {
+      "original_p1": 0.5,
+      "search_p1": 0.5,
+      "optimized_p1": 0.5,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 0.5833333333333334,
+      "search_mrr": 0.6,
+      "optimized_mrr": 0.5833333333333334,
+      "n_queries": 2
+    },
+    "EthanHenrickson/math-mcp::max": {
+      "original_p1": 1.0,
+      "search_p1": 1.0,
+      "optimized_p1": 1.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 1.0,
+      "search_mrr": 1.0,
+      "optimized_mrr": 1.0,
+      "n_queries": 1
+    },
+    "EthanHenrickson/math-mcp::mean": {
+      "original_p1": 1.0,
+      "search_p1": 1.0,
+      "optimized_p1": 1.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 1.0,
+      "search_mrr": 1.0,
+      "optimized_mrr": 1.0,
+      "n_queries": 1
+    },
+    "EthanHenrickson/math-mcp::median": {
+      "original_p1": 1.0,
+      "search_p1": 0.0,
+      "optimized_p1": 1.0,
+      "delta_search_p1": -1.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 1.0,
+      "search_mrr": 0.5,
+      "optimized_mrr": 1.0,
+      "n_queries": 1
+    },
+    "EthanHenrickson/math-mcp::modulo": {
+      "original_p1": 1.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": -1.0,
+      "delta_optimized_p1": -1.0,
+      "original_mrr": 1.0,
+      "search_mrr": 0.3333333333333333,
+      "optimized_mrr": 0.5,
+      "n_queries": 1
+    },
+    "EthanHenrickson/math-mcp::round": {
+      "original_p1": 1.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": -1.0,
+      "delta_optimized_p1": -1.0,
+      "original_mrr": 1.0,
+      "search_mrr": 0.3333333333333333,
+      "optimized_mrr": 0.3333333333333333,
+      "n_queries": 1
+    },
+    "EthanHenrickson/math-mcp::sin": {
+      "original_p1": 1.0,
+      "search_p1": 1.0,
+      "optimized_p1": 1.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 1.0,
+      "search_mrr": 1.0,
+      "optimized_mrr": 1.0,
+      "n_queries": 1
+    },
+    "clay-inc/clay-mcp::archive_contact": {
+      "original_p1": 0.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 0.125,
+      "search_mrr": 0.06666666666666667,
+      "optimized_mrr": 0.125,
+      "n_queries": 1
+    },
+    "clay-inc/clay-mcp::createContact": {
+      "original_p1": 1.0,
+      "search_p1": 1.0,
+      "optimized_p1": 1.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 1.0,
+      "search_mrr": 1.0,
+      "optimized_mrr": 1.0,
+      "n_queries": 1
+    },
+    "clay-inc/clay-mcp::createNote": {
+      "original_p1": 0.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 0.14285714285714285,
+      "search_mrr": 0.3333333333333333,
+      "optimized_mrr": 0.3333333333333333,
+      "n_queries": 1
+    },
+    "clay-inc/clay-mcp::find_duplicates": {
+      "original_p1": 1.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": -1.0,
+      "delta_optimized_p1": -1.0,
+      "original_mrr": 1.0,
+      "search_mrr": 0.09090909090909091,
+      "optimized_mrr": 0.5,
+      "n_queries": 1
+    },
+    "clay-inc/clay-mcp::getContact": {
+      "original_p1": 1.0,
+      "search_p1": 1.0,
+      "optimized_p1": 1.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 1.0,
+      "search_mrr": 1.0,
+      "optimized_mrr": 1.0,
+      "n_queries": 1
+    },
+    "clay-inc/clay-mcp::getGroups": {
+      "original_p1": 1.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": -1.0,
+      "delta_optimized_p1": -1.0,
+      "original_mrr": 1.0,
+      "search_mrr": 0.2,
+      "optimized_mrr": 0.5,
+      "n_queries": 1
+    },
+    "clay-inc/clay-mcp::getRecentEmails": {
+      "original_p1": 0.0,
+      "search_p1": 1.0,
+      "optimized_p1": 1.0,
+      "delta_search_p1": 1.0,
+      "delta_optimized_p1": 1.0,
+      "original_mrr": 0.5,
+      "search_mrr": 1.0,
+      "optimized_mrr": 1.0,
+      "n_queries": 1
+    },
+    "clay-inc/clay-mcp::getUpcomingReminders": {
+      "original_p1": 0.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 0.022222222222222223,
+      "search_mrr": 0.011764705882352941,
+      "optimized_mrr": 0.019230769230769232,
+      "n_queries": 1
+    },
+    "clay-inc/clay-mcp::searchContacts": {
+      "original_p1": 1.0,
+      "search_p1": 1.0,
+      "optimized_p1": 1.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 1.0,
+      "search_mrr": 1.0,
+      "optimized_mrr": 1.0,
+      "n_queries": 1
+    },
+    "clay-inc/clay-mcp::updateContact": {
+      "original_p1": 0.0,
+      "search_p1": 1.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": 1.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 0.5,
+      "search_mrr": 1.0,
+      "optimized_mrr": 0.5,
+      "n_queries": 1
+    },
+    "github::create_branch": {
+      "original_p1": 1.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": -1.0,
+      "delta_optimized_p1": -1.0,
+      "original_mrr": 1.0,
+      "search_mrr": 0.25,
+      "optimized_mrr": 0.5,
+      "n_queries": 1
+    },
+    "github::create_pull_request": {
+      "original_p1": 0.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 0.2,
+      "search_mrr": 0.2,
+      "optimized_mrr": 0.2,
+      "n_queries": 1
+    },
+    "github::get_file_contents": {
+      "original_p1": 0.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 0.5,
+      "search_mrr": 0.5,
+      "optimized_mrr": 0.5,
+      "n_queries": 1
+    },
+    "github::list_commits": {
+      "original_p1": 0.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 0.05263157894736842,
+      "search_mrr": 0.05555555555555555,
+      "optimized_mrr": 0.05,
+      "n_queries": 1
+    },
+    "github::list_issues": {
+      "original_p1": 0.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 0.13010204081632654,
+      "search_mrr": 0.1694915254237288,
+      "optimized_mrr": 0.25471698113207547,
+      "n_queries": 2
+    },
+    "github::search_code": {
+      "original_p1": 0.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 0.03571428571428571,
+      "search_mrr": 0.011764705882352941,
+      "optimized_mrr": 0.043478260869565216,
+      "n_queries": 1
+    },
+    "github::search_repositories": {
+      "original_p1": 0.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 0.2543859649122807,
+      "search_mrr": 0.2692307692307692,
+      "optimized_mrr": 0.17097701149425287,
+      "n_queries": 2
+    },
+    "instagram::INSTAGRAM_CREATE_CAROUSEL_CONTAINER": {
+      "original_p1": 1.0,
+      "search_p1": 1.0,
+      "optimized_p1": 1.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 1.0,
+      "search_mrr": 1.0,
+      "optimized_mrr": 1.0,
+      "n_queries": 1
+    },
+    "instagram::INSTAGRAM_CREATE_POST": {
+      "original_p1": 0.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 0.14285714285714285,
+      "search_mrr": 0.03571428571428571,
+      "optimized_mrr": 0.05555555555555555,
+      "n_queries": 1
+    },
+    "instagram::INSTAGRAM_GET_CONVERSATION": {
+      "original_p1": 0.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 0.1,
+      "search_mrr": 0.07142857142857142,
+      "optimized_mrr": 0.06666666666666667,
+      "n_queries": 1
+    },
+    "instagram::INSTAGRAM_GET_POST_COMMENTS": {
+      "original_p1": 1.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": -1.0,
+      "delta_optimized_p1": -1.0,
+      "original_mrr": 1.0,
+      "search_mrr": 0.5,
+      "optimized_mrr": 0.5,
+      "n_queries": 1
+    },
+    "instagram::INSTAGRAM_GET_POST_INSIGHTS": {
+      "original_p1": 1.0,
+      "search_p1": 1.0,
+      "optimized_p1": 1.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 1.0,
+      "search_mrr": 1.0,
+      "optimized_mrr": 1.0,
+      "n_queries": 1
+    },
+    "instagram::INSTAGRAM_GET_USER_INFO": {
+      "original_p1": 0.0,
+      "search_p1": 1.0,
+      "optimized_p1": 1.0,
+      "delta_search_p1": 1.0,
+      "delta_optimized_p1": 1.0,
+      "original_mrr": 0.5,
+      "search_mrr": 1.0,
+      "optimized_mrr": 1.0,
+      "n_queries": 1
+    },
+    "instagram::INSTAGRAM_GET_USER_INSIGHTS": {
+      "original_p1": 0.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 0.008130081300813009,
+      "search_mrr": 0.008264462809917356,
+      "optimized_mrr": 0.008,
+      "n_queries": 1
+    },
+    "instagram::INSTAGRAM_GET_USER_MEDIA": {
+      "original_p1": 1.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": -1.0,
+      "delta_optimized_p1": -1.0,
+      "original_mrr": 1.0,
+      "search_mrr": 0.2,
+      "optimized_mrr": 0.1111111111111111,
+      "n_queries": 1
+    },
+    "instagram::INSTAGRAM_LIST_ALL_CONVERSATIONS": {
+      "original_p1": 0.0,
+      "search_p1": 0.0,
+      "optimized_p1": 0.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 0.14285714285714285,
+      "search_mrr": 0.047619047619047616,
+      "optimized_mrr": 0.09090909090909091,
+      "n_queries": 1
+    },
+    "instagram::INSTAGRAM_REPLY_TO_COMMENT": {
+      "original_p1": 1.0,
+      "search_p1": 1.0,
+      "optimized_p1": 1.0,
+      "delta_search_p1": 0.0,
+      "delta_optimized_p1": 0.0,
+      "original_mrr": 1.0,
+      "search_mrr": 1.0,
+      "optimized_mrr": 1.0,
+      "n_queries": 1
+    }
+  }
+}
