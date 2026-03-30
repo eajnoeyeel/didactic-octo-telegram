@@ -79,7 +79,8 @@ uv run python scripts/collect_data.py
 uv run python scripts/build_index.py --pool-size 50
 uv run python scripts/generate_ground_truth.py
 uv run python scripts/verify_ground_truth.py   # GT 품질 검증 (통계/QualityGate/무결성)
-uv run python scripts/import_mcp_zero.py       # MCP-Zero → MCPServer/MCPTool + Qdrant
+uv run python scripts/import_mcp_zero.py                    # MCP-Zero → MCPServer/MCPTool JSONL
+uv run python scripts/import_mcp_zero.py --index --index-servers  # + Qdrant 인덱싱 (tools + servers)
 uv run python scripts/convert_mcp_atlas.py     # MCP-Atlas → GT JSONL
 uv run python scripts/run_e0.py                         # E0 baseline 실행
 ```
