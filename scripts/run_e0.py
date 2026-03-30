@@ -11,11 +11,13 @@ Usage:
     PYTHONPATH=src uv run python scripts/run_e0.py --top-k 10
     PYTHONPATH=src uv run python scripts/run_e0.py --pool-size 50
     PYTHONPATH=src uv run python scripts/run_e0.py --sweep
+    PYTHONPATH=src uv run python scripts/run_e0.py --no-wandb
 
 Results saved to:
     .claude/evals/E0-baseline.log  (default run)
     data/results/e0_result.json    (single run)
     data/results/e5_scale_sweep.json (sweep mode)
+    W&B project: mcp-discovery     (unless --no-wandb)
 """
 
 import argparse
@@ -24,6 +26,8 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+import wandb
 
 # Add src/ to path so we can import project modules
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -38,6 +42,7 @@ from embedding.openai_embedder import OpenAIEmbedder
 from evaluation.harness import evaluate
 from evaluation.metrics import EvalResult
 from pipeline.flat import FlatStrategy
+from pipeline.parallel import ParallelStrategy
 from pipeline.sequential import SequentialStrategy
 from retrieval.qdrant_store import QdrantStore
 
@@ -58,6 +63,7 @@ E0_EMBEDDING_DIMENSION = 3072
 
 RESULTS_DIR = Path("data/results")
 SWEEP_SIZES: list[int] = [5, 20, 50, 100, 200, 308]
+STRATEGY_CHOICES: list[str] = ["flat", "sequential", "parallel", "all"]
 
 
 def _load_pool_server_ids(pool_path: Path, pool_size: int | None = None) -> list[str]:
@@ -178,73 +184,91 @@ def _save_json(data: dict, path: Path) -> None:
 
 
 def _format_results_table(
-    flat_result: EvalResult,
-    seq_result: EvalResult,
+    eval_results: list[EvalResult],
     n_entries: int,
     top_k: int,
     pool_size: int | None = None,
 ) -> str:
-    """Format the comparison table between Flat and Sequential strategies."""
+    """Format comparison table for any number of strategies."""
     pool_label = f", pool={pool_size}" if pool_size is not None else ""
+    names = [r.strategy_name for r in eval_results]
+    col_width = 20
+    name_header = "".join(f"{n:>{col_width}}" for n in names)
+    name_sep = "".join(f"{'-' * col_width}" for _ in names)
     header = (
         f"\n{'=' * 60}\n"
         f"E0 EXPERIMENT RESULTS  (n={n_entries}, top_k={top_k}{pool_label})\n"
-        f"{'=' * 60}"
+        f"{'=' * 60}\n"
+        f"{'Metric':<20} {name_header}\n"
+        f"{'-' * 20} {name_sep}\n"
     )
 
-    def row(metric: str, f: float | None, s: float | None, delta: bool = True) -> str:
-        f_str = f"{f:>14.3f}" if f is not None else f"{'N/A':>14}"
-        s_str = f"{s:>20.3f}" if s is not None else f"{'N/A':>20}"
-        d = ""
-        if delta and f is not None and s is not None:
-            d = f" {s - f:>+8.3f}"
-        return f"{metric:<20} {f_str} {s_str}{d}"
-
-    def row_ms(metric: str, f: float, s: float) -> str:
-        return f"{metric:<20} {f:>14.1f} {s:>20.1f}"
-
-    rows = [
-        f"{'Metric':<20} {'FlatStrategy':>14} {'SequentialStrategy':>20} {'Delta':>8}",
-        f"{'-' * 20} {'-' * 14} {'-' * 20} {'-' * 8}",
-        row("Precision@1", flat_result.precision_at_1, seq_result.precision_at_1),
-        row("Recall@K", flat_result.recall_at_k, seq_result.recall_at_k),
-        row("MRR", flat_result.mrr, seq_result.mrr),
-        row("NDCG@5", flat_result.ndcg_at_5, seq_result.ndcg_at_5),
-        row(
-            "Confusion Rate",
-            flat_result.confusion_rate,
-            seq_result.confusion_rate,
-            delta=False,
-        ),
-        row("ECE", flat_result.ece, seq_result.ece, delta=False),
-        row_ms("Latency p50 (ms)", flat_result.latency_p50, seq_result.latency_p50),
-        row_ms("Latency mean (ms)", flat_result.latency_mean, seq_result.latency_mean),
+    metrics = [
+        ("Precision@1", "precision_at_1"),
+        ("Recall@K", "recall_at_k"),
+        ("MRR", "mrr"),
+        ("NDCG@5", "ndcg_at_5"),
+        ("Confusion Rate", "confusion_rate"),
+        ("ECE", "ece"),
     ]
-    return header + "\n" + "\n".join(rows) + "\n"
+    latency_metrics = [
+        ("Latency p50 (ms)", "latency_p50"),
+        ("Latency mean (ms)", "latency_mean"),
+    ]
+
+    rows: list[str] = []
+    for label, attr in metrics:
+        vals = "".join(
+            f"{getattr(r, attr):>{col_width}.3f}"
+            if getattr(r, attr) is not None
+            else f"{'N/A':>{col_width}}"
+            for r in eval_results
+        )
+        rows.append(f"{label:<20} {vals}")
+
+    for label, attr in latency_metrics:
+        vals = "".join(f"{getattr(r, attr):>{col_width}.1f}" for r in eval_results)
+        rows.append(f"{label:<20} {vals}")
+
+    return header + "\n".join(rows) + "\n"
 
 
-async def _run_single_eval(
+async def _run_strategies(
+    strategy_names: list[str],
     embedder: OpenAIEmbedder,
     tool_store: QdrantStore,
     server_store: QdrantStore,
     entries: list,
     top_k: int,
 ) -> list[EvalResult]:
-    """Run FlatStrategy + SequentialStrategy, return [flat_result, seq_result]."""
-    flat = FlatStrategy(embedder=embedder, tool_store=tool_store)
-    logger.info("Running FlatStrategy (1-layer)...")
-    flat_result = await evaluate(flat, entries, top_k=top_k)
+    """Run requested strategies, return list of EvalResults."""
+    results: list[EvalResult] = []
 
-    seq = SequentialStrategy(
-        embedder=embedder,
-        tool_store=tool_store,
-        server_store=server_store,
-        top_k_servers=5,
-    )
-    logger.info("Running SequentialStrategy (2-layer)...")
-    seq_result = await evaluate(seq, entries, top_k=top_k)
+    for name in strategy_names:
+        if name == "flat":
+            strategy = FlatStrategy(embedder=embedder, tool_store=tool_store)
+        elif name == "sequential":
+            strategy = SequentialStrategy(
+                embedder=embedder,
+                tool_store=tool_store,
+                server_store=server_store,
+                top_k_servers=5,
+            )
+        elif name == "parallel":
+            strategy = ParallelStrategy(
+                embedder=embedder,
+                tool_store=tool_store,
+                server_store=server_store,
+                top_k_servers=5,
+            )
+        else:
+            raise ValueError(f"Unknown strategy: {name}")
 
-    return [flat_result, seq_result]
+        logger.info(f"Running {name} strategy...")
+        result = await evaluate(strategy, entries, top_k=top_k)
+        results.append(result)
+
+    return results
 
 
 def _format_sweep_table(sweep_payloads: list[dict]) -> str:
@@ -270,8 +294,35 @@ def _format_sweep_table(sweep_payloads: list[dict]) -> str:
     return header + "\n" + "\n".join(rows) + "\n"
 
 
+def _log_wandb_results(eval_results: list[EvalResult]) -> None:
+    """Log all strategy results to the active W&B run."""
+    log_data: dict[str, float] = {}
+    for result in eval_results:
+        name = result.strategy_name
+        log_data[f"{name}/precision_at_1"] = result.precision_at_1
+        log_data[f"{name}/recall_at_k"] = result.recall_at_k
+        log_data[f"{name}/mrr"] = result.mrr
+        log_data[f"{name}/ndcg_at_5"] = result.ndcg_at_5
+        if result.confusion_rate is not None:
+            log_data[f"{name}/confusion_rate"] = result.confusion_rate
+        log_data[f"{name}/latency_p50_ms"] = result.latency_p50
+        log_data[f"{name}/latency_p95_ms"] = result.latency_p95
+        log_data[f"{name}/n_failed"] = result.n_failed
+
+    # Delta between flat and sequential if both present
+    by_name = {r.strategy_name: r for r in eval_results}
+    flat = by_name.get("FlatStrategy")
+    seq = by_name.get("SequentialStrategy")
+    if flat and seq:
+        log_data["delta/precision_at_1"] = seq.precision_at_1 - flat.precision_at_1
+        log_data["delta/mrr"] = seq.mrr - flat.mrr
+
+    wandb.log(log_data)
+
+
 async def main(args: argparse.Namespace) -> None:
     settings = Settings()
+    use_wandb = not args.no_wandb
 
     # --- Resolve pool sizes to run ---
     if args.sweep:
@@ -314,16 +365,41 @@ async def main(args: argparse.Namespace) -> None:
                 f"GT: {len(entries)} entries (covered by pool of {actual_pool_size} servers)"
             )
 
+            # Determine which strategies to run
+            if args.strategy == "all":
+                strategy_names = ["flat", "sequential", "parallel"]
+            else:
+                strategy_names = [args.strategy]
+
+            # --- W&B: init run for this iteration ---
+            if use_wandb:
+                experiment_label = "E5" if args.sweep else "E0"
+                wandb.init(
+                    project="mcp-discovery",
+                    name=f"{experiment_label}-{args.strategy}-pool{actual_pool_size}",
+                    config={
+                        "experiment": experiment_label,
+                        "strategy": args.strategy,
+                        "pool_size": actual_pool_size,
+                        "top_k": args.top_k,
+                        "embedding_model": E0_EMBEDDING_MODEL,
+                        "gt_sources": ["seed_set", "mcp_atlas"],
+                        "n_queries": len(entries),
+                    },
+                )
+
             # Run evaluation
-            eval_results = await _run_single_eval(
-                embedder, tool_store, server_store, entries, args.top_k
+            eval_results = await _run_strategies(
+                strategy_names, embedder, tool_store, server_store, entries, args.top_k
             )
-            flat_result, seq_result = eval_results
+
+            # --- W&B: log results + finish ---
+            if use_wandb:
+                _log_wandb_results(eval_results)
+                wandb.finish()
 
             # Print per-iteration results table
-            output = _format_results_table(
-                flat_result, seq_result, len(entries), args.top_k, pool_size
-            )
+            output = _format_results_table(eval_results, len(entries), args.top_k, pool_size)
             logger.info(output)
 
             # Build JSON payload
@@ -372,9 +448,20 @@ if __name__ == "__main__":
         help="Number of servers to use (alphabetical subset). Default: all",
     )
     parser.add_argument(
+        "--strategy",
+        choices=STRATEGY_CHOICES,
+        default="all",
+        help="Strategy to run: flat, sequential, parallel, or all (default: all)",
+    )
+    parser.add_argument(
         "--sweep",
         action="store_true",
         help="Run E5 scale sweep: pool sizes [5, 20, 50, 100, 200, 308]",
+    )
+    parser.add_argument(
+        "--no-wandb",
+        action="store_true",
+        help="Disable W&B logging (offline/local test mode)",
     )
     args = parser.parse_args()
     asyncio.run(main(args))

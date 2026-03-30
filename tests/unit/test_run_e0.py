@@ -8,14 +8,18 @@ from pathlib import Path
 # Ensure scripts/ is importable
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
 
+from unittest.mock import patch
+
 import pytest
 from run_e0 import (
+    STRATEGY_CHOICES,
     SWEEP_SIZES,
     _build_result_payload,
     _eval_result_to_dict,
     _format_results_table,
     _format_sweep_table,
     _load_pool_server_ids,
+    _log_wandb_results,
     _save_json,
 )
 
@@ -144,21 +148,42 @@ class TestSaveJson:
 
 class TestFormatResultsTable:
     def test_contains_strategy_names(self) -> None:
-        r = _make_eval_result("FlatStrategy")
-        s = _make_eval_result("SequentialStrategy")
-        output = _format_results_table(r, s, n_entries=10, top_k=10)
+        r1 = _make_eval_result("FlatStrategy")
+        r2 = _make_eval_result("SequentialStrategy")
+        output = _format_results_table([r1, r2], n_entries=10, top_k=10)
         assert "FlatStrategy" in output
         assert "SequentialStrategy" in output
 
     def test_includes_pool_size_when_specified(self) -> None:
         r = _make_eval_result()
-        output = _format_results_table(r, r, n_entries=10, top_k=10, pool_size=50)
+        output = _format_results_table([r], n_entries=10, top_k=10, pool_size=50)
         assert "pool=50" in output
 
     def test_omits_pool_size_when_none(self) -> None:
         r = _make_eval_result()
-        output = _format_results_table(r, r, n_entries=10, top_k=10, pool_size=None)
+        output = _format_results_table([r], n_entries=10, top_k=10, pool_size=None)
         assert "pool=" not in output
+
+    def test_single_strategy(self) -> None:
+        r = _make_eval_result("ParallelStrategy")
+        output = _format_results_table([r], n_entries=10, top_k=10)
+        assert "ParallelStrategy" in output
+
+    def test_three_strategies(self) -> None:
+        results = [
+            _make_eval_result("FlatStrategy"),
+            _make_eval_result("SequentialStrategy"),
+            _make_eval_result("ParallelStrategy"),
+        ]
+        output = _format_results_table(results, n_entries=10, top_k=10)
+        assert "FlatStrategy" in output
+        assert "SequentialStrategy" in output
+        assert "ParallelStrategy" in output
+
+
+class TestStrategyChoices:
+    def test_valid_choices(self) -> None:
+        assert set(STRATEGY_CHOICES) == {"flat", "sequential", "parallel", "all"}
 
 
 class TestFormatSweepTable:
@@ -179,3 +204,33 @@ class TestFormatSweepTable:
 class TestSweepSizes:
     def test_sweep_sizes_constant(self) -> None:
         assert SWEEP_SIZES == [5, 20, 50, 100, 200, 308]
+
+
+class TestLogWandbResults:
+    @patch("run_e0.wandb")
+    def test_logs_strategy_metrics(self, mock_wandb) -> None:
+        results = [_make_eval_result("FlatStrategy")]
+        _log_wandb_results(results)
+        mock_wandb.log.assert_called_once()
+        logged = mock_wandb.log.call_args[0][0]
+        assert logged["FlatStrategy/precision_at_1"] == 0.5
+        assert logged["FlatStrategy/mrr"] == 0.6
+        assert logged["FlatStrategy/latency_p50_ms"] == 100.0
+
+    @patch("run_e0.wandb")
+    def test_logs_delta_when_flat_and_sequential(self, mock_wandb) -> None:
+        results = [
+            _make_eval_result("FlatStrategy"),
+            _make_eval_result("SequentialStrategy"),
+        ]
+        _log_wandb_results(results)
+        logged = mock_wandb.log.call_args[0][0]
+        assert "delta/precision_at_1" in logged
+        assert "delta/mrr" in logged
+
+    @patch("run_e0.wandb")
+    def test_no_delta_without_both_strategies(self, mock_wandb) -> None:
+        results = [_make_eval_result("FlatStrategy")]
+        _log_wandb_results(results)
+        logged = mock_wandb.log.call_args[0][0]
+        assert "delta/precision_at_1" not in logged
