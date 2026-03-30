@@ -47,8 +47,8 @@ Description Optimizer — Provider가 MCP 서버/도구를 등록할 때 descrip
 | `docs/analysis/description-optimizer-root-cause-analysis.md` | **근본원인 분석 SOT** (2026-03-30) — 평가/검색 경로 불일치, GEO 보상 왜곡, disambiguation 오염 |
 | `docs/progress/grounded-optimization-handoff.md` | 구현 완료 내역 (Task 1-10 커밋 + 상세) |
 | `docs/superpowers/plans/2026-03-29-description-optimizer-grounded-optimization.md` | 구현 계획서 |
-| `docs/research-analysis.md` | 학술적 근거 분석, 논문 비교, 검증 설계 |
-| `docs/evaluation-design.md` | 평가 전략 상세 (A/B Test, Quality Gate, Semantic Preservation) |
+| `description_optimizer/docs/research-analysis.md` | 학술적 근거 분석, 논문 비교, 검증 설계 |
+| `description_optimizer/docs/evaluation-design.md` | 평가 전략 상세 (A/B Test, Quality Gate, Semantic Preservation) |
 | 루트 `CLAUDE.md` | 프로젝트 전체 규칙 (상위 참조) |
 | 루트 `docs/design/metrics-rubric.md` | GEO Score 6차원 정의 (SOT) |
 
@@ -67,8 +67,8 @@ Description Optimizer Pipeline
     Quality Report               optimized_description
                                  search_description (embedding용)
     ↓
-    Quality Gate (4-gate: Similarity + Hallucination + Info Preservation + Faithfulness)
-    GEO Score → diagnostic metric only (gate에서 제외)
+    Quality Gate (현재 5-gate: GEO비회귀 + Similarity + Hallucination + Info Preservation + Faithfulness)
+    → 목표: GEO gate 제거 → 4-gate로 전환, GEO는 diagnostic metric only
     ↓
     Store: original + optimized + search descriptions
 ```
@@ -77,7 +77,7 @@ Description Optimizer Pipeline
 
 - `DescriptionAnalyzer` ABC — GEO Score 분석 (Heuristic / LLM-as-Judge)
 - `DescriptionOptimizer` ABC — 재작성 (LLM / Rule-based), `optimize(report, context=None)`
-- `QualityGate` — 4-gate 시스템 (의미 유사도, 환각 탐지, 정보 보존, RAGAS faithfulness). GEO Score는 diagnostic metric으로만 사용.
+- `QualityGate` — 현재 5-gate 시스템 (GEO 비회귀 + 의미 유사도 + 환각 탐지 + 정보 보존 + RAGAS faithfulness). **목표**: GEO gate 제거 → 4-gate로 전환, GEO는 diagnostic metric으로만 사용.
 
 ### Grounded Optimization (신규, 2026-03-29)
 
@@ -123,7 +123,7 @@ Description Optimizer Pipeline
 - 루트 `CLAUDE.md`의 모든 제약 조건을 상속 (async only, loguru, pytest-asyncio 등)
 - **원본 description은 절대 삭제하지 않음** — 항상 보존
 - **Semantic Preservation**: cosine similarity >= 0.75 유지
-- **Quality Gate**: 4-gate (의미 유사도 + 환각 탐지 + 정보 보존 + RAGAS faithfulness). GEO는 diagnostic metric (gate 아님).
+- **Quality Gate**: 현재 5-gate (GEO 비회귀 + 의미 유사도 + 환각 탐지 + 정보 보존 + RAGAS faithfulness). **목표**: GEO gate 제거 → 4-gate 전환.
 - **비용 제약**: GPT-4o-mini 사용, tool당 ~$0.001
 - **기존 파이프라인 호환**: `MCPTool.description`은 변경하지 않고 별도 필드 추가
 
