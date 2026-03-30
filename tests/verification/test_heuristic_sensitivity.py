@@ -47,19 +47,20 @@ class TestClarityDimension:
 
 
 class TestDisambiguationDimension:
-    """Verify disambiguation scoring responds to contrast language."""
+    """Verify disambiguation scoring responds to target-specificity signals."""
 
-    async def test_adding_contrast_increases_disambiguation(
+    async def test_adding_target_specificity_increases_disambiguation(
         self, analyzer: HeuristicAnalyzer
     ) -> None:
-        """Adding 'unlike X' phrase increases disambiguation."""
+        """Adding action-object pairs and scope delimiters increases disambiguation."""
         base = "Searches files"
-        with_contrast = (
-            "Searches files. Unlike grep, this tool only searches filenames, not content."
+        enhanced = (
+            "Searches for filenames within the local filesystem. "
+            "Only for file name lookups, limited to the directory tree provided."
         )
         r_base = await analyzer.analyze("t::a", base)
-        r_contrast = await analyzer.analyze("t::b", with_contrast)
-        assert _dim(r_contrast, "disambiguation") > _dim(r_base, "disambiguation")
+        r_enhanced = await analyzer.analyze("t::b", enhanced)
+        assert _dim(r_enhanced, "disambiguation") > _dim(r_base, "disambiguation")
 
     async def test_adding_only_for_increases_disambiguation(
         self, analyzer: HeuristicAnalyzer

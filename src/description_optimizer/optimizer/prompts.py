@@ -284,7 +284,7 @@ def build_query_aware_prompt(
             "3. NEVER invent limitations, capabilities, or parameters not in the provided data",
             "4. Make the description naturally match the search queries above",
             "5. Include actual parameter names from the schema (with backticks) if available",
-            "6. If sibling tools exist, briefly clarify what makes this tool different",
+            "6. Emphasize this tool's unique action or domain — do NOT name or reference other tools",
             "",
             "## Output Format",
             'Return JSON: {"optimized_description": "...", "search_description": "..."}',
