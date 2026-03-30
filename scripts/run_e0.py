@@ -36,6 +36,7 @@ from config import Settings
 from data.ground_truth import load_ground_truth, merge_ground_truth
 from embedding.openai_embedder import OpenAIEmbedder
 from evaluation.harness import evaluate
+from evaluation.metrics import EvalResult
 from pipeline.flat import FlatStrategy
 from pipeline.sequential import SequentialStrategy
 from retrieval.qdrant_store import QdrantStore
@@ -177,8 +178,8 @@ def _save_json(data: dict, path: Path) -> None:
 
 
 def _format_results_table(
-    flat_result,
-    seq_result,
+    flat_result: EvalResult,
+    seq_result: EvalResult,
     n_entries: int,
     top_k: int,
     pool_size: int | None = None,
@@ -223,12 +224,12 @@ def _format_results_table(
 
 
 async def _run_single_eval(
-    embedder,
-    tool_store,
-    server_store,
+    embedder: OpenAIEmbedder,
+    tool_store: QdrantStore,
+    server_store: QdrantStore,
     entries: list,
     top_k: int,
-) -> list:
+) -> list[EvalResult]:
     """Run FlatStrategy + SequentialStrategy, return [flat_result, seq_result]."""
     flat = FlatStrategy(embedder=embedder, tool_store=tool_store)
     logger.info("Running FlatStrategy (1-layer)...")
@@ -306,9 +307,7 @@ async def main(args: argparse.Namespace) -> None:
             # Load & filter GT
             entries = _load_and_filter_gt(pool_server_ids)
             if not entries:
-                logger.warning(
-                    f"No GT entries for pool_size={pool_size}. Skipping."
-                )
+                logger.warning(f"No GT entries for pool_size={pool_size}. Skipping.")
                 continue
 
             logger.info(

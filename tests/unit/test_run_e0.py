@@ -9,7 +9,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
 
 import pytest
-from run_e0 import _build_result_payload, _eval_result_to_dict, _load_pool_server_ids, _save_json
+from run_e0 import (
+    SWEEP_SIZES,
+    _build_result_payload,
+    _eval_result_to_dict,
+    _format_results_table,
+    _format_sweep_table,
+    _load_pool_server_ids,
+    _save_json,
+)
 
 from evaluation.metrics import EvalResult
 
@@ -132,3 +140,42 @@ class TestSaveJson:
         _save_json(data, out_path)
         assert out_path.exists()
         assert json.loads(out_path.read_text()) == {"test": True}
+
+
+class TestFormatResultsTable:
+    def test_contains_strategy_names(self) -> None:
+        r = _make_eval_result("FlatStrategy")
+        s = _make_eval_result("SequentialStrategy")
+        output = _format_results_table(r, s, n_entries=10, top_k=10)
+        assert "FlatStrategy" in output
+        assert "SequentialStrategy" in output
+
+    def test_includes_pool_size_when_specified(self) -> None:
+        r = _make_eval_result()
+        output = _format_results_table(r, r, n_entries=10, top_k=10, pool_size=50)
+        assert "pool=50" in output
+
+    def test_omits_pool_size_when_none(self) -> None:
+        r = _make_eval_result()
+        output = _format_results_table(r, r, n_entries=10, top_k=10, pool_size=None)
+        assert "pool=" not in output
+
+
+class TestFormatSweepTable:
+    def test_contains_all_pool_sizes(self) -> None:
+        payloads = [
+            _build_result_payload("E0", size, 10, [_make_eval_result()]) for size in [5, 50]
+        ]
+        output = _format_sweep_table(payloads)
+        assert "5" in output
+        assert "50" in output
+
+    def test_contains_strategy_name(self) -> None:
+        payloads = [_build_result_payload("E0", 5, 10, [_make_eval_result("FlatStrategy")])]
+        output = _format_sweep_table(payloads)
+        assert "FlatStrategy" in output
+
+
+class TestSweepSizes:
+    def test_sweep_sizes_constant(self) -> None:
+        assert SWEEP_SIZES == [5, 20, 50, 100, 200, 308]
