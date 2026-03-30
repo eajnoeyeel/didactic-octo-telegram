@@ -113,10 +113,13 @@ Task 1 ✅ → Task 2 ✅ → Task 3 → Task 4 → Task 7 → Task 8 → Task 9
 | Per-tool 승부 | 3승 | **11승** (1 tie) | **Grounded 압도적** |
 | 차원별 승부 | 1승 | **5승** | clarity, param_cov, fluency, stats, precision |
 
-**결론:** boundary 차원 제거만으로 Goodhart 문제 해결. 이전 ungrounded의 GEO 우위(+0.0372)가 역전되어 grounded가 +0.0258로 승리. Per-tool도 8:12→11:3으로 완전 역전.
+**결론:** boundary 차원 제거로 GEO-level Goodhart 완화. 이전 ungrounded의 GEO 우위(+0.0372)가 역전되어 grounded가 +0.0258로 승리. Per-tool도 8:12→11:3으로 완전 역전. 후속 P@1 A/B에서 GEO 향상이 retrieval 향상으로 이어지지 않음 확인 (δP@1 = -0.069). 근본원인: `docs/analysis/description-optimizer-root-cause-analysis.md`
 
 ### 다음 단계
 
-1. **P@1 end-to-end 검증**: `scripts/run_retrieval_ab_eval.py` — 프록시(GEO)가 아닌 실제 검색 성능 측정
-2. **RAGAS faithfulness 파이프라인 통합**: 최적화 루프에 check_faithfulness 통합
-3. **disambiguation 개선**: regex → sibling tools 간 임베딩 거리 기반 측정
+1. ~~**P@1 end-to-end 검증**~~ — 완료 (δP@1 = -0.069)
+2. ~~**근본원인 분석**~~ — 완료 (2026-03-30)
+3. **Retrieval 경로 재정렬** — `search_description`을 실제 임베딩/평가 경로에 연결
+4. **3-way A/B 평가** — original vs optimized vs search
+5. **GEO diagnostic 전환 + disambiguation 재설계**
+6. **RAGAS faithfulness 파이프라인 통합**
