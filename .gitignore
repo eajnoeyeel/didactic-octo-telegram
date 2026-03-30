@@ -10,3 +10,6 @@ __pycache__
 # External datasets (large, downloaded separately)
 data/external/mcp-zero/
 data/external/mcp-atlas/
+
+# Experiment results (generated, not committed)
+data/results/
