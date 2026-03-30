@@ -4,6 +4,8 @@
 > Branch: `feat/description-optimizer`
 > Verifier: Claude (자동 검증) + 수동 리뷰 가이드
 
+> **최신 업데이트 (2026-03-30):** Phase 2 이후 boundary→fluency 교체, GEO가 diagnostic metric으로 전환, Quality Gate가 4-gate(GEO 비회귀 제외)로 변경됨. 이 문서의 검증 결과는 Phase 1 기준이며, 아래 내용은 해당 시점에서 유효합니다.
+
 ---
 
 ## 자동 검증 결과
@@ -84,7 +86,7 @@ ruff format: No changes needed
 | Good | PostgreSQL run_query (풍부한 설명) | 0.583 |
 | Good | GitHub search_issues (풍부한 설명) | 0.467 |
 
-**관찰**: poor < medium < good 순서 정확히 유지. medium tier의 GEO가 예상보다 낮음 (0.1 수준) — heuristic이 disambiguation, boundary, stats 없는 설명에 엄격함.
+**관찰**: poor < medium < good 순서 유지. medium tier의 GEO가 예상보다 낮음 (0.1 수준). **주의:** GEO Score는 retrieval 성능(P@1)과 직접 상관하지 않으므로, 이 캘리브레이션은 description 품질 진단 참고용이지 검색 성능 예측 지표가 아님.
 
 ---
 
@@ -124,7 +126,7 @@ asyncio.run(main())
 - [ ] good 설명은 GEO > 0.45인가?
 - [ ] 각 차원 점수가 설명 내용과 직관적으로 매치되는가?
 - [ ] precision 차원에서 기술 용어가 있는 설명이 높은 점수를 받는가?
-- [ ] boundary 차원에서 "Cannot", "Does not" 등이 있는 설명이 높은 점수를 받는가?
+- [x] ~~boundary 차원~~ — 제거됨 (2026-03-29). fluency 차원으로 교체.
 
 ---
 
@@ -150,8 +152,7 @@ asyncio.run(main())
   - 너무 높으면: 개선된 설명도 거부
 - [ ] `skip_threshold=0.75` — GEO 0.75 이상이면 이미 충분히 좋은가?
   - 참고: 현재 heuristic에서 0.75+ 받으려면 최소 4-5개 차원에서 높은 점수 필요
-- [ ] `allow_geo_decrease=False` — 어떤 상황에서도 GEO 하락을 허용하지 않는 것이 합리적인가?
-  - 고려: 의미 보존을 위해 약간의 GEO 하락이 나을 수 있음
+- [x] `allow_geo_decrease` — GEO는 diagnostic metric으로 전환됨. GEO 비회귀 gate는 제거 대상.
 
 ---
 
