@@ -15,14 +15,16 @@
 | Phase 1 (Core) | Task 1-10 완료 ✅ |
 | Phase 2 (Grounded) | boundary→fluency, RAGAS, doc2query, P@1 A/B 완료 ✅ |
 | P@1 A/B 평가 | **δP@1 = -0.069 (검색 성능 저하 확인)** |
+| 3-way A/B 평가 | **δP@1 = 0.000 (search) / -0.069 (gt_opt) — sibling 오염 확인** |
 | 근본원인 분석 | **완료** (2026-03-30) |
-| **현재 단계** | **문서 정비 → retrieval 경로 재정렬 → 3-way A/B** |
+| **현재 단계** | **disambiguation 재설계 → 3-way A/B 재검증** |
 
 ### 핵심 발견
 
 Grounded optimization은 환각 제거에 성공했으나, retrieval alignment 미해결:
 - GEO +0.19 향상이 P@1 -0.069 하락으로 이어짐
 - 근본원인: `search_description`이 retrieval 경로에 연결되지 않음 + GEO 보상 왜곡
+- 3-way A/B 결과: search_description도 동일하게 저하 — 길이가 아닌 sibling 오염이 원인
 - 상세: `docs/analysis/description-optimizer-root-cause-analysis.md`
 
 ---

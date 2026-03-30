@@ -10,7 +10,7 @@
 | 항목 | 현재 상태 |
 |------|-----------|
 | 완료된 Phase | Phase 0 ~ Phase 5, Description Optimizer Grounded Optimization |
-| 진행중 | **문서 정비 + Retrieval 경로 재정렬** (근본원인 분석 완료) |
+| 진행중 | **disambiguation 재설계** (3-way A/B 완료, sibling 오염 확인) |
 | 다음 Phase | Phase 6 (Reranker) + OQ-2 (Pool 크롤링/인덱싱) |
 | 테스트 | **389 passed** (main 233 + desc-optimizer 156) |
 | 커버리지 | **92%** (feat/description-optimizer 기준) |
@@ -26,8 +26,9 @@
 | A/B 비교 (30 tools) | 완료 — 환각 제거 성공, GEO scorer 한계 발견 |
 | **P@1 A/B 평가** | **완료 — δP@1 = -0.069 (검색 성능 저하)** |
 | **핵심 발견** | 근본원인 확인: retrieval 경로 불일치 + GEO 보상 왜곡 (분석 완료 2026-03-30) |
+| 3-way A/B 평가 | 완료 — search/optimized 모두 δP@1=-0.069, sibling 오염 근본원인 |
 | 근본원인 분석 | **완료** — `docs/analysis/description-optimizer-root-cause-analysis.md` |
-| **다음 단계** | retrieval 경로 재정렬 (`search_description` 연결) → 3-way A/B → GEO diagnostic 전환 |
+| **다음 단계** | disambiguation 재설계 (sibling 이름 제거) → 3-way A/B 재검증 |
 | 상세 보고서 | `data/verification/retrieval_ab_report.json` |
 
 **P@1 A/B 평가 상세 (2026-03-29):**
@@ -298,13 +299,13 @@ tests/
 
 ## 다음 단계
 
-### 우선순위 1: Description Optimizer Retrieval 경로 재정렬
+### 우선순위 1: Description Optimizer disambiguation 재설계
 1. ~~**논문 리서치**~~ — 완료 (`description_optimizer/docs/research-phase2-synthesis.md`)
 2. ~~**GEO-P@1 근본원인 분석**~~ — 완료 (`docs/analysis/description-optimizer-root-cause-analysis.md`)
-3. **Retrieval 경로 재정렬** — `search_description`을 실제 임베딩/평가 경로에 연결
-4. **3-way A/B 평가** — original vs optimized_description vs search_description
-5. **GEO diagnostic 전환** — hard gate에서 제외
-6. **disambiguation 재설계** — sibling 이름 나열 → target-only qualifier 중심
+3. ~~**Retrieval 경로 재정렬 + 3-way A/B**~~ — 완료 (search/optimized 모두 δP@1=-0.069, sibling 오염 확인)
+4. **disambiguation 재설계** — sibling 이름 제거, target-only qualifier 중심
+5. **3-way A/B 재검증** — disambiguation 개선 후 original vs optimized vs search 재평가
+6. **GEO diagnostic 전환** — hard gate에서 제외
 
 ### 우선순위 2: 기존 파이프라인 진행
 1. **OQ-2: 임베딩 인덱스 빌드** — `scripts/collect_data.py` + `scripts/build_index.py --pool-size 50`으로 Pool 50 인덱싱
@@ -318,9 +319,9 @@ tests/
 | ~~높음~~ | ~~Grounded Optimization 구현 (10 tasks)~~ | **완료** (2026-03-29) |
 | ~~높음~~ | ~~`openai_embedder.py` 통합 테스트 활성화~~ | **완료** |
 | ~~높음~~ | ~~Synthetic GT 생성 실행~~ — 838개 생성 | **완료** |
-| **높음** | Retrieval 경로 재정렬 (search_description 연결) | **대기** |
-| **높음** | 3-way A/B 평가 (original vs optimized vs search) | 경로 재정렬 후 |
-| **높음** | GEO diagnostic 전환 + disambiguation 재설계 | 대기 |
+| ~~높음~~ | ~~Retrieval 경로 재정렬 + 3-way A/B 평가~~ | **완료** (sibling 오염 확인) |
+| **높음** | disambiguation 재설계 (sibling 이름 제거) → 3-way A/B 재검증 | **대기** |
+| **높음** | GEO diagnostic 전환 | 대기 |
 | 높음 | 임베딩 인덱스 빌드 (`scripts/build_index.py`) | 대기 |
 | 중간 | E0 실험: 1-Layer vs 2-Layer 검증 | Phase 5 완료 후 |
 | ~~중간~~ | ~~Precision@1 end-to-end 평가~~ | **완료** (δP@1=-0.069) |
