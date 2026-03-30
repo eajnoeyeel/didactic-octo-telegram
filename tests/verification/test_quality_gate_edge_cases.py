@@ -30,13 +30,21 @@ def _make_report(geo_uniform: float) -> AnalysisReport:
 class TestGEOScoreBoundary:
     """Verify check_geo_score behaves correctly at numeric boundaries."""
 
-    def test_epsilon_decrease_fails(self) -> None:
-        """A tiny GEO score decrease (0.5 -> 0.4999) must fail."""
-        gate = QualityGate()
+    def test_epsilon_decrease_fails_in_strict_mode(self) -> None:
+        """A tiny GEO score decrease (0.5 -> 0.4999) must fail in strict mode."""
+        gate = QualityGate(allow_geo_decrease=False)
         before = _make_report(0.5)
         after = _make_report(0.4999)
         result = gate.check_geo_score(before, after)
         assert not result.passed
+
+    def test_epsilon_decrease_passes_in_default_diagnostic_mode(self) -> None:
+        """A tiny GEO score decrease passes by default (diagnostic mode)."""
+        gate = QualityGate()
+        before = _make_report(0.5)
+        after = _make_report(0.4999)
+        result = gate.check_geo_score(before, after)
+        assert result.passed
 
     def test_zero_to_zero_passes(self) -> None:
         """Both scores at 0.0: no decrease, must pass."""
@@ -157,9 +165,9 @@ class TestFullGateResultReason:
         assert full_result.passed
         assert "All gates passed" in full_result.reason
 
-    def test_both_fail_reason(self) -> None:
-        """When both gates fail, reason must mention 'GEO' and 'Similarity'."""
-        gate = QualityGate()
+    def test_both_fail_reason_strict_mode(self) -> None:
+        """When both gates fail (strict mode), reason must mention 'GEO' and 'Similarity'."""
+        gate = QualityGate(allow_geo_decrease=False)
         before = _make_report(0.8)
         after = _make_report(0.2)  # GEO decrease
         vec_a = np.array([1.0, 0.0])
@@ -167,4 +175,17 @@ class TestFullGateResultReason:
         full_result = gate.evaluate(before, after, vec_a, vec_b)
         assert not full_result.passed
         assert "GEO" in full_result.reason
+        assert "Similarity" in full_result.reason
+
+    def test_geo_decrease_passes_but_similarity_fails_default(self) -> None:
+        """In default diagnostic mode, GEO decrease passes but similarity can still fail."""
+        gate = QualityGate()
+        before = _make_report(0.8)
+        after = _make_report(0.2)  # GEO decrease — allowed in diagnostic mode
+        vec_a = np.array([1.0, 0.0])
+        vec_b = np.array([-1.0, 0.0])  # opposite → similarity fails
+        full_result = gate.evaluate(before, after, vec_a, vec_b)
+        assert not full_result.passed
+        assert full_result.geo_result.passed  # GEO passes (diagnostic)
+        assert not full_result.similarity_result.passed  # Similarity fails
         assert "Similarity" in full_result.reason
