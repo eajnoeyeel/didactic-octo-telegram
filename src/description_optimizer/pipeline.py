@@ -1,6 +1,6 @@
 """Orchestrates the description optimization pipeline.
 
-Flow: analyze -> (skip if high GEO) -> optimize -> re-analyze -> gate -> result
+Flow: analyze -> optimize -> re-analyze -> gate -> result
 """
 
 from loguru import logger
@@ -18,7 +18,7 @@ from models import MCPTool
 
 
 class OptimizationPipeline:
-    """End-to-end description optimization: analyze -> optimize -> validate."""
+    """End-to-end retrieval description optimization: analyze -> optimize -> validate."""
 
     def __init__(
         self,
@@ -32,6 +32,7 @@ class OptimizationPipeline:
         self._optimizer = optimizer
         self._embedder = embedder
         self._gate = gate
+        # Retained for constructor compatibility; retrieval-oriented execution does not skip on GEO.
         self._skip_threshold = skip_threshold
 
     async def run(self, tool_id: str, description: str | None) -> OptimizedDescription:
@@ -126,25 +127,6 @@ class OptimizationPipeline:
         report_before = await self._analyzer.analyze(tool_id, desc)
         logger.info(f"Analyzed {tool_id}: GEO={report_before.geo_score:.3f}")
 
-        # Skip if already high quality
-        if report_before.geo_score >= self._skip_threshold:
-            logger.info(
-                f"Skipping {tool_id}: GEO={report_before.geo_score:.3f} >= {self._skip_threshold}"
-            )
-            return OptimizedDescription(
-                tool_id=tool_id,
-                original_description=desc,
-                optimized_description=desc,
-                search_description=desc,
-                geo_score_before=report_before.geo_score,
-                geo_score_after=report_before.geo_score,
-                status=OptimizationStatus.SKIPPED,
-                skip_reason=(
-                    f"GEO score {report_before.geo_score:.3f} "
-                    f"already above threshold {self._skip_threshold}"
-                ),
-            )
-
         # Phase 2: Optimize (with context if available)
         try:
             optimized = await self._optimizer.optimize(report_before, context=context)
@@ -154,7 +136,7 @@ class OptimizationPipeline:
                 tool_id=tool_id,
                 original_description=desc,
                 optimized_description=desc,
-                search_description=desc,
+                retrieval_description=desc,
                 geo_score_before=report_before.geo_score,
                 geo_score_after=report_before.geo_score,
                 status=OptimizationStatus.FAILED,
@@ -162,14 +144,18 @@ class OptimizationPipeline:
             )
 
         optimized_desc = optimized["optimized_description"]
-        search_desc = optimized["search_description"]
+        retrieval_desc = (
+            optimized.get("retrieval_description")
+            or optimized.get("search_description")
+            or optimized_desc
+        )
 
-        # Phase 3: Re-analyze optimized description
-        report_after = await self._analyzer.analyze(tool_id, optimized_desc)
+        # Phase 3: Re-analyze retrieval description for diagnostics.
+        report_after = await self._analyzer.analyze(tool_id, retrieval_desc)
 
-        # Phase 4: Compute embeddings for semantic similarity
+        # Phase 4: Compute embeddings for semantic similarity on the text that will be embedded.
         vec_before = await self._embedder.embed_one(desc)
-        vec_after = await self._embedder.embed_one(optimized_desc)
+        vec_after = await self._embedder.embed_one(retrieval_desc)
 
         # Phase 5: Quality Gate
         gate_result = self._gate.evaluate(
@@ -178,8 +164,11 @@ class OptimizationPipeline:
             vec_before,
             vec_after,
             input_schema=context.input_schema if context else None,
-            optimized_text=optimized_desc,
+            optimized_text=retrieval_desc,
             original_text=desc,
+            sibling_tool_names=[
+                sibling["tool_name"] for sibling in (context.sibling_tools if context else [])
+            ],
         )
 
         if not gate_result.passed:
@@ -188,7 +177,7 @@ class OptimizationPipeline:
                 tool_id=tool_id,
                 original_description=desc,
                 optimized_description=desc,
-                search_description=desc,
+                retrieval_description=desc,
                 geo_score_before=report_before.geo_score,
                 geo_score_after=report_after.geo_score,
                 status=OptimizationStatus.GATE_REJECTED,
@@ -204,7 +193,7 @@ class OptimizationPipeline:
             tool_id=tool_id,
             original_description=desc,
             optimized_description=optimized_desc,
-            search_description=search_desc,
+            retrieval_description=retrieval_desc,
             geo_score_before=report_before.geo_score,
             geo_score_after=report_after.geo_score,
             status=OptimizationStatus.SUCCESS,

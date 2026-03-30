@@ -176,9 +176,39 @@ class TestFullGate:
             },
         )
         vec_a = np.array([1.0, 0.0, 0.0])
-        vec_b = np.array([0.95, 0.1, 0.05])
+        vec_b = np.array([0.0, 1.0, 0.0])
         result = gate.evaluate(before, after, vec_a, vec_b)
         assert result.passed is False
+
+    def test_geo_drop_does_not_fail_active_gate(self, gate: QualityGate) -> None:
+        before = _make_report(
+            "s::t",
+            "old",
+            {
+                "clarity": 0.9,
+                "disambiguation": 0.9,
+                "parameter_coverage": 0.8,
+                "fluency": 0.8,
+                "stats": 0.7,
+                "precision": 0.9,
+            },
+        )
+        after = _make_report(
+            "s::t",
+            "new",
+            {
+                "clarity": 0.8,
+                "disambiguation": 0.8,
+                "parameter_coverage": 0.7,
+                "fluency": 0.7,
+                "stats": 0.6,
+                "precision": 0.8,
+            },
+        )
+        vec_a = np.array([1.0, 0.0, 0.0])
+        vec_b = np.array([0.99, 0.01, 0.0])
+        result = gate.evaluate(before, after, vec_a, vec_b)
+        assert result.passed is True
 
 
 class TestHallucinationGate:

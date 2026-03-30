@@ -94,36 +94,35 @@ class TestOptimizedDescription:
             tool_id="server::tool",
             original_description="basic tool",
             optimized_description="An advanced tool that performs X when Y",
-            search_description="tool X Y Z purpose disambiguation",
+            retrieval_description="tool X Y Z purpose disambiguation",
             geo_score_before=0.3,
             geo_score_after=0.7,
             status=OptimizationStatus.SUCCESS,
         )
         assert opt.improvement == pytest.approx(0.4)
         assert opt.status == OptimizationStatus.SUCCESS
+        assert opt.retrieval_description == "tool X Y Z purpose disambiguation"
 
     def test_improvement_calculation(self) -> None:
         opt = OptimizedDescription(
             tool_id="server::tool",
             original_description="test",
             optimized_description="test improved",
-            search_description="test search",
+            retrieval_description="test search",
             geo_score_before=0.5,
             geo_score_after=0.8,
             status=OptimizationStatus.SUCCESS,
         )
         assert opt.improvement == pytest.approx(0.3)
 
-    def test_skipped_status(self) -> None:
+    def test_legacy_search_description_input_is_accepted(self) -> None:
         opt = OptimizedDescription(
             tool_id="server::tool",
             original_description="already great tool description",
             optimized_description="already great tool description",
-            search_description="already great tool description",
+            search_description="legacy search text",
             geo_score_before=0.9,
             geo_score_after=0.9,
-            status=OptimizationStatus.SKIPPED,
-            skip_reason="GEO score already above threshold",
+            status=OptimizationStatus.SUCCESS,
         )
-        assert opt.improvement == pytest.approx(0.0)
-        assert opt.skip_reason is not None
+        assert opt.retrieval_description == "legacy search text"

@@ -47,7 +47,7 @@ def mock_optimizer() -> AsyncMock:
     optimizer = AsyncMock()
     optimizer.optimize.return_value = {
         "optimized_description": "improved desc",
-        "search_description": "search desc",
+        "retrieval_description": "search desc",
     }
     return optimizer
 
@@ -92,7 +92,7 @@ class TestPipelineSuccess:
         assert isinstance(result, OptimizedDescription)
         assert result.status == OptimizationStatus.SUCCESS
         assert result.optimized_description == "improved desc"
-        assert result.search_description == "search desc"
+        assert result.retrieval_description == "search desc"
 
     async def test_calls_analyzer_first(
         self,
@@ -121,18 +121,19 @@ class TestPipelineSuccess:
         mock_gate.evaluate.assert_called_once()
 
 
-class TestPipelineSkip:
-    async def test_skip_when_high_geo_score(
+class TestPipelineNoSkip:
+    async def test_high_geo_score_still_runs_optimizer(
         self,
         pipeline: OptimizationPipeline,
         mock_analyzer: AsyncMock,
+        mock_optimizer: AsyncMock,
     ) -> None:
         mock_analyzer.analyze.return_value = _make_report(0.85, "already great")
         result = await pipeline.run("s::t", "already great")
-        assert result.status == OptimizationStatus.SKIPPED
-        assert result.skip_reason is not None
+        assert result.status == OptimizationStatus.SUCCESS
+        mock_optimizer.optimize.assert_called_once()
 
-    async def test_skip_preserves_original(
+    async def test_high_geo_score_returns_retrieval_description(
         self,
         pipeline: OptimizationPipeline,
         mock_analyzer: AsyncMock,
@@ -140,7 +141,7 @@ class TestPipelineSkip:
         mock_analyzer.analyze.return_value = _make_report(0.85, "already great")
         result = await pipeline.run("s::t", "already great")
         assert result.original_description == "already great"
-        assert result.optimized_description == "already great"
+        assert result.retrieval_description == "search desc"
 
 
 class TestPipelineGateRejection:
@@ -212,7 +213,7 @@ async def test_run_with_tool_passes_context_to_optimizer() -> None:
     optimizer = AsyncMock()
     optimizer.optimize.return_value = {
         "optimized_description": "Deletes a comment. Requires `id` parameter.",
-        "search_description": "delete comment slack",
+        "retrieval_description": "delete comment slack",
     }
 
     embedder = AsyncMock()
@@ -264,8 +265,8 @@ async def test_pipeline_rejects_hallucinated_params() -> None:
     optimizer = AsyncMock()
     # LLM hallucinates a `query` parameter
     optimizer.optimize.return_value = {
-        "optimized_description": "A test tool. Accepts `query` string and `limit` integer.",
-        "search_description": "test tool",
+        "optimized_description": "A test tool.",
+        "retrieval_description": "A test tool. Accepts `query` string and `limit` integer.",
     }
 
     embedder = AsyncMock()
@@ -302,7 +303,7 @@ async def test_run_with_tool_batch() -> None:
     optimizer = AsyncMock()
     optimizer.optimize.return_value = {
         "optimized_description": "Improved Tool 1.",
-        "search_description": "tool 1 search",
+        "retrieval_description": "tool 1 search",
     }
 
     embedder = AsyncMock()

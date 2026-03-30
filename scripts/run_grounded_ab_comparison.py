@@ -274,7 +274,6 @@ async def main() -> None:
         optimizer=optimizer,
         embedder=embedder,
         gate=gate,
-        skip_threshold=0.75,
     )
 
     with open(SAMPLE_FILE) as f:

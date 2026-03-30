@@ -147,7 +147,6 @@ async def phase_optimize():
         optimizer=optimizer,
         embedder=embedder,
         gate=gate,
-        skip_threshold=0.75,
     )
 
     results_file = VERIFICATION_DIR / "optimization_results.jsonl"
@@ -189,12 +188,11 @@ async def phase_optimize():
             results.append(json.loads(line.strip()))
 
     success = sum(1 for r in results if r["status"] == "success")
-    skipped = sum(1 for r in results if r["status"] == "skipped")
     failed = sum(1 for r in results if r["status"] == "failed")
     rejected = sum(1 for r in results if r["status"] == "gate_rejected")
 
     print("\n=== OPTIMIZATION SUMMARY ===")
-    print(f"Success: {success}, Skipped: {skipped}, Failed: {failed}, Gate Rejected: {rejected}")
+    print(f"Success: {success}, Failed: {failed}, Gate Rejected: {rejected}")
 
     if success > 0:
         improvements = [
@@ -316,8 +314,9 @@ def _write_report(f, results: list[dict]) -> None:
         if r["status"] == "success":
             f.write("**Optimized:**\n")
             f.write(f"```\n{r['optimized_description'][:500]}\n```\n\n")
-            f.write("**Search Description:**\n")
-            f.write(f"```\n{r.get('search_description', 'N/A')[:300]}\n```\n\n")
+            f.write("**Retrieval Description:**\n")
+            retrieval_text = r.get("retrieval_description") or r.get("search_description", "N/A")
+            f.write(f"```\n{retrieval_text[:300]}\n```\n\n")
 
         f.write("---\n\n")
 
@@ -347,8 +346,8 @@ def _write_report(f, results: list[dict]) -> None:
     f.write("- [ ] 최적화된 설명이 원본의 의미를 보존하는가? (Section 3 side-by-side 확인)\n")
     f.write("- [ ] 최적화된 설명에 환각(hallucination)이 없는가?\n")
     f.write("- [ ] Quality Gate가 나쁜 최적화를 적절히 걸러냈는가?\n")
-    f.write("- [ ] search_description이 벡터 검색에 적합한 키워드를 포함하는가?\n")
-    f.write("- [ ] 최적화된 설명의 길이가 적절한가? (50-200 words)\n")
+    f.write("- [ ] retrieval_description이 벡터 검색에 적합한 키워드를 포함하는가?\n")
+    f.write("- [ ] retrieval_description의 길이가 적절한가? (15-60 words 권장)\n")
 
 
 async def main(args: argparse.Namespace) -> None:

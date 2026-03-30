@@ -80,10 +80,12 @@ class TestMCPTool:
             tool_name="search_issues",
             tool_id="@smithery-ai/github::search_issues",
             description="Search GitHub issues",
+            retrieval_description="github issues search query",
         )
         assert tool.tool_id == "@smithery-ai/github::search_issues"
         assert tool.server_id == "@smithery-ai/github"
         assert tool.tool_name == "search_issues"
+        assert tool.retrieval_description == "github issues search query"
 
     def test_tool_id_validator_rejects_wrong_format(self):
         with pytest.raises(ValueError, match="tool_id must be"):
@@ -132,6 +134,14 @@ class TestMCPTool:
             input_schema={"type": "object"},
         )
         assert tool.parameter_names == []
+
+    def test_retrieval_description_defaults_to_none(self):
+        tool = MCPTool(
+            server_id="srv",
+            tool_name="t",
+            tool_id="srv::t",
+        )
+        assert tool.retrieval_description is None
 
 
 class TestSearchResult:

@@ -35,6 +35,7 @@ class FullGateResult:
     hallucination_result: GateResult | None = None
     info_preservation_result: GateResult | None = None
     faithfulness_result: GateResult | None = None
+    contamination_result: GateResult | None = None
 
     @property
     def reason(self) -> str:
@@ -51,6 +52,8 @@ class FullGateResult:
             reasons.append(f"InfoPreservation: {self.info_preservation_result.reason}")
         if self.faithfulness_result and not self.faithfulness_result.passed:
             reasons.append(f"Faithfulness: {self.faithfulness_result.reason}")
+        if self.contamination_result and not self.contamination_result.passed:
+            reasons.append(f"Contamination: {self.contamination_result.reason}")
         return "; ".join(reasons)
 
 
@@ -256,6 +259,24 @@ class QualityGate:
             reason=f"All {len(claims)} claims verified as faithful",
         )
 
+    def check_sibling_name_contamination(
+        self,
+        optimized: str,
+        sibling_tool_names: list[str] | None,
+    ) -> GateResult:
+        """Reject retrieval text that directly names sibling tools."""
+        if not sibling_tool_names:
+            return GateResult(passed=True, reason="No sibling tools provided")
+
+        optimized_lower = optimized.lower()
+        mentioned = [name for name in sibling_tool_names if name.lower() in optimized_lower]
+        if mentioned:
+            return GateResult(
+                passed=False,
+                reason=f"Retrieval text mentions sibling tool names: {sorted(mentioned)}",
+            )
+        return GateResult(passed=True, reason="No sibling tool contamination detected")
+
     def evaluate(
         self,
         before: AnalysisReport,
@@ -265,6 +286,7 @@ class QualityGate:
         input_schema: dict | None = None,
         optimized_text: str | None = None,
         original_text: str | None = None,
+        sibling_tool_names: list[str] | None = None,
     ) -> FullGateResult:
         """Run all quality gate checks."""
         geo_result = self.check_geo_score(before, after)
@@ -272,6 +294,7 @@ class QualityGate:
 
         hallucination_result = None
         info_preservation_result = None
+        contamination_result = None
 
         if optimized_text and input_schema:
             hallucination_result = self.check_hallucinated_params(optimized_text, input_schema)
@@ -279,11 +302,16 @@ class QualityGate:
         if original_text and optimized_text:
             info_preservation_result = self.check_info_preservation(original_text, optimized_text)
 
+        if optimized_text:
+            contamination_result = self.check_sibling_name_contamination(
+                optimized_text, sibling_tool_names
+            )
+
         passed = (
-            geo_result.passed
-            and sim_result.passed
+            sim_result.passed
             and (hallucination_result is None or hallucination_result.passed)
             and (info_preservation_result is None or info_preservation_result.passed)
+            and (contamination_result is None or contamination_result.passed)
         )
 
         if not passed:
@@ -296,6 +324,11 @@ class QualityGate:
                     if info_preservation_result
                     else ""
                 )
+                + (
+                    f", Contamination={contamination_result.passed}"
+                    if contamination_result
+                    else ""
+                )
             )
 
         return FullGateResult(
@@ -304,4 +337,5 @@ class QualityGate:
             similarity_result=sim_result,
             hallucination_result=hallucination_result,
             info_preservation_result=info_preservation_result,
+            contamination_result=contamination_result,
         )

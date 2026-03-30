@@ -1,6 +1,6 @@
 # MCP Discovery Platform — 진행 현황 보고서
 
-> 최종 업데이트: 2026-03-29
+> 최종 업데이트: 2026-03-30
 > 브랜치: `main` + `feat/description-optimizer` (활성)
 
 ---
@@ -20,11 +20,11 @@
 | 항목 | 현재 상태 |
 |------|-----------|
 | 완료된 Phase | Phase 0 ~ Phase 5, Description Optimizer Grounded Optimization |
-| 진행중 | **GEO-P@1 불일치 근본원인 분석** (P@1 평가 완료, δP@1=-0.069) |
+| 진행중 | **Description Optimizer retrieval-aligned 구현 반영 후 MCP-Zero 검증 결과 정리 및 gate tuning 준비** |
 | 다음 Phase | Phase 6 (Reranker) + OQ-2 (Pool 크롤링/인덱싱) |
-| 테스트 | **389 passed** (main 233 + desc-optimizer 156) |
+| 테스트 | **description-optimizer targeted 230 passed** (2026-03-30) |
 | 커버리지 | **92%** (feat/description-optimizer 기준) |
-| Lint/Format | PASS (ruff check + ruff format) |
+| Lint/Format | changed-file `ruff check` PASS, repo-wide ruff는 `scripts/run_e0.py` 기존 이슈 존재 |
 | 외부 서비스 | Qdrant Docker 로컬 + Smithery API + OpenAI API 실제 연동 검증 완료 |
 | PR | #1 (core-pipeline), #2 (ground-truth) 머지 완료 |
 
@@ -34,10 +34,10 @@
 |------|------|
 | Grounded Optimization | 10 tasks 구현 완료 |
 | A/B 비교 (30 tools) | 완료 — 환각 제거 성공, GEO scorer 한계 발견 |
-| **P@1 A/B 평가** | **완료 — δP@1 = -0.069 (검색 성능 저하)** |
-| **핵심 발견** | GEO↑ but P@1↓: 프록시 메트릭이 실제 검색 성능과 불일치 |
-| **다음 단계** | GEO-P@1 불일치 근본원인 분석 → 최적화 전략 재설계 (새 세션) |
-| 상세 보고서 | `data/verification/retrieval_ab_report.json` |
+| **Historical P@1 A/B** | 완료 — `optimized_description` 임베딩 기준 δP@1 = -0.069 |
+| **핵심 발견** | GEO↑ but retrieval↓: 프록시 메트릭과 실제 retrieval objective 불일치 |
+| **현재 방향** | `retrieval_description` canonicalization 완료, MCP-Zero 기준 query-level 재검증 완료 |
+| 상세 보고서 | `docs/analysis/description-optimizer-mcp-zero-validation-20260330.md` |
 
 **P@1 A/B 평가 상세 (2026-03-29):**
 - 36 GT 도구 최적화 → 18 success, 18 gate-rejected
@@ -45,6 +45,19 @@
 - Per-tool: 1 improved (`github::list_issues`), 3 degraded (`math-mcp::median`, `math-mcp::round`, `instagram::GET_USER_MEDIA`), 32 same
 - **결론**: GEO 프록시 메트릭이 검색 성능과 반대 방향 — 근본원인 분석 필요
 - 가설: (a) GEO 차원 무관성 (b) 길이→임베딩 희석 (c) sibling 혼동
+
+**MCP-Zero Offline Validation (2026-03-30):**
+- 평가 셋: `data/raw/mcp_zero_servers.jsonl` + filtered GT `178 queries / 32 tools / 10 servers`
+- optimizer 결과: `7 success / 25 gate_rejected`
+- query-level primary metrics:
+  - `P@1`: `0.2753 → 0.3427` (`+0.0674`)
+  - `Recall@10`: `0.6517 → 0.6629` (`+0.0112`)
+  - `MRR`: `0.4136 → 0.4439` (`+0.0304`)
+- 통계 신호:
+  - `delta P@1` 95% CI: `[+0.0281, +0.1067]`
+  - `delta MRR` 95% CI: `[+0.0069, +0.0529]`
+  - `delta Recall@10` 95% CI: `[-0.0112, +0.0393]`
+- **결론**: retrieval-aligned 방향 전환은 유효. 다만 gate reject 비율이 높아 전체 효과가 제한적이며, 다음 bottleneck은 gate throughput과 long-tail regression control이다.
 
 ---
 

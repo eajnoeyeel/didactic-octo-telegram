@@ -188,6 +188,8 @@ class QdrantStore:
 
     @staticmethod
     def build_tool_text(tool: MCPTool) -> str:
+        if tool.retrieval_description:
+            return f"{tool.tool_name}: {tool.retrieval_description}"
         if tool.description:
             return f"{tool.tool_name}: {tool.description}"
         return tool.tool_name
@@ -199,6 +201,7 @@ class QdrantStore:
             "server_id": tool.server_id,
             "tool_name": tool.tool_name,
             "description": tool.description,
+            "retrieval_description": tool.retrieval_description,
             "input_schema": tool.input_schema,
         }
 
@@ -210,6 +213,7 @@ class QdrantStore:
                 tool_name=payload["tool_name"],
                 tool_id=payload["tool_id"],
                 description=payload.get("description"),
+                retrieval_description=payload.get("retrieval_description"),
                 input_schema=payload.get("input_schema"),
             )
         except (KeyError, Exception) as e:

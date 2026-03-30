@@ -10,7 +10,7 @@ class DescriptionOptimizer(ABC):
 
     Takes an AnalysisReport (with weak dimension info) and optionally
     an OptimizationContext (with input_schema + sibling tools) to produce
-    an optimized description + search description.
+    an optimized description + retrieval description.
     """
 
     @abstractmethod
@@ -26,6 +26,6 @@ class DescriptionOptimizer(ABC):
             context: Optional grounding context with input_schema and sibling tools.
 
         Returns:
-            Dict with keys: 'optimized_description', 'search_description'.
+            Dict with keys: 'optimized_description', 'retrieval_description'.
         """
         ...

@@ -19,6 +19,7 @@ def sample_tools() -> list[MCPTool]:
             tool_name="tool1",
             tool_id="@a/srv::tool1",
             description="First tool",
+            retrieval_description="first retrieval text",
         ),
         MCPTool(
             server_id="@a/srv",
@@ -73,6 +74,25 @@ class TestToolIndexer:
         await indexer.index_tools(sample_tools, batch_size=2)
         # 3 tools with batch_size=2: 2 upsert calls (2 + 1)
         assert mock_store.upsert_tools.call_count == 2
+
+    async def test_index_tools_embeds_retrieval_description_first(
+        self, sample_tools, mock_store
+    ):
+        captured_texts = []
+
+        async def mock_embed_batch(texts, batch_size=50):
+            captured_texts.extend(texts)
+            return [np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32) for _ in texts]
+
+        mock_embedder = AsyncMock(spec=Embedder)
+        mock_embedder.embed_batch = mock_embed_batch
+
+        indexer = ToolIndexer(embedder=mock_embedder, store=mock_store)
+        await indexer.index_tools(sample_tools)
+
+        assert captured_texts[0] == "tool1: first retrieval text"
+        assert captured_texts[1] == "tool2: Second tool"
+        assert captured_texts[2] == "tool3"
 
     async def test_index_empty_list(self, mock_embedder, mock_store):
         indexer = ToolIndexer(embedder=mock_embedder, store=mock_store)

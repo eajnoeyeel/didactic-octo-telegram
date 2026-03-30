@@ -161,14 +161,14 @@ class TestEmbedderFailure:
 
 
 class TestSkipThreshold:
-    """Verify skip logic uses >= comparison at various threshold boundaries."""
+    """Verify retrieval-oriented pipeline never skips based on GEO score."""
 
-    async def test_exactly_at_threshold_skips(self) -> None:
-        """GEO=0.75 with threshold=0.75 → SKIPPED (>= comparison)."""
+    async def test_exactly_at_threshold_still_optimizes(self) -> None:
+        """Even GEO=0.75 with threshold=0.75 should still optimize."""
         pipeline = _build_pipeline(geo_before=0.75, skip_threshold=0.75)
         result = await pipeline.run("server::tool", "description")
 
-        assert result.status == OptimizationStatus.SKIPPED
+        assert result.status == OptimizationStatus.SUCCESS
 
     async def test_just_below_threshold_optimizes(self) -> None:
         """GEO=0.749 with threshold=0.75 → proceeds to optimization → SUCCESS."""
@@ -181,12 +181,12 @@ class TestSkipThreshold:
 
         assert result.status == OptimizationStatus.SUCCESS
 
-    async def test_threshold_zero_skips_everything(self) -> None:
-        """GEO=0.0 with threshold=0.0 → SKIPPED (0.0 >= 0.0)."""
+    async def test_threshold_zero_still_optimizes(self) -> None:
+        """Even threshold=0.0 should not cause GEO-based skipping."""
         pipeline = _build_pipeline(geo_before=0.0, skip_threshold=0.0)
         result = await pipeline.run("server::tool", "description")
 
-        assert result.status == OptimizationStatus.SKIPPED
+        assert result.status == OptimizationStatus.SUCCESS
 
     async def test_threshold_one_skips_only_perfect(self) -> None:
         """GEO=0.99 with threshold=1.0 → proceeds to optimization (0.99 < 1.0) → SUCCESS."""

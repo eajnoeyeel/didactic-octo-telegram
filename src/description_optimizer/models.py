@@ -3,7 +3,14 @@
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 GEO_DIMENSIONS = frozenset(
     {"clarity", "disambiguation", "parameter_coverage", "fluency", "stats", "precision"}
@@ -66,11 +73,20 @@ class OptimizedDescription(BaseModel):
     tool_id: str
     original_description: str
     optimized_description: str
-    search_description: str = Field(description="Embedding-optimized description for vector search")
+    retrieval_description: str = Field(
+        description="Embedding-optimized description for vector search",
+        validation_alias=AliasChoices("retrieval_description", "search_description"),
+        serialization_alias="retrieval_description",
+    )
     geo_score_before: float = Field(ge=0.0, le=1.0)
     geo_score_after: float = Field(ge=0.0, le=1.0)
     status: OptimizationStatus
     skip_reason: str | None = None
+
+    @property
+    def search_description(self) -> str:
+        """Backward-compatible alias for legacy code/tests."""
+        return self.retrieval_description
 
     @computed_field
     @property
