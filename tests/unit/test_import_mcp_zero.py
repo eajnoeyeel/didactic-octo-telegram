@@ -23,12 +23,15 @@ from src.models import TOOL_ID_SEPARATOR, MCPServer, MCPTool
 
 
 def _make_raw_server(
-    server_name: str = "GitHub MCP",
-    server_summary: str = "Interact with GitHub",
-    server_description: str = "A server for GitHub interactions",
+    name: str = "GitHub MCP",
+    summary: str = "Interact with GitHub",
+    description: str = "A server for GitHub interactions",
     tools: list[dict] | None = None,
 ) -> dict:
-    """Build a minimal MCP-Zero server entry for testing."""
+    """Build a minimal MCP-Zero server entry for testing.
+
+    Uses actual MCP-Zero schema: name, description, summary, url, tools.
+    """
     if tools is None:
         tools = [
             {
@@ -42,9 +45,10 @@ def _make_raw_server(
             },
         ]
     return {
-        "server_name": server_name,
-        "server_summary": server_summary,
-        "server_description": server_description,
+        "name": name,
+        "summary": summary,
+        "description": description,
+        "url": "https://github.com/example/mcp",
         "description_embedding": [0.01] * 3072,
         "summary_embedding": [0.02] * 3072,
         "tools": tools,
@@ -165,7 +169,7 @@ class TestConvertServer:
 
     def test_server_id_normalization(self):
         """'My Cool Server' → 'my_cool_server'."""
-        raw = _make_raw_server(server_name="My Cool Server")
+        raw = _make_raw_server(name="My Cool Server")
         server = convert_server(raw)
 
         assert server is not None
@@ -179,9 +183,9 @@ class TestConvertServer:
         assert result is None
 
     def test_missing_server_name_returns_none(self):
-        """Missing server_name key → None."""
+        """Missing name key → None."""
         raw = _make_raw_server()
-        del raw["server_name"]
+        del raw["name"]
         result = convert_server(raw)
 
         assert result is None
@@ -201,8 +205,8 @@ class TestConvertServer:
         assert set(MCPTool.model_fields.keys()) == expected_fields
 
     def test_empty_server_name_returns_none(self):
-        """Empty string server_name → None."""
-        raw = _make_raw_server(server_name="")
+        """Empty string name → None."""
+        raw = _make_raw_server(name="")
         result = convert_server(raw)
 
         assert result is None
@@ -273,10 +277,10 @@ class TestConvertServer:
         assert server.tools[0].tool_name == "tool_a"
         assert server.tools[1].tool_name == "tool_b"
 
-    def test_server_summary_fallback(self):
-        """If server_description is missing, fall back to server_summary."""
+    def test_summary_fallback(self):
+        """If description is missing, fall back to summary."""
         raw = _make_raw_server()
-        del raw["server_description"]
+        del raw["description"]
         server = convert_server(raw)
 
         assert server is not None
@@ -316,18 +320,18 @@ class TestExtractToolEmbeddings:
         assert len(embeddings) == 0
 
     def test_skips_servers_without_name(self):
-        """Servers without server_name are skipped entirely."""
+        """Servers without name are skipped entirely."""
         raw = _make_raw_server()
-        del raw["server_name"]
+        del raw["name"]
         embeddings = extract_tool_embeddings([raw])
 
         assert len(embeddings) == 0
 
     def test_multiple_servers_multiple_tools(self):
         """Correct count across multiple servers."""
-        raw1 = _make_raw_server(server_name="Server A")
+        raw1 = _make_raw_server(name="Server A")
         raw2 = _make_raw_server(
-            server_name="Server B",
+            name="Server B",
             tools=[
                 {
                     "name": "t1",
@@ -359,7 +363,7 @@ class TestLoadMcpZeroJson:
 
     def test_loads_list_format(self, tmp_path):
         """JSON file is a list of server objects."""
-        data = [_make_raw_server(), _make_raw_server(server_name="Second")]
+        data = [_make_raw_server(), _make_raw_server(name="Second")]
         path = tmp_path / "servers.json"
         path.write_text(json.dumps(data))
 

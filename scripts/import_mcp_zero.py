@@ -5,9 +5,11 @@ Pydantic models, and optionally indexes them into Qdrant with pre-computed
 text-embedding-3-large (3072-dim) vectors.
 
 MCP-Zero server entry fields:
-    - server_name: string
-    - server_summary: string
-    - server_description: string
+    - name: string
+    - summary: string
+    - description: string
+    - url: string
+    - readme_file: string
     - description_embedding: float[3072]
     - summary_embedding: float[3072]
     - tools: array of tool objects
@@ -30,7 +32,11 @@ import argparse
 import asyncio
 import json
 import re
+import sys
 from pathlib import Path
+
+# Add project root to path so we can import src.* modules
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import numpy as np
 from loguru import logger
@@ -98,8 +104,8 @@ def convert_server(raw: dict) -> MCPServer | None:
     """Convert a single MCP-Zero server entry to our MCPServer model.
 
     Uses verified MCP-Zero schema fields:
-        - server_name → server_id (normalized), name
-        - server_description → description (fallback: server_summary)
+        - name → server_id (normalized), name
+        - description → description (fallback: summary)
         - tools[].name → tool_name
         - tools[].parameter → input_schema (via parse_parameter_schema)
 
@@ -109,15 +115,15 @@ def convert_server(raw: dict) -> MCPServer | None:
     Returns:
         MCPServer instance or None if conversion fails.
     """
-    server_name = raw.get("server_name", "")
+    server_name = raw.get("name", "")
     if not server_name or not server_name.strip():
-        logger.warning("Server entry missing server_name, skipping")
+        logger.warning("Server entry missing name, skipping")
         return None
 
     server_id = _normalize_server_id(server_name)
 
-    # Description: prefer server_description, fall back to server_summary
-    description = raw.get("server_description") or raw.get("server_summary", "")
+    # Description: prefer description, fall back to summary
+    description = raw.get("description") or raw.get("summary", "")
 
     tools_raw = raw.get("tools") or []
     tools: list[MCPTool] = []
@@ -168,7 +174,7 @@ def extract_tool_embeddings(raw_servers: list[dict]) -> dict[str, list[float]]:
     embeddings: dict[str, list[float]] = {}
 
     for raw in raw_servers:
-        server_name = raw.get("server_name", "")
+        server_name = raw.get("name", "")
         if not server_name or not server_name.strip():
             continue
 
