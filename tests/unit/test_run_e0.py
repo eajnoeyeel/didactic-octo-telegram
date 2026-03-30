@@ -2,13 +2,16 @@
 
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # Ensure scripts/ is importable
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
 
 import pytest
-from run_e0 import _load_pool_server_ids
+from run_e0 import _build_result_payload, _eval_result_to_dict, _load_pool_server_ids, _save_json
+
+from evaluation.metrics import EvalResult
 
 
 class TestLoadPoolServerIds:
@@ -39,3 +42,93 @@ class TestLoadPoolServerIds:
     def test_file_not_found_raises(self) -> None:
         with pytest.raises(FileNotFoundError):
             _load_pool_server_ids(Path("/nonexistent/pool.jsonl"))
+
+
+def _make_eval_result(name: str = "FlatStrategy") -> EvalResult:
+    """Minimal EvalResult for testing."""
+    return EvalResult(
+        strategy_name=name,
+        n_queries=10,
+        n_failed=0,
+        k_used=10,
+        precision_at_1=0.5,
+        recall_at_k=0.7,
+        mrr=0.6,
+        ndcg_at_5=0.55,
+        confusion_rate=0.1,
+        ece=0.05,
+        latency_p50=100.0,
+        latency_p95=200.0,
+        latency_p99=300.0,
+        latency_mean=120.0,
+    )
+
+
+class TestEvalResultToDict:
+    def test_serializes_metrics(self) -> None:
+        result = _make_eval_result()
+        d = _eval_result_to_dict(result)
+        assert d["name"] == "FlatStrategy"
+        assert d["metrics"]["precision_at_1"] == 0.5
+        assert d["metrics"]["latency_p95"] == 200.0
+        assert d["n_queries"] == 10
+
+    def test_excludes_per_query(self) -> None:
+        d = _eval_result_to_dict(_make_eval_result())
+        assert "per_query" not in d
+        assert "per_query" not in d.get("metrics", {})
+
+    def test_none_values_preserved(self) -> None:
+        result = EvalResult(
+            strategy_name="Test",
+            n_queries=1,
+            n_failed=0,
+            k_used=10,
+            precision_at_1=0.0,
+            recall_at_k=0.0,
+            mrr=0.0,
+            ndcg_at_5=0.0,
+            confusion_rate=None,
+            ece=None,
+            latency_p50=0.0,
+            latency_p95=0.0,
+            latency_p99=0.0,
+            latency_mean=0.0,
+        )
+        d = _eval_result_to_dict(result)
+        assert d["metrics"]["confusion_rate"] is None
+        assert d["metrics"]["ece"] is None
+
+    def test_json_serializable(self) -> None:
+        d = _eval_result_to_dict(_make_eval_result())
+        json.dumps(d)  # Should not raise
+
+
+class TestBuildResultPayload:
+    def test_schema_structure(self) -> None:
+        payload = _build_result_payload(
+            experiment="E0",
+            pool_size=308,
+            top_k=10,
+            results=[_make_eval_result()],
+        )
+        assert payload["experiment"] == "E0"
+        assert "timestamp" in payload
+        assert payload["config"]["pool_size"] == 308
+        assert payload["config"]["top_k"] == 10
+        assert payload["config"]["embedding_model"] == "text-embedding-3-large"
+        assert payload["config"]["gt_sources"] == ["seed_set", "mcp_atlas"]
+        assert len(payload["strategies"]) == 1
+
+    def test_timestamp_is_iso_format(self) -> None:
+        payload = _build_result_payload("E0", 50, 10, [_make_eval_result()])
+        datetime.fromisoformat(payload["timestamp"])  # Should not raise
+
+
+class TestSaveJson:
+    def test_creates_file_and_parents(self, tmp_path: Path) -> None:
+        data = {"test": True}
+        out_path = tmp_path / "sub" / "dir" / "out.json"
+        _save_json(data, out_path)
+        assert out_path.exists()
+        assert json.loads(out_path.read_text()) == {"test": True}

@@ -1,7 +1,7 @@
 """E0 Experiment: 1-Layer (FlatStrategy) vs 2-Layer (SequentialStrategy).
 
 Uses MCP-Zero pool (308 servers, 2,797 tools) with combined ground truth
-from seed_set.jsonl (80 entries) and mcp_atlas.jsonl (394 entries).
+from seed_set.jsonl and mcp_atlas.jsonl.
 
 Qdrant collection was built with text-embedding-3-large (3072-dim) vectors.
 The query embedder must match.
@@ -9,14 +9,20 @@ The query embedder must match.
 Usage:
     PYTHONPATH=src uv run python scripts/run_e0.py
     PYTHONPATH=src uv run python scripts/run_e0.py --top-k 10
+    PYTHONPATH=src uv run python scripts/run_e0.py --pool-size 50
+    PYTHONPATH=src uv run python scripts/run_e0.py --sweep
 
-Results saved to: .claude/evals/E0-baseline.log
+Results saved to:
+    .claude/evals/E0-baseline.log  (default run)
+    data/results/e0_result.json    (single run)
+    data/results/e5_scale_sweep.json (sweep mode)
 """
 
 import argparse
 import asyncio
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Add src/ to path so we can import project modules
@@ -48,6 +54,9 @@ POOL_PATH = Path("data/raw/mcp_zero_servers.jsonl")
 # Embedding model must match the Qdrant collection vectors (text-embedding-3-large, 3072-dim)
 E0_EMBEDDING_MODEL = "text-embedding-3-large"
 E0_EMBEDDING_DIMENSION = 3072
+
+RESULTS_DIR = Path("data/results")
+SWEEP_SIZES: list[int] = [5, 20, 50, 100, 200, 308]
 
 
 def _load_pool_server_ids(pool_path: Path, pool_size: int | None = None) -> list[str]:
@@ -117,6 +126,54 @@ def _load_and_filter_gt(pool_server_ids: list[str]) -> list:
     )
 
     return filtered
+
+
+def _eval_result_to_dict(result) -> dict:
+    """Convert EvalResult to JSON-serializable dict (excluding per_query)."""
+    return {
+        "name": result.strategy_name,
+        "metrics": {
+            "precision_at_1": result.precision_at_1,
+            "recall_at_k": result.recall_at_k,
+            "mrr": result.mrr,
+            "ndcg_at_5": result.ndcg_at_5,
+            "confusion_rate": result.confusion_rate,
+            "ece": result.ece,
+            "latency_p50": result.latency_p50,
+            "latency_p95": result.latency_p95,
+            "latency_p99": result.latency_p99,
+            "latency_mean": result.latency_mean,
+        },
+        "n_queries": result.n_queries,
+        "n_failed": result.n_failed,
+    }
+
+
+def _build_result_payload(
+    experiment: str,
+    pool_size: int,
+    top_k: int,
+    results: list,
+) -> dict:
+    """Build the complete JSON payload for one experiment run."""
+    return {
+        "experiment": experiment,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "config": {
+            "pool_size": pool_size,
+            "top_k": top_k,
+            "embedding_model": E0_EMBEDDING_MODEL,
+            "gt_sources": ["seed_set", "mcp_atlas"],
+        },
+        "strategies": [_eval_result_to_dict(r) for r in results],
+    }
+
+
+def _save_json(data: dict, path: Path) -> None:
+    """Write dict as formatted JSON, creating parent directories."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+    logger.info(f"JSON results saved to {path}")
 
 
 async def main(args: argparse.Namespace) -> None:
