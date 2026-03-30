@@ -10,6 +10,7 @@ import json
 
 from import_mcp_zero import (
     convert_server,
+    extract_server_embeddings,
     extract_tool_embeddings,
     load_mcp_zero_json,
     parse_parameter_schema,
@@ -351,6 +352,59 @@ class TestExtractToolEmbeddings:
 
         # 1 from server A + 2 from server B = 3
         assert len(embeddings) == 3
+
+
+# ===========================================================================
+# TestExtractServerEmbeddings
+# ===========================================================================
+
+
+class TestExtractServerEmbeddings:
+    """Test extraction of pre-computed server-level embeddings keyed by server_id."""
+
+    def test_extracts_server_embeddings(self):
+        """Returns dict mapping server_id → embedding vector."""
+        raw_servers = [_make_raw_server()]
+        embeddings = extract_server_embeddings(raw_servers)
+
+        assert "github_mcp" in embeddings
+        assert len(embeddings["github_mcp"]) == 3072
+
+    def test_skips_servers_without_embedding(self):
+        """Servers missing description_embedding are skipped."""
+        raw = _make_raw_server()
+        del raw["description_embedding"]
+        embeddings = extract_server_embeddings([raw])
+
+        assert len(embeddings) == 0
+
+    def test_skips_servers_without_name(self):
+        """Servers without name are skipped entirely."""
+        raw = _make_raw_server()
+        del raw["name"]
+        embeddings = extract_server_embeddings([raw])
+
+        assert len(embeddings) == 0
+
+    def test_multiple_servers(self):
+        """Correct count across multiple servers."""
+        raw1 = _make_raw_server(name="Server A")
+        raw2 = _make_raw_server(name="Server B")
+        raw3 = _make_raw_server(name="Server C")
+        embeddings = extract_server_embeddings([raw1, raw2, raw3])
+
+        assert len(embeddings) == 3
+        assert "server_a" in embeddings
+        assert "server_b" in embeddings
+        assert "server_c" in embeddings
+
+    def test_uses_normalized_server_id_as_key(self):
+        """'My Cool Server' → 'my_cool_server'."""
+        raw = _make_raw_server(name="My Cool Server")
+        embeddings = extract_server_embeddings([raw])
+
+        assert "my_cool_server" in embeddings
+        assert len(embeddings) == 1
 
 
 # ===========================================================================

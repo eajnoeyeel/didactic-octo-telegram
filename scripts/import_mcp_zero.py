@@ -24,6 +24,8 @@ Usage:
     uv run python scripts/import_mcp_zero.py
     uv run python scripts/import_mcp_zero.py --input data/external/mcp-zero/servers.json
     uv run python scripts/import_mcp_zero.py --index  # Also upsert to Qdrant
+    uv run python scripts/import_mcp_zero.py --index --index-servers  # Index both
+    uv run python scripts/import_mcp_zero.py --index-servers          # Servers only
 """
 
 from __future__ import annotations
@@ -195,6 +197,37 @@ def extract_tool_embeddings(raw_servers: list[dict]) -> dict[str, list[float]]:
     return embeddings
 
 
+def extract_server_embeddings(raw_servers: list[dict]) -> dict[str, list[float]]:
+    """Extract pre-computed server-level embeddings keyed by server_id.
+
+    MCP-Zero provides text-embedding-3-large (3072-dim) vectors in each server's
+    ``description_embedding`` field. We extract them keyed by normalized server_id
+    so they can be upserted directly to Qdrant without re-embedding.
+
+    Args:
+        raw_servers: List of raw MCP-Zero server dicts.
+
+    Returns:
+        Dict mapping server_id -> embedding vector (list[float]).
+    """
+    embeddings: dict[str, list[float]] = {}
+
+    for raw in raw_servers:
+        server_name = raw.get("name", "")
+        if not server_name or not server_name.strip():
+            continue
+
+        server_id = _normalize_server_id(server_name)
+
+        embedding = raw.get("description_embedding")
+        if not embedding:
+            continue
+
+        embeddings[server_id] = embedding
+
+    return embeddings
+
+
 def load_mcp_zero_json(input_path: Path) -> list[dict]:
     """Load MCP-Zero servers from JSON file.
 
@@ -307,6 +340,17 @@ def main() -> None:
         default=None,
         help="Qdrant collection name (overrides settings default)",
     )
+    parser.add_argument(
+        "--index-servers",
+        action="store_true",
+        help="Also upsert servers to Qdrant mcp_servers collection (requires QDRANT_URL)",
+    )
+    parser.add_argument(
+        "--server-collection",
+        type=str,
+        default="mcp_servers",
+        help="Qdrant collection name for servers (default: mcp_servers)",
+    )
     args = parser.parse_args()
 
     if not args.input.exists():
@@ -336,27 +380,83 @@ def main() -> None:
 
     logger.info(f"Output: {args.output}")
 
-    if args.index:
+    if args.index or args.index_servers:
+        from qdrant_client import AsyncQdrantClient
+
         from src.config import Settings
 
         settings = Settings()
-
         qdrant_url = args.qdrant_url or settings.qdrant_url
-        collection_name = args.collection or settings.qdrant_collection_name
 
-        # Extract pre-computed embeddings
-        embeddings = extract_tool_embeddings(raw_servers)
-        logger.info(f"Extracted {len(embeddings)} pre-computed tool embeddings")
+        async def _run_indexing() -> None:
+            client = AsyncQdrantClient(url=qdrant_url, api_key=settings.qdrant_api_key)
+            try:
+                if args.index:
+                    tool_embeddings = extract_tool_embeddings(raw_servers)
+                    logger.info(f"Extracted {len(tool_embeddings)} pre-computed tool embeddings")
 
-        asyncio.run(
-            index_to_qdrant(
-                servers=servers,
-                embeddings=embeddings,
-                qdrant_url=qdrant_url,
-                qdrant_api_key=settings.qdrant_api_key,
-                collection_name=collection_name,
-            )
-        )
+                    collection_name = args.collection or settings.qdrant_collection_name
+                    tool_store = QdrantStore(client=client, collection_name=collection_name)
+                    await tool_store.ensure_collection(dimension=MCP_ZERO_EMBEDDING_DIM)
+
+                    tools_with_vectors: list[tuple] = []
+                    skipped = 0
+                    for server in servers:
+                        for tool in server.tools:
+                            vec = tool_embeddings.get(tool.tool_id)
+                            if vec is not None:
+                                tools_with_vectors.append((tool, np.array(vec, dtype=np.float32)))
+                            else:
+                                skipped += 1
+
+                    if skipped > 0:
+                        logger.warning(f"Skipped {skipped} tools without pre-computed embeddings")
+
+                    logger.info(f"Indexing {len(tools_with_vectors)} tools to '{collection_name}'")
+                    batch_size = 50
+                    for i in range(0, len(tools_with_vectors), batch_size):
+                        batch = tools_with_vectors[i : i + batch_size]
+                        await tool_store.upsert_tools([t for t, _ in batch], [v for _, v in batch])
+                    logger.info(f"Tool indexing complete: {len(tools_with_vectors)} tools")
+
+                if args.index_servers:
+                    server_embeddings = extract_server_embeddings(raw_servers)
+                    logger.info(
+                        f"Extracted {len(server_embeddings)} pre-computed server embeddings"
+                    )
+
+                    server_store = QdrantStore(
+                        client=client, collection_name=args.server_collection
+                    )
+                    await server_store.ensure_collection(dimension=MCP_ZERO_EMBEDDING_DIM)
+
+                    servers_with_vectors: list[tuple] = []
+                    skipped_servers = 0
+                    for server in servers:
+                        vec = server_embeddings.get(server.server_id)
+                        if vec is not None:
+                            servers_with_vectors.append((server, np.array(vec, dtype=np.float32)))
+                        else:
+                            skipped_servers += 1
+
+                    if skipped_servers > 0:
+                        logger.warning(f"Skipped {skipped_servers} servers without embeddings")
+
+                    logger.info(
+                        f"Indexing {len(servers_with_vectors)} servers to "
+                        f"'{args.server_collection}'"
+                    )
+                    batch_size = 50
+                    for i in range(0, len(servers_with_vectors), batch_size):
+                        batch = servers_with_vectors[i : i + batch_size]
+                        await server_store.upsert_servers(
+                            [s for s, _ in batch], [v for _, v in batch]
+                        )
+                    logger.info(f"Server indexing complete: {len(servers_with_vectors)} servers")
+            finally:
+                await client.close()
+
+        asyncio.run(_run_indexing())
 
 
 if __name__ == "__main__":
