@@ -106,17 +106,20 @@ class TestEvaluate:
 
 
 class TestExceptionIsolation:
-    async def test_failed_query_is_skipped(self):
+    async def test_failed_query_counted_as_zero_result(self):
+        """Failed queries are included as zero-result entries (not excluded from denominator)."""
         mock_strategy = AsyncMock()
         mock_strategy.search = AsyncMock(side_effect=RuntimeError("network timeout"))
         result = await evaluate(mock_strategy, [_make_entry()], top_k=10)
         assert result.n_queries == 1
         assert result.n_failed == 1
-        assert len(result.per_query) == 0
+        assert len(result.per_query) == 1  # included as zero-result
         assert result.precision_at_1 == 0.0
+        assert result.per_query[0].top_1_correct is False
+        assert result.per_query[0].retrieved_tool_ids == ()
 
-    async def test_partial_failure(self):
-        """One query fails, one succeeds — only successful query contributes to metrics."""
+    async def test_partial_failure_dilutes_metrics(self):
+        """One query fails, one succeeds — failed query counts as incorrect in denominator."""
         mock_strategy = AsyncMock()
         mock_strategy.search = AsyncMock(
             side_effect=[
@@ -128,8 +131,9 @@ class TestExceptionIsolation:
         result = await evaluate(mock_strategy, entries, top_k=10)
         assert result.n_queries == 2
         assert result.n_failed == 1
-        assert len(result.per_query) == 1
-        assert result.precision_at_1 == pytest.approx(1.0)
+        assert len(result.per_query) == 2  # both included
+        # P@1 = 1/2 = 0.5 (failed query counts as incorrect)
+        assert result.precision_at_1 == pytest.approx(0.5)
 
 
 class TestDefaultEvaluator:

@@ -74,7 +74,7 @@ MCP 추천 최적화에서도 아래 분리가 필요하다.
 - 최종 프로젝트 반영 포인트:
   - 평가 축 분리
   - runnable benchmark 설계
-  - tool-use 오류 taxonomy 초안
+  - tool-use 오류 taxonomy 초안 (논문이 명시적 오류 taxonomy를 제공하는지는 본문 확인 필요 — abstract에서는 planning/retrieval/calling 분리 평가만 확인됨)
 
 ## 관련 research 문서
 

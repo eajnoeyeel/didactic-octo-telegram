@@ -1,7 +1,7 @@
 # MCP Discovery Platform — 구현 계획 Hub
 
-> **Source of truth**: 구현 스펙. Phase별 상세는 개별 파일 참조.
-> 각 Phase 파일에 코드 스니펫, 테스트, 파일 구조 포함.
+> 구현 로드맵. Phase별 상세는 개별 파일 참조. 설계 SOT는 `docs/design/`.
+> 이 문서는 target roadmap이며 현재 구현 상태 문서가 아니다. 실제 진행 상태는 `docs/plan/checklist.md`, `docs/progress/status-report.md`를 본다.
 
 ---
 
@@ -25,7 +25,7 @@
 | 언어 | Python 3.12, type hints 필수 |
 | 프레임워크 | FastAPI, pydantic v2 |
 | 벡터 DB | Qdrant Cloud (free tier) |
-| 임베딩 | BGE-M3 or OpenAI `text-embedding-3-small` (실험으로 결정, voyage-code-2 사용 금지) |
+| 임베딩 | BGE-M3, OpenAI `text-embedding-3-small`, OpenAI `text-embedding-3-large` (E2 실험으로 결정, voyage-code-2 사용 금지). MCP-Zero가 `text-embedding-3-large` 3072D pre-computed 벡터 제공 (ADR-0011) |
 | 리랭커 | Cohere Rerank 3 |
 | 트레이싱 | Langfuse (LLM tracing) |
 | 실험 추적 | Weights & Biases |
@@ -36,14 +36,14 @@
 
 ## Phase 요약 테이블
 
-| Phase | 이름 | 상세 파일 | 주요 산출물 |
+| Phase | 이름 | 상세 파일 | 목표 산출물 |
 |-------|------|-----------|-------------|
 | 0 | Project Foundation | [phase-0-2.md](phase-0-2.md) | `pyproject.toml`, `src/config.py`, `src/models.py` |
-| 1 | Data Collection | [phase-0-2.md](phase-0-2.md) | `src/data/crawler.py`, `src/data/mcp_connector.py` |
+| 1 | Data Collection + 외부 데이터 통합 | [phase-0-2.md](phase-0-2.md) | `src/data/crawler.py`, `src/data/mcp_connector.py`, `scripts/import_mcp_zero.py`, `scripts/convert_mcp_atlas.py` |
 | 2 | Embedding & Vector Store | [phase-0-2.md](phase-0-2.md) | `src/embedding/`, `src/retrieval/qdrant_store.py`, `src/data/indexer.py` |
 | 3 | Core Pipeline (Sequential) | [phase-3-5.md](phase-3-5.md) | `src/pipeline/strategy.py`, `src/pipeline/sequential.py` |
 | 4 | Ground Truth Generation | [phase-3-5.md](phase-3-5.md) | `src/data/ground_truth.py`, `data/ground_truth/` |
-| 5 | Evaluation Harness | [phase-3-5.md](phase-3-5.md) | `src/evaluation/`, 6개 core metrics |
+| 5 | Evaluation Harness | [phase-3-5.md](phase-3-5.md) | `src/evaluation/`, 7개 core metrics |
 | 6 | Reranker | [phase-6-8.md](phase-6-8.md) | `src/reranking/`, Cohere + LLM fallback |
 | 7 | Hybrid Search (RRF) | [phase-6-8.md](phase-6-8.md) | `src/retrieval/hybrid.py`, Strategy B (Parallel) |
 | 8 | FastAPI + MCP Tool Server | [phase-6-8.md](phase-6-8.md) | `src/api/`, `/search` endpoint |
@@ -101,8 +101,9 @@ Phase 1 (Data Collection) --> Phase 2 (Embedding & Vector Store)
 - **TDD**: 실패 테스트 먼저 > 구현 > 통과 확인
 - **ABC 패턴**: Embedder, Reranker, Strategy, Evaluator는 추상 클래스
 - **네이밍**
-  - tool_id: `"{server_id}/{tool_name}"`
-  - query_id: `"gt-{category}-{number}"`
+  - tool_id: `"{server_id}::{tool_name}"`
+  - query_id (seed): `"gt-{category}-{number}"` (e.g., `gt-search-001`)
+  - query_id (MCP-Atlas per-step): `"gt-atlas-{task:03d}-s{step:02d}"` (e.g., `gt-atlas-042-s00`, ADR-0012)
 - **커밋**: Phase 단위, `feat: ...` / `test: ...` / `fix: ...` prefix
 - **환경변수**: `.env` + pydantic-settings, 하드코딩 금지
 - **테스트**: 외부 API는 AsyncMock, integration은 `@pytest.mark.skipif(no_api_key)`

@@ -233,8 +233,8 @@ class TestECE:
         correct = [False, False, False, False, False]
         assert compute_ece(confidences, correct, n_bins=5) > 0.5
 
-    def test_empty_returns_zero(self):
-        assert compute_ece([], [], n_bins=10) == 0.0
+    def test_empty_returns_none(self):
+        assert compute_ece([], [], n_bins=10) is None
 
     def test_single_item(self):
         # One item in bin [0.7, 0.8): acc=1.0, conf=0.75 -> ECE = |1.0 - 0.75| = 0.25
@@ -251,13 +251,13 @@ class TestECE:
         ece = compute_ece([0.0], [False], n_bins=10)
         assert ece == pytest.approx(0.0)  # acc=0.0, conf=0.0
 
-    def test_out_of_range_raises(self):
-        with pytest.raises(ValueError, match="confidences must be in"):
-            compute_ece([1.5], [True], n_bins=10)
+    def test_out_of_range_returns_none(self):
+        """Uncalibrated confidences (>1.0) return None instead of raising."""
+        assert compute_ece([1.5], [True], n_bins=10) is None
 
-    def test_negative_confidence_raises(self):
-        with pytest.raises(ValueError, match="confidences must be in"):
-            compute_ece([-0.1, 0.5], [True, False], n_bins=10)
+    def test_negative_confidence_returns_none(self):
+        """Uncalibrated confidences (<0.0) return None instead of raising."""
+        assert compute_ece([-0.1, 0.5], [True, False], n_bins=10) is None
 
 
 class TestLatencyStats:

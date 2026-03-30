@@ -277,3 +277,43 @@ class TestGroundTruthEntryFull:
     def test_with_notes(self):
         gt = GroundTruthEntry(**self._base(notes="test note"))
         assert gt.notes == "test note"
+
+    # --- External dataset source tests (ADR-0011) ---
+
+    def test_external_mcp_atlas_source_valid(self):
+        gt = GroundTruthEntry(
+            **self._base(
+                source="external_mcp_atlas",
+                manually_verified=True,
+                author="scale_ai",
+                query_id="gt-atlas-001",
+                origin_task_id="task-042",
+                step_index=0,
+            )
+        )
+        assert gt.source == "external_mcp_atlas"
+        assert gt.manually_verified is True
+        assert gt.origin_task_id == "task-042"
+        assert gt.step_index == 0
+
+    def test_external_mcp_atlas_requires_manually_verified(self):
+        with pytest.raises(ValueError, match="external_mcp_atlas.*manually_verified"):
+            GroundTruthEntry(
+                **self._base(
+                    source="external_mcp_atlas",
+                    manually_verified=False,
+                )
+            )
+
+    def test_external_mcp_zero_source_valid(self):
+        gt = GroundTruthEntry(
+            **self._base(
+                source="external_mcp_zero",
+                manually_verified=False,
+            )
+        )
+        assert gt.source == "external_mcp_zero"
+
+    def test_invalid_source_rejected(self):
+        with pytest.raises(ValueError):
+            GroundTruthEntry(**self._base(source="unknown_source"))

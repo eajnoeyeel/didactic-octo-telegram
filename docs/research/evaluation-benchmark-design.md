@@ -70,7 +70,7 @@
   - `latency.py`: Latency p50/p95/p99 (Layer별 + 전체)
   - `correlation.py`: Spearman(quality, selection), Regression R²
   - `pass_rate.py`: Pass Rate (자체 MCP 서버 한정, StableToolBench의 Solvable Pass Rate 개념 적용)
-- `data/ground-truth/`: Pydantic schema 기반 Ground Truth
+- `data/ground_truth/`: Pydantic schema 기반 Ground Truth
   - `seed_set.jsonl`: 80개 수동 작성 (Quality Matters 리스크 대응)
   - `synthetic.jsonl`: LLM 생성 (seed_set 패턴 편향 보완)
   - `schema.py`: GroundTruthEntry Pydantic 모델 — query, expected_server, expected_tool, alternative_tools, difficulty, category, domain

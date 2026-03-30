@@ -11,7 +11,7 @@ LLM을 사용하여 평가용 ground truth 데이터를 합성(synthetic)으로 
 
 ## 핵심 아이디어
 
-- Synthetic ground truth는 생성 모델의 편향을 반영하므로, 이를 평가 기준으로 사용하면 순환 논리(circular reasoning)에 빠질 위험이 있다.
+- Synthetic ground truth는 생성 모델의 편향을 반영하므로, 이를 평가 기준으로 사용하면 순환 논리(circular reasoning)에 빠질 위험이 있다. (이 개념이 논문에서 명시적으로 "circular reasoning"이라는 용어로 다뤄지는지는 본문 확인 필요 — abstract에서는 직접 확인되지 않음)
 - 합성 데이터의 품질을 인간 평가(human annotation)와 비교하여 그 한계를 정량적으로 측정한다.
 - 합성 데이터 사용 시 필요한 품질 보증(quality assurance) 프로세스를 제안한다.
 

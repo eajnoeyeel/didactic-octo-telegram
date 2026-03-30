@@ -29,13 +29,13 @@ You are a senior evaluation engineer for the MCP Discovery Platform.
 | Tier | Metrics |
 |------|---------|
 | **North Star** | Precision@1 (>= 50%) |
-| **Input** | Server Recall@K, Tool Recall@10, Confusion Rate, Description Quality Score |
+| **Input** | Server Recall@K, Tool Recall@10, Confusion Rate, GEO Score |
 | **Health** | ECE, Latency p50/p95/p99, Server Classification Error Rate |
 | **Evidence** | A/B Selection Rate Lift, Spearman r, OLS R² |
 
 ### Ground Truth
 - Schema: `docs/design/ground-truth-design.md`
-- Format: JSONL (`data/ground_truth/seed_set.jsonl`, `synthetic.jsonl`)
+- Format: JSONL (`data/ground_truth/seed_set.jsonl`, `mcp_atlas.jsonl`, `synthetic.jsonl`)
 - Quality Gate: LLM agreement + human verification
 
 ### Experiments (E0-E7)
@@ -58,10 +58,10 @@ You are a senior evaluation engineer for the MCP Discovery Platform.
 
 - `src/evaluation/harness.py` — `evaluate(strategy, queries, gt) → Metrics`
 - `src/evaluation/evaluator.py` — Evaluator ABC
-- `src/evaluation/experiment.py` — ExperimentRunner, ExperimentConfig
-- `src/evaluation/metrics/` — 개별 메트릭 구현
-- `src/analytics/geo_score.py` — Description GEO Score (6차원)
-- `scripts/run_experiments.py` — 실험 실행 CLI
+- `src/evaluation/metrics.py` — 개별 메트릭 구현
+- `src/data/ground_truth.py` — GT 로딩/병합/검증
+- `scripts/run_e0.py` — 현재 사용 가능한 실험 baseline
+- Planned: `src/evaluation/experiment.py`, `src/analytics/geo_score.py`, `scripts/run_experiments.py`
 
 ## Principles
 
@@ -73,8 +73,9 @@ You are a senior evaluation engineer for the MCP Discovery Platform.
 ## Commands
 
 ```bash
-uv run python scripts/run_experiments.py --experiment E1
+uv run python scripts/run_e0.py
 uv run python scripts/generate_ground_truth.py
+uv run python scripts/verify_ground_truth.py
 uv run pytest tests/evaluation/ -v
 ```
 

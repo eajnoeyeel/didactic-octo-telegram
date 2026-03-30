@@ -12,11 +12,11 @@ Project-specific profiling and optimization for the retrieval pipeline. For gene
 ### py-spy (Production-safe sampling profiler)
 
 ```bash
-# Profile the FastAPI server under load
-uv run py-spy record -o profile.svg -- uvicorn src.api.main:app
+# Profile the current baseline experiment
+uv run py-spy record -o experiment.svg -- python scripts/run_e0.py
 
-# Profile a specific experiment run
-uv run py-spy record -o experiment.svg -- python scripts/run_experiments.py --experiment E1
+# Planned, after FastAPI app lands:
+# uv run py-spy record -o profile.svg -- uvicorn src.api.main:app
 ```
 
 ### cProfile for specific functions
@@ -137,7 +137,7 @@ async def index_tools_streaming(tools_path: Path, embedder, qdrant, batch_size=5
 
 ```python
 # E1-E3 share the same Ground Truth and index — don't rebuild between runs
-# Use --reuse-index flag in run_experiments.py
+# When `run_experiments.py` lands, prefer a `--reuse-index` style flow
 
 # Profile experiment overhead vs actual pipeline time
 # Most time should be in pipeline, not in metric calculation

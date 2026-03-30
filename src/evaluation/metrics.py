@@ -48,7 +48,8 @@ class EvalResult:
     confusion_rate: float | None
 
     # Calibration (for DP6 confidence branching validation)
-    ece: float  # [0, 1] Expected Calibration Error
+    # None when confidence values are not calibrated (e.g. raw similarity scores)
+    ece: float | None
 
     # Latency (ms)
     latency_p50: float
@@ -133,27 +134,34 @@ def compute_ece(
     confidences: list[float],
     correct: list[bool],
     n_bins: int = 10,
-) -> float:
+) -> float | None:
     """Expected Calibration Error (Naeini et al., AAAI 2015).
 
-    Bins queries by confidence score (rank-1 similarity), then sums the
-    weighted absolute gap between bin accuracy and bin mean confidence.
+    Bins queries by confidence score, then sums the weighted absolute gap
+    between bin accuracy and bin mean confidence.
+
+    Returns None if confidences are not calibrated (outside [0, 1]),
+    since ECE requires calibrated probability estimates to be meaningful.
 
     Args:
-        confidences: Rank-1 similarity score per query (proxy for confidence).
+        confidences: Calibrated confidence per query (must be in [0, 1]).
         correct: Whether rank-1 result was correct per query.
         n_bins: Number of equal-width bins over [0, 1].
 
-    Raises:
-        ValueError: If any confidence is outside [0, 1].
+    Returns:
+        ECE value in [0, 1], or None if confidences are uncalibrated.
     """
     if not confidences:
-        return 0.0
+        return None
     if not all(0.0 <= c <= 1.0 for c in confidences):
+        from loguru import logger
+
         out_min, out_max = min(confidences), max(confidences)
-        raise ValueError(
-            f"compute_ece: confidences must be in [0, 1], got range [{out_min:.3f}, {out_max:.3f}]"
+        logger.warning(
+            f"compute_ece: confidences outside [0,1] (range [{out_min:.3f}, {out_max:.3f}]). "
+            "Returning None — ECE requires calibrated probabilities."
         )
+        return None
     n = len(confidences)
     bin_edges = [i / n_bins for i in range(n_bins + 1)]
     ece = 0.0

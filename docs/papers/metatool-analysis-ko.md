@@ -1,6 +1,6 @@
 # MetaTool: A Benchmark for Large Language Models in Tool Usage
 
-> 출처: ICLR 2024, arxiv:2310.03128
+> 출처: arxiv:2310.03128 (ICLR 2024 게재 여부 미확인 — 공식 proceedings 확인 필요)
 > 한 줄 요약: LLM의 도구 사용 능력을 체계적으로 평가하기 위한 벤치마크로, 특히 유사한 도구 간의 혼동(similar tool confusion)을 독립적인 서브태스크로 분류하여 평가한다.
 
 ---
@@ -27,7 +27,7 @@ LLM이 다수의 도구 후보 중에서 올바른 도구를 선택하는 능력
 
 - "유사 도구 혼동"을 독립적으로 측정 가능한 최초의 체계적 벤치마크
 - 실패 원인 진단이 가능하여, 개선 방향을 구체적으로 제시할 수 있음
-- ICLR 2024에 채택된 신뢰성 높은 연구
+- arXiv preprint (ICLR 2024 게재 여부는 공식 proceedings에서 확인 필요)
 
 ## 한계
 

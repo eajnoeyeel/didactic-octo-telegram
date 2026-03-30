@@ -5,6 +5,7 @@
 ## 기본 정보
 
 - 논문: [RAG-MCP: Mitigating Prompt Bloat in LLM Tool Selection via Retrieval-Augmented Generation](https://arxiv.org/abs/2505.03275)
+- 저자: Tiantian Gan, Qiyao Sun 외
 - 대상 저장소: `/root/rag-mcp`
 - 목적: `MCP 추천 최적화` 프로젝트의 baseline 후보로서 현재 `RAG-MCP` 구현의 연구적 가치와 재사용 가능성을 평가
 

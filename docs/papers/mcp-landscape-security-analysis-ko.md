@@ -6,7 +6,7 @@
 
 - 논문: [Model Context Protocol (MCP): Landscape, Security Threats, and Future Research Directions](https://arxiv.org/abs/2503.23278)
 - 최초 제출일: 2025-03-30
-- 최신 arXiv 개정 확인일: v3, 2025-10-07
+- 최신 arXiv 개정 확인일: v3, 2025-10-07 (재확인 필요 — arXiv에서 최신 버전 다시 체크할 것)
 - 저자: Xinyi Hou 외
 
 ## 무엇을 해결하려는가

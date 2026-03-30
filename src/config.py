@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     top_k_rerank: int = 3
     confidence_gap_threshold: float = 0.15
 
+    # External data (ADR-0011)
+    external_data_dir: str = "data/external"
+
     # Langfuse
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None

@@ -1,6 +1,6 @@
 # 진행 체크리스트
 
-> 최종 업데이트: 2026-03-25
+> 최종 업데이트: 2026-03-30
 > 상세 구현 스펙: `docs/plan/implementation.md`
 > 타임라인: 2026-03-20 ~ 2026-04-26 (5주)
 
@@ -14,24 +14,31 @@
 
 ## 미결 Blockers
 
-### OQ-2: Smithery 크롤링 + Pool 구성 (데이터)
-- [ ] Smithery API rate limit 확인
-- [ ] 크롤링 범위 결정: 카테고리별 5-10개 균형 수집
+### OQ-2: Tool Pool 구성 (MCP-Zero + Smithery 보조) — ADR-0011 — 핵심 완료 (2026-03-30)
+- [x] MCP-Zero 데이터셋 다운로드 → `data/external/mcp-zero/servers.json` (308 servers, 2,797 tools)
+- [x] MCP-Atlas GT 다운로드 → `data/external/mcp-atlas/MCP-Atlas.parquet` (500 human-authored tasks)
+- [x] `scripts/import_mcp_zero.py` 검증된 스키마로 재작성 + 25 unit tests
+- [x] `scripts/import_mcp_zero.py` 실행 → 308 servers, 2,797 tools 변환 완료
+- [x] `scripts/convert_mcp_atlas.py` ADR-0012 per-step 분해 완성 + 17 unit tests
+- [x] `scripts/convert_mcp_atlas.py` 실행 → 394 per-step GT entries (80 tasks, 35 servers)
+- [x] MCP-Atlas per-step GT + self seed 80 병합 검증 (194 covered, query_id 중복 없음)
+- [x] `scripts/run_e0.py` 업데이트 → MCP-Zero pool + 다중 GT 소스 지원
+- [ ] Description Smells 4D vs GEO Score 6D 매핑 테이블 작성 (E7 비교용)
+- [ ] 4종 Pool 정의 (Base, High Similarity, Low Similarity, Description Quality) — MCP-Zero 308 servers에서 선별
+- [ ] Smithery API rate limit 확인 (보조 소스)
 - [ ] `tools/list` 직접 연결 가능한 서버 목록 확인
-- [ ] 4종 Pool 정의 (Base, High Similarity, Low Similarity, Description Quality)
-- [ ] 각 Pool에 포함할 서버 목록 수동 작성
 
 ### OQ-3: 자체 MCP 서버 구축 (A/B 실증)
 - [ ] mcp-arxiv, mcp-calculator, mcp-korean-news 서버 구현
 - [ ] 각 서버 x 2 description 버전 (Version A: Poor, Version B: Good)
 - [ ] 실제 `tools/list` 연결 검증
 
-### OQ-4: Sequential 2-Layer 버그 수정
-- [ ] `sequential.py`를 진짜 2-Layer로 수정 (서버 인덱스 → 필터 → 툴 검색)
+### OQ-4: Sequential 2-Layer 버그 수정 — 부분 해결
+- [x] `sequential.py`를 진짜 2-Layer로 수정 (서버 인덱스 → 필터 → 툴 검색)
 - [ ] Server Classification Error Rate 별도 로깅 추가
 
 ### OQ-5: 2-Layer 아키텍처 유효성 검증 (E0 선행)
-- [ ] 1-Layer 파이프라인 구현 (`src/pipeline/flat.py`)
+- [x] 1-Layer 파이프라인 구현 (`src/pipeline/flat.py`)
 - [ ] E0 실행: 1-Layer vs 2-Layer Sequential vs 2-Layer Parallel
 - [ ] 판정: Precision@1 +5%p 이상 차이 → 2-Layer 유효
 - [ ] CTO 멘토링에서 결과 논의
@@ -77,14 +84,15 @@
 - [x] 검증 스크립트 작성 (`scripts/verify_ground_truth.py`)
 - [ ] 파일럿 검증: seed 20개로 파이프라인 테스트 (Phase 5 이후)
 
-## Phase 5: 평가 하네스 (Week 2)
-- [ ] `src/evaluation/evaluator.py` — Evaluator ABC
-- [ ] Precision@1, Recall@K, Latency, Confusion Rate, ECE, Spearman 구현
-- [ ] `src/evaluation/harness.py` — `evaluate(strategy, queries, gt) → Metrics`
-- [ ] 전체 메트릭 단위 테스트 + E2E 평가 흐름 테스트
+## Phase 5: 평가 하네스 (Week 2) — ✅ 완료 (2026-03-26)
+- [x] `src/evaluation/evaluator.py` — Evaluator ABC
+- [x] Precision@1, Recall@K, MRR, NDCG@5, Confusion Rate, ECE, Latency 구현 (7개 메트릭)
+- [x] `src/evaluation/harness.py` — `evaluate(strategy, queries, gt) → Metrics`
+- [x] 메트릭 단위 테스트 31개 + 하네스 통합 테스트 9개 (총 40개)
 
 ## Phase 6: Reranker (Week 2)
-- [ ] `src/reranking/base.py`, `cohere_reranker.py`, `llm_fallback.py`
+- [x] `src/reranking/base.py`, `cohere_reranker.py`
+- [ ] `src/reranking/llm_fallback.py`
 - [ ] Sequential + Parallel 전략에 Reranker 연결
 - [ ] 단위 테스트
 
@@ -131,7 +139,7 @@
 ## 실험
 
 ### E0: 1-Layer vs 2-Layer 아키텍처 검증 (Week 2 선행)
-- [ ] `src/pipeline/flat.py` 구현
+- [x] `src/pipeline/flat.py` 구현 (100% 커버리지)
 - [ ] E0-A/B/C 실행 (1-Layer, 2-Layer Sequential, 2-Layer Parallel)
 - [ ] 판정: +5%p 이상 → E1 진행. 결과 CTO 공유
 
@@ -140,7 +148,7 @@
 - [ ] 지표: Precision@1, Server Recall@K, Tool Recall@10, MRR, Confusion Rate, Latency
 
 ### E2: 임베딩 모델 비교 (Week 3)
-- [ ] BGE-M3, OpenAI text-embedding-3-small, Voyage voyage-3 비교
+- [ ] BGE-M3, OpenAI text-embedding-3-small, OpenAI text-embedding-3-large (MCP-Zero 제공) 비교
 - [ ] BGE-M3 sparse 기여도 측정 (Dense-only vs Dense+Sparse)
 
 ### E3: Reranker 비교 (Week 3)
@@ -152,13 +160,13 @@
 - [ ] Evidence Triangulation: 3개 중 2개 이상 통과 여부
 
 ### E5: Pool 스케일 (Week 4)
-- [ ] Pool 5/20/50/100에서 Precision@1, Latency, Confusion Rate 측정
+- [ ] Pool 5/20/50/100/200/308에서 Precision@1, Latency, Confusion Rate 측정 (MCP-Zero 활용)
 
 ### E6: Pool 유사도 (Week 4)
 - [ ] Low/Base/High Similarity Pool에서 Confusion Rate, Precision@1, NDCG@5
 
 ### E7: GEO 점수 비교 (OQ-1 해결 후)
-- [ ] 휴리스틱 vs LLM Spearman 비교 + Human agreement (20-30개)
+- [ ] 휴리스틱 vs LLM vs Description Smells 4D Spearman 비교 + Human agreement (20-30개)
 
 ---
 

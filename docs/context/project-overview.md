@@ -1,5 +1,7 @@
 # 프로젝트 개요
 
+> 최종 업데이트: 2026-03-29
+
 ## 목표
 
 MCP Gateway + Analytics Platform — **양면 플랫폼**
@@ -21,7 +23,7 @@ MCP Gateway + Analytics Platform — **양면 플랫폼**
 - 스트레치: >= 65% (Pool 100, high similarity)
 - Alert: < 30% → 전략/임베딩 재검토
 
-## 핵심 테제 (Evidence Triangulation)
+## 핵심 테제 (E4에서 검증할 가설)
 
 **"Description 품질이 높을수록 Tool 선택률이 높아진다"**
 - Primary: A/B Selection Rate Lift > 30%, p < 0.05 (McNemar's test)
@@ -32,11 +34,10 @@ MCP Gateway + Analytics Platform — **양면 플랫폼**
 ## 타임라인
 
 - **4/26 최종 제출** | CTO 멘토링: 매주 화요일 (첫 세션 3/25)
-- Week 1 (3/20): Phase 0-4 — 기반 + 데이터 + Ground Truth
-- Week 2 (3/27): Phase 5-8 — 평가 하네스 + Reranker + API + E1
-- Week 3 (4/3): Phase 9-11 — Analytics + 실험 러너 + E2/E3
-- Week 4 (4/10): E4 (테제 검증) + E5/E6
-- Week 5 (4/17): 보고서 + Provider Analytics 데모
+- Week 1-2 (3/20 - 4/2): Phase 0-5 완료 + 외부 데이터 통합 정렬 + E0 재실행
+- Week 3 (4/3 - 4/9): E1 + E2
+- Week 4 (4/10 - 4/16): E3 + E4 + E5 + E6
+- Week 5 (4/17 - 4/25): E7 + 보고서 + Provider Analytics 데모
 
 ## 기술 스택
 

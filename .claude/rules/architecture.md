@@ -18,50 +18,60 @@ Qdrant Vector Store   Cohere Rerank 3
                    Confidence Branching (gap > 0.15)
 ```
 
-## Module Structure (Canonical Pattern)
+## Module Structure
+
+> 아래는 현재 구현 + 계획을 구분한 구조. [planned]는 미구현.
 
 ```
 src/
-├── models.py              # MCPTool, MCPServer, SearchResult, GroundTruth
+├── models.py              # MCPTool, MCPServer, SearchResult, GroundTruthEntry
 ├── config.py              # pydantic-settings (BaseSettings)
 ├── pipeline/
 │   ├── strategy.py        # PipelineStrategy ABC + StrategyRegistry
+│   ├── flat.py            # 1-Layer (E0 baseline)
 │   ├── sequential.py      # Strategy A
-│   ├── parallel.py        # Strategy B
-│   ├── taxonomy_gated.py  # Strategy C
-│   └── confidence.py      # Gap-based confidence branching
+│   ├── confidence.py      # Gap-based confidence branching
+│   ├── parallel.py        # [planned] Strategy B
+│   └── taxonomy_gated.py  # [planned] Strategy C
 ├── embedding/
 │   ├── base.py            # Embedder ABC
-│   ├── bge_m3.py          # BGE-M3
-│   └── openai_embedder.py # text-embedding-3-small
+│   ├── openai_embedder.py # text-embedding-3-small
+│   └── bge_m3.py          # [planned] BGE-M3
 ├── retrieval/
 │   ├── qdrant_store.py    # Qdrant Cloud wrapper
-│   └── hybrid.py          # RRF fusion
+│   └── hybrid.py          # [planned] RRF fusion
 ├── reranking/
 │   ├── base.py            # Reranker ABC
 │   ├── cohere_reranker.py # Cohere Rerank 3
-│   └── llm_fallback.py    # LLM reranker (low-confidence)
+│   └── llm_fallback.py    # [planned] LLM reranker (low-confidence)
 ├── data/
 │   ├── crawler.py         # Smithery registry crawler
+│   ├── smithery_client.py # Smithery HTTP client
+│   ├── server_selector.py # Server selection logic
 │   ├── mcp_connector.py   # Direct tools/list MCP
 │   ├── ground_truth.py    # GT 생성 + Quality Gate
 │   └── indexer.py         # Batch embed + Qdrant upsert
+data/
+├── external/              # 외부 데이터셋 (Git-ignored, 별도 다운로드)
+│   ├── mcp-zero/          # MCP-Zero 308 servers (repo-local canonical input: servers.json)
+│   ├── mcp-atlas/         # MCP-Atlas GT 원본 (*.parquet, 36 servers, 307 tools)
+│   └── README.md          # 다운로드 방법, 라이선스
+src/
 ├── evaluation/
 │   ├── harness.py         # evaluate(strategy, queries, gt)
 │   ├── evaluator.py       # Evaluator ABC
-│   ├── experiment.py      # ExperimentRunner, ExperimentConfig
-│   └── metrics/           # Precision@1, Recall@K, ECE, etc.
-├── analytics/
-│   ├── logger.py          # Query log (JSONL)
-│   ├── aggregator.py      # Log → ToolStats
-│   ├── geo_score.py       # Description GEO score (GEO 기법 기반 품질 평가)
-│   └── ab_test.py         # A/B test runner
-├── bridge/
-│   ├── mcp_bridge.py      # Bridge MCP Server
-│   ├── proxy.py           # execute_tool → Provider MCP proxy
-│   └── registry.py        # tool_id → ClientSession 매핑 + 세션 풀 관리 (persistent connections)
-└── api/
-    ├── main.py            # FastAPI app
+│   └── metrics.py         # Precision@1, Recall@K, MRR, NDCG@5, Confusion Rate, ECE, Latency
+├── analytics/             # [planned]
+│   ├── logger.py          # [planned] Query log (JSONL)
+│   ├── aggregator.py      # [planned] Log → ToolStats
+│   ├── geo_score.py       # [planned] Description GEO score
+│   └── ab_test.py         # [planned] A/B test runner
+├── bridge/                # [planned]
+│   ├── mcp_bridge.py      # [planned] Bridge MCP Server
+│   ├── proxy.py           # [planned] execute_tool → Provider MCP proxy
+│   └── registry.py        # [planned] tool_id → ClientSession 매핑
+└── api/                   # [planned]
+    ├── main.py            # [planned] FastAPI app
     └── routes/            # search, provider analytics
 ```
 
@@ -72,9 +82,11 @@ src/
 | DP1 | MCP Tool (Bridge) + REST API 이중 노출 |
 | DP2 | 2-Layer (서버 → Tool) 추천 — 서버 수준 필터 후 Tool 매칭 |
 | DP3 | Strategy Pattern — A/B/C 모두 `PipelineStrategy` ABC 구현 |
-| DP5 | Reranker: Cohere Rerank 3 + low-confidence LLM fallback |
+| DP5 | Reranker: Cohere Rerank 3 (`rerank-v3.5`) + low-confidence LLM fallback |
 | DP6 | Confidence 분기: gap 기반 (threshold 0.15) |
 | DP8 | 배포: 로컬 FastAPI → Lambda + API Gateway |
+
+> DP0 (우선순위), DP4 (임베딩 모델 — E2 실험 결정), DP7 (데이터 소스 — ADR-0011로 대체), DP9 (평가 체계)는 `docs/design/architecture.md` 참조.
 
 ## Design Patterns (Mandatory)
 
@@ -126,6 +138,15 @@ result = requests.get(url)  # Use httpx.AsyncClient
 
 # WRONG: voyage-code-2 embedding (DP4 금지)
 embedder = VoyageEmbedder(model="voyage-code-2")  # 코드 특화, MCP description은 자연어
+```
+
+## 외부 데이터 흐름 (ADR-0011)
+
+```
+External Sources (MCP-Zero, MCP-Atlas)
+    ↓ import scripts (import_mcp_zero.py, convert_mcp_atlas.py)
+data/external/ → data/ground_truth/ (변환 후 GT)
+               → Qdrant (인덱싱 후 Tool Pool)
 ```
 
 ## Source of Truth
