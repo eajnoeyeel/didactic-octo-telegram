@@ -1,8 +1,7 @@
 # Description Optimizer — 진행 현황
 
-> 최종 업데이트: 2026-03-28
+> 최종 업데이트: 2026-03-30
 > 브랜치: `feat/description-optimizer`
-> 구현 계획: `docs/superpowers/plans/2026-03-28-description-optimizer.md`
 
 ---
 
@@ -11,13 +10,24 @@
 | 항목 | 상태 |
 |------|------|
 | 브랜치 | `feat/description-optimizer` (main에서 분기) |
-| 테스트 | **58 passed**, 0 failed (description optimizer 관련) |
+| 테스트 | **396 passed** (description optimizer + verification + evaluation) |
 | Lint | PASS |
-| 완료된 Task | Task 1-10 (10개 중 10개) ✅ |
+| Phase 1 (Core) | Task 1-10 완료 ✅ |
+| Phase 2 (Grounded) | boundary→fluency, RAGAS, doc2query, P@1 A/B 완료 ✅ |
+| P@1 A/B 평가 | **δP@1 = -0.069 (검색 성능 저하 확인)** |
+| 근본원인 분석 | **완료** (2026-03-30) |
+| **현재 단계** | **문서 정비 → retrieval 경로 재정렬 → 3-way A/B** |
+
+### 핵심 발견
+
+Grounded optimization은 환각 제거에 성공했으나, retrieval alignment 미해결:
+- GEO +0.19 향상이 P@1 -0.069 하락으로 이어짐
+- 근본원인: `search_description`이 retrieval 경로에 연결되지 않음 + GEO 보상 왜곡
+- 상세: `docs/analysis/description-optimizer-root-cause-analysis.md`
 
 ---
 
-## 완료된 작업
+## Phase 1 완료 작업 (2026-03-28)
 
 ### Task 1: Data Models — ✅ 완료
 - `src/description_optimizer/__init__.py`
@@ -72,3 +82,4 @@
 | `description_optimizer/CLAUDE.md` | 서브프로젝트 규칙, 아키텍처 |
 | `description_optimizer/docs/research-analysis.md` | 학술적 근거 |
 | `description_optimizer/docs/evaluation-design.md` | 평가 설계 |
+| `docs/analysis/description-optimizer-root-cause-analysis.md` | **근본원인 분석 SOT** (2026-03-30) |
