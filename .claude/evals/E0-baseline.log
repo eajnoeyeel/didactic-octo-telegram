@@ -14,3 +14,26 @@ Latency mean (ms)             340.1                299.5
 
 Note: Seed Set only (n=40, 4 servers: instagram, EthanHenrickson/math-mcp, clay-inc/clay-mcp, github)
 Missing from GT: arxiv, brave-search, postgres, yahoo-finance (removed from Smithery)
+
+--- Run: flat ---
+
+============================================================
+E0 EXPERIMENT RESULTS  (n=194, top_k=10, strategy=flat)
+============================================================
+Strategy: Flat
+Metric                        Value
+-------------------- --------------
+precision_at_1                0.309
+recall_at_k                   0.644
+mrr                           0.430
+ndcg_at_5                     0.476
+confusion_rate                0.485
+ece                           0.186
+latency_mean (ms)             141.6
+latency_p50 (ms)              130.3
+latency_p95 (ms)              196.2
+
+Pool: MCP-Zero (292 servers)
+GT sources: seed_set (data/ground_truth/seed_set.jsonl), mcp_atlas (data/ground_truth/mcp_atlas.jsonl)
+Embedding: text-embedding-3-large (3072-dim)
+Entries used: 194 (covered by pool)
