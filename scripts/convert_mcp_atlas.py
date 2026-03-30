@@ -20,7 +20,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import sys
 from pathlib import Path
+
+# Add project root to path so we can import src.models
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from loguru import logger
 
@@ -391,6 +395,10 @@ async def _process_tasks(
 
 def main() -> None:
     """CLI entrypoint for MCP-Atlas → per-step GT conversion."""
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
     parser = argparse.ArgumentParser(
         description="Convert MCP-Atlas parquet → per-step GT JSONL (ADR-0012)"
     )
