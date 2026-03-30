@@ -10,7 +10,7 @@
 | 항목 | 현재 상태 |
 |------|-----------|
 | 완료된 Phase | Phase 0 ~ Phase 5, Description Optimizer Grounded Optimization |
-| 진행중 | **disambiguation 재설계** (3-way A/B 완료, sibling 오염 확인) |
+| 진행중 | **disambiguation 재설계 v2** (코드 완료, P@1 0.375 — 과도한 제거 확인) |
 | 다음 Phase | Phase 6 (Reranker) + OQ-2 (Pool 크롤링/인덱싱) |
 | 테스트 | **389 passed** (main 233 + desc-optimizer 156) |
 | 커버리지 | **92%** (feat/description-optimizer 기준) |
@@ -28,8 +28,17 @@
 | **핵심 발견** | 근본원인 확인: retrieval 경로 불일치 + GEO 보상 왜곡 (분석 완료 2026-03-30) |
 | 3-way A/B 평가 | 완료 — search/optimized 모두 δP@1=-0.069, sibling 오염 근본원인 |
 | 근본원인 분석 | **완료** — `docs/analysis/description-optimizer-root-cause-analysis.md` |
-| **다음 단계** | disambiguation 재설계 (sibling 이름 제거) → 3-way A/B 재검증 |
-| 상세 보고서 | `data/verification/retrieval_ab_report.json` |
+| **disambiguation v2** | 완료 — sibling 이름 제거 성공, 그러나 P@1 0.375 (v1 0.472보다 악화) |
+| **다음 단계** | sibling context 재도입 (이름 없이 카운트/카테고리만) 또는 description 최적화 중단 판단 |
+| 상세 보고서 | `data/verification/retrieval_3way_ab_gt_report_v2.json` |
+
+**Disambiguation v2 실험 결과 (2026-03-30):**
+- 29 success tools, 0 sibling contamination (목표 달성)
+- median P@1: 0.0→1.0 (optimized) — sibling 오염 제거로 정확히 회복
+- 전체 P@1: original 0.5417, search 0.3750, optimized 0.3750
+- v1 대비: search δP@1 -0.097 악화 (v1 -0.069 → v2 -0.167)
+- 새 degradation 5건: modulo, find_duplicates, getGroups, create_branch, GET_POST_COMMENTS
+- **결론**: sibling 이름 제거는 정당하나, context 완전 제거는 과도한 조치. 중간 지점 필요
 
 **P@1 A/B 평가 상세 (2026-03-29):**
 - 36 GT 도구 최적화 → 18 success, 18 gate-rejected
