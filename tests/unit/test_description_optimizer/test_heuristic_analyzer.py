@@ -41,16 +41,72 @@ class TestClarityScoring:
 
 class TestDisambiguationScoring:
     async def test_high_disambiguation(self, analyzer: HeuristicAnalyzer) -> None:
-        desc = "Searches only in the GitHub Issues API, unlike the PR search tool. Does not search code repositories."  # noqa: E501
+        # New scoring: action-object pairs + scope delimiters give high score
+        desc = "Searches for issues specifically within the GitHub Issues API. Limited to issue records only, not pull requests."  # noqa: E501
         report = await analyzer.analyze("s::tool", desc)
         score = next(s for s in report.dimension_scores if s.dimension == "disambiguation")
-        assert score.score >= 0.6
+        assert score.score >= 0.4
 
     async def test_no_disambiguation(self, analyzer: HeuristicAnalyzer) -> None:
         desc = "Search tool for finding things."
         report = await analyzer.analyze("s::tool", desc)
         score = next(s for s in report.dimension_scores if s.dimension == "disambiguation")
         assert score.score <= 0.3
+
+
+class TestDisambiguationRedesign:
+    """Verify disambiguation no longer rewards sibling name contamination."""
+
+    @pytest.fixture
+    def analyzer(self) -> HeuristicAnalyzer:
+        return HeuristicAnalyzer()
+
+    @pytest.mark.asyncio
+    async def test_contrast_phrases_do_not_boost_score(self, analyzer: HeuristicAnalyzer) -> None:
+        """'Unlike X, Y, Z' should NOT increase disambiguation score."""
+        clean = "Calculates the median value of a sorted numeric list."
+        # Adds only a contrast phrase (unlike ...) with no additional action-object pairs
+        contaminated = (
+            "Calculates the median value of a sorted numeric list. "
+            "Unlike addition, subtraction, and division."
+        )
+        report_clean = await analyzer.analyze("s::median", clean)
+        report_dirty = await analyzer.analyze("s::median", contaminated)
+        score_clean = next(
+            s for s in report_clean.dimension_scores if s.dimension == "disambiguation"
+        )
+        score_dirty = next(
+            s for s in report_dirty.dimension_scores if s.dimension == "disambiguation"
+        )
+        # Contaminated text should NOT score higher than clean text
+        assert score_dirty.score <= score_clean.score
+
+    @pytest.mark.asyncio
+    async def test_target_specificity_rewards_action_object(  # noqa: E501
+        self, analyzer: HeuristicAnalyzer
+    ) -> None:
+        """Target-specific descriptions with action+object should score well."""
+        specific = "Calculates the median — the middle value of a sorted numeric list."
+        generic = "Does something with numbers."
+        report_specific = await analyzer.analyze("s::median", specific)
+        report_generic = await analyzer.analyze("s::median", generic)
+        score_specific = next(
+            s for s in report_specific.dimension_scores if s.dimension == "disambiguation"
+        )
+        score_generic = next(
+            s for s in report_generic.dimension_scores if s.dimension == "disambiguation"
+        )
+        assert score_specific.score > score_generic.score
+
+    @pytest.mark.asyncio
+    async def test_domain_qualifier_without_sibling_names(  # noqa: E501
+        self, analyzer: HeuristicAnalyzer
+    ) -> None:
+        """Domain qualifiers like 'specifically for' boost score without sibling names."""
+        desc = "Specifically handles rounding numeric values to the nearest whole integer."
+        report = await analyzer.analyze("s::round", desc)
+        score = next(s for s in report.dimension_scores if s.dimension == "disambiguation")
+        assert score.score > 0.0
 
 
 class TestFluencyScoring:

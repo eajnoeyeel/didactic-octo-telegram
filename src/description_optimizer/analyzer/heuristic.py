@@ -37,19 +37,19 @@ class HeuristicAnalyzer(DescriptionAnalyzer):
         re.IGNORECASE,
     )
 
-    # --- Disambiguation patterns ---
-    _CONTRAST_PHRASES: re.Pattern[str] = re.compile(
-        r"\b(unlike|not to be confused with|as opposed to|different from"
-        r"|specifically for|only for|exclusively)\b",
+    # --- Disambiguation patterns (target-specificity, NO sibling name rewards) ---
+    _UNIQUE_ACTION: re.Pattern[str] = re.compile(
+        r"\b(specifically|exclusively|dedicated to|focused on|specializes in)\b",
         re.IGNORECASE,
     )
-    _DOMAIN_QUALIFIERS: re.Pattern[str] = re.compile(
-        r"\b(only|specifically|exclusively)\b",
+    _ACTION_OBJECT_PAIR: re.Pattern[str] = re.compile(
+        r"\b(calculates? the|retrieves? the|converts? the|rounds? the|finds? the"
+        r"|creates? a|generates? a|searches? for|lists? all|fetches? the"
+        r"|deletes? the|updates? the|sends? a|gets? the|posts? a)\b",
         re.IGNORECASE,
     )
-    _NEGATIVE_INSTRUCTIONS: re.Pattern[str] = re.compile(
-        r"\b(not for|cannot|does not|will not|unable to|should not|won't|isn't|doesn't"
-        r"|not suitable|not designed|limitations?:?)\b",
+    _SCOPE_DELIMITER: re.Pattern[str] = re.compile(
+        r"\b(only for|limited to|restricted to|within the|from the)\b",
         re.IGNORECASE,
     )
 
@@ -162,24 +162,29 @@ class HeuristicAnalyzer(DescriptionAnalyzer):
         score = 0.0
         reasons: list[str] = []
 
-        # Contrast phrases — each +0.3, cap 0.5
-        contrast_matches = self._CONTRAST_PHRASES.findall(desc)
-        contrast_contribution = _clamp(len(contrast_matches) * 0.3, hi=0.5)
-        score += contrast_contribution
-        if contrast_matches:
-            reasons.append(f"contrast_phrases={len(contrast_matches)}")
+        # Action-object pairs — each +0.2, cap 0.4
+        # Rewards descriptions that clearly state WHAT the tool does to WHAT
+        ao_matches = self._ACTION_OBJECT_PAIR.findall(desc)
+        ao_contribution = _clamp(len(ao_matches) * 0.2, hi=0.4)
+        score += ao_contribution
+        if ao_matches:
+            reasons.append(f"action_object_pairs={len(ao_matches)}")
 
-        # Domain qualifiers — each +0.2, cap 0.3
-        qualifier_matches = self._DOMAIN_QUALIFIERS.findall(desc)
-        qualifier_contribution = _clamp(len(qualifier_matches) * 0.2, hi=0.3)
-        score += qualifier_contribution
-        if qualifier_matches:
-            reasons.append(f"domain_qualifiers={len(qualifier_matches)}")
+        # Unique action qualifiers — each +0.2, cap 0.3
+        # Rewards "specifically", "exclusively", "dedicated to" WITHOUT naming siblings
+        unique_matches = self._UNIQUE_ACTION.findall(desc)
+        unique_contribution = _clamp(len(unique_matches) * 0.2, hi=0.3)
+        score += unique_contribution
+        if unique_matches:
+            reasons.append(f"unique_qualifiers={len(unique_matches)}")
 
-        # Negative instructions present — +0.2
-        if self._NEGATIVE_INSTRUCTIONS.search(desc):
-            score += 0.2
-            reasons.append("negative_instructions")
+        # Scope delimiters — each +0.15, cap 0.3
+        # Rewards scope narrowing like "only for", "limited to", "within the"
+        scope_matches = self._SCOPE_DELIMITER.findall(desc)
+        scope_contribution = _clamp(len(scope_matches) * 0.15, hi=0.3)
+        score += scope_contribution
+        if scope_matches:
+            reasons.append(f"scope_delimiters={len(scope_matches)}")
 
         final = _clamp(score)
         return DimensionScore(
