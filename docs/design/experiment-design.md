@@ -3,6 +3,8 @@
 > 최종 업데이트: 2026-03-29
 > 상세 스펙 (입력/출력/코드): `./experiment-details.md`
 
+> 실행 상태 업데이트 (2026-03-31): E4/E7과 `description-optimizer` 후속 실험은 스펙을 보존하되, 현재 로드맵에서는 **최종 backlog**로 미룬다. 먼저 E0-E3와 core pipeline/analytics를 안정화한다.
+
 ---
 
 ## 실험이 답하는 4가지 질문
@@ -22,10 +24,10 @@
 | **E1** | 검색 전략 비교 (Sequential / Parallel / Taxonomy) | Precision@1 | 핵심 실험 |
 | **E2** | 임베딩 모델 비교 (BGE-M3 / OpenAI small / OpenAI large) | Tool Recall@10 | E1 후 진행 |
 | **E3** | Reranker 비교 (Cohere / Cohere+LLM / LLM-only) | Precision@1 향상폭 | E2 후 진행 |
-| **E4** | Description 품질 → 선택률 인과 관계 | A/B Lift > 30% | **가장 중요** (외부 검증: Description Smells +11.6%) |
+| **E4** | Description 품질 → 선택률 인과 관계 | A/B Lift > 30% | **최종 backlog** (스펙 보존) |
 | **E5** | Pool 스케일 (5/20/50/100/200/308 서버) | Precision@1 저하 곡선 | E4와 병렬 |
 | **E6** | Pool 유사도 (Low/Base/High similarity) | Confusion Rate 변화 | E4와 병렬 (MCPAgentBench distractor 방식 참고) |
-| **E7** | GEO 점수 방식 비교 (휴리스틱 vs LLM vs Description Smells 4D) | Spearman(geo_score, selection_rate) | OQ-1 해결 |
+| **E7** | GEO 점수 방식 비교 (휴리스틱 vs LLM vs Description Smells 4D) | Spearman(geo_score, selection_rate) | **E4 후 최종 backlog** |
 
 ---
 
@@ -114,8 +116,9 @@ Phase 5 (OQ-1 해결 후):
 |------|------|------|--------|
 | Week 1-2 | 3/20 - 4/2 | Foundation (Phase 0-5) ✅ + 외부 데이터 통합 + E0 재실행 | seed_set.jsonl (80개), MCP-Zero 인덱싱, MCP-Atlas per-step 분해, E0 baseline |
 | Week 3 | 4/3 - 4/9 | E1 (전략 비교) + E2 (임베딩) | 최적 전략·임베딩 결정 |
-| Week 4 | 4/10 - 4/16 | E3 (Reranker) + E4 (테제 검증) + E5 + E6 | 최적 파이프라인 확정, evidence triangulation |
-| Week 5 | 4/17 - 4/25 | E7 (GEO 점수) + 보고서 작성 + Provider Analytics 데모 | 최종 제출물 |
+| Week 4 | 4/10 - 4/16 | E3 (Reranker) + E5 + E6 | 최적 파이프라인 확정 |
+| Week 5 | 4/17 - 4/25 | 보고서 작성 + Provider Analytics 데모 | 최종 제출물 |
+| Post-core follow-up | 이후 | E4 (테제 검증) + E7 (GEO 점수 비교) | `description-optimizer` 재개 |
 
 ---
 

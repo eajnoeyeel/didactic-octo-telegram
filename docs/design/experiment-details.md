@@ -3,6 +3,8 @@
 > 최종 업데이트: 2026-03-29
 > 실험 허브 (요약/방법론): `./experiment-design.md`
 
+> 실행 상태 업데이트 (2026-03-31): E4/E7 스펙은 삭제하지 않고 유지하지만, 실제 실행은 core pipeline 실험(E0-E3, E5-E6) 이후의 **최종 backlog**로 미룬다.
+
 ---
 
 ## E0: 1-Layer vs 2-Layer 아키텍처 검증
@@ -102,6 +104,7 @@ uv run python scripts/run_e0.py                # Flat + Sequential (Parallel은 
 ## E4: Description 품질 → 선택률 인과 관계 (테제 검증)
 
 > **이 프로젝트에서 가장 중요한 실험.**
+> **실행 우선순위:** 2026-03-31 기준 최종 backlog. 재개 전에 `description_optimizer/docs/development-history.md`를 먼저 읽는다.
 > 외부 검증: Description Smells 논문 (arxiv:2602.18914)이 description 품질 → 선택률 인과 관계를 사전 검증 (+11.6% 개선, p<0.001). 우리의 차별점: smell 유무 비교가 아닌 GEO 기법을 통한 체계적 개선 방법론 제시.
 
 ### Version A / B 작성 기준 (GEO 기반)
@@ -194,6 +197,8 @@ model = sm.OLS(y, sm.add_constant(X)).fit()
 ---
 
 ## E7: GEO 점수 방식 비교 (OQ-1 해결)
+
+> 실행 우선순위: E4 재개 후 follow-up으로만 진행.
 
 | 조건 | 점수 방식 |
 |------|----------|

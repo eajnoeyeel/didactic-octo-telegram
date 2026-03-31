@@ -1,6 +1,7 @@
 # Description Optimizer — Evaluation Design
 
 > 최종 업데이트: 2026-03-30
+> 실행 상태 업데이트 (2026-03-31): 이 설계는 보존하지만 실제 실행은 `description-optimizer` 재개 시점의 **최종 backlog**에서만 진행한다. 재개 전 `development-history.md`를 먼저 읽는다.
 
 ---
 
