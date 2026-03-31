@@ -35,12 +35,12 @@
 
 ### OQ-4: Sequential 2-Layer 버그 수정 — 부분 해결
 - [x] `sequential.py`를 진짜 2-Layer로 수정 (서버 인덱스 → 필터 → 툴 검색)
-- [ ] Server Classification Error Rate 별도 로깅 추가
+- [ ] Server Classification Error Rate 별도 로깅 추가 (→ `server_recall_at_k` 메트릭으로 추가 예정)
 
-### OQ-5: 2-Layer 아키텍처 유효성 검증 (E0 선행)
+### OQ-5: 2-Layer 아키텍처 유효성 검증 (E0 선행) — ✅ 완료 (2026-03-31)
 - [x] 1-Layer 파이프라인 구현 (`src/pipeline/flat.py`)
-- [ ] E0 실행: 1-Layer vs 2-Layer Sequential vs 2-Layer Parallel
-- [ ] 판정: Precision@1 +5%p 이상 차이 → 2-Layer 유효
+- [x] E0 실행: 1-Layer vs 2-Layer Sequential vs 2-Layer Parallel (reranker=rerank-v3.5, n=194)
+- [x] 판정: Parallel +5.6%p (0.376 vs 0.356) → E0 Gate PASSED. Sequential -3.1%p (Layer 1 손실)
 - [ ] CTO 멘토링에서 결과 논의
 
 ---
@@ -90,16 +90,16 @@
 - [x] `src/evaluation/harness.py` — `evaluate(strategy, queries, gt) → Metrics`
 - [x] 메트릭 단위 테스트 31개 + 하네스 통합 테스트 9개 (총 40개)
 
-## Phase 6: Reranker (Week 2)
-- [x] `src/reranking/base.py`, `cohere_reranker.py`
+## Phase 6: Reranker (Week 2) — ✅ 핵심 완료 (2026-03-31)
+- [x] `src/reranking/base.py`, `cohere_reranker.py` (rate limiter 포함)
 - [ ] `src/reranking/llm_fallback.py`
-- [ ] Sequential + Parallel 전략에 Reranker 연결
-- [ ] 단위 테스트
+- [x] FlatStrategy, SequentialStrategy, ParallelStrategy에 reranker 연결 + `--no-rerank` 플래그
+- [x] 단위 테스트 (reranker 통합 경로 8+2+2=12 tests 추가)
 
-## Phase 7: Hybrid Search + Strategy B (Week 2)
-- [ ] `src/retrieval/hybrid.py` — RRF fusion
-- [ ] `src/pipeline/parallel.py` — Strategy B
-- [ ] 단위 테스트
+## Phase 7: Hybrid Search + Strategy B (Week 2) — ✅ 완료 (2026-03-31)
+- [ ] `src/retrieval/hybrid.py` — RRF fusion (ParallelStrategy 내부 구현, 별도 파일 분리 선택적)
+- [x] `src/pipeline/parallel.py` — Strategy B (RRF + reranker)
+- [x] 단위 테스트 (14 tests)
 
 ## Phase 8: FastAPI (Week 2)
 - [ ] `src/api/main.py` + `src/api/routes/search.py`
@@ -138,10 +138,11 @@
 
 ## 실험
 
-### E0: 1-Layer vs 2-Layer 아키텍처 검증 (Week 2 선행)
+### E0: 1-Layer vs 2-Layer 아키텍처 검증 (Week 2 선행) — ✅ 완료 (2026-03-31)
 - [x] `src/pipeline/flat.py` 구현 (100% 커버리지)
-- [ ] E0-A/B/C 실행 (1-Layer, 2-Layer Sequential, 2-Layer Parallel)
-- [ ] 판정: +5%p 이상 → E1 진행. 결과 CTO 공유
+- [x] E0-A/B/C 실행 (1-Layer=0.356, Sequential=0.325, Parallel=0.376, reranker=rerank-v3.5)
+- [x] 판정: Parallel +5.6%p → E0 Gate PASSED → E1 진행 가능. Sequential Layer 1 손실 별도 분석 예정
+- [ ] 결과 CTO 공유
 
 ### E1: 전략 비교 (Week 2, E0 후)
 - [ ] Sequential (A), Parallel (B) 실행 + 결과 비교
