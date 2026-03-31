@@ -4,14 +4,15 @@ E0 EXPERIMENT RESULTS  (n=194, top_k=10)
 ============================================================
 Metric                       FlatStrategy  SequentialStrategy    ParallelStrategy
 -------------------- ------------------------------------------------------------
-Precision@1                         0.356               0.325               0.376
-Recall@K                            0.644               0.407               0.649
-MRR                                 0.469               0.356               0.483
-NDCG@5                              0.502               0.366               0.513
-Confusion Rate                      0.448               0.122               0.438
-ECE                                 0.098               0.100               0.105
-Latency p50 (ms)                   6006.5              6018.3              6007.0
-Latency mean (ms)                  5977.8              6081.8              6019.6
+Precision@1                         0.361               0.325               0.376
+Recall@K                            0.649               0.407               0.649
+Server Recall@K                     0.722               0.423               0.716
+MRR                                 0.474               0.356               0.483
+NDCG@5                              0.507               0.366               0.513
+Confusion Rate                      0.452               0.122               0.438
+ECE                                 0.102               0.100               0.115
+Latency p50 (ms)                    414.0               470.6               405.3
+Latency mean (ms)                   526.3               558.0               464.3
 
 Pool: MCP-Zero (292 servers)
 GT sources: seed_set (data/ground_truth/seed_set.jsonl), mcp_atlas (data/ground_truth/mcp_atlas.jsonl)
