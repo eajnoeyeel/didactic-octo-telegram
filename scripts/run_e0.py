@@ -145,6 +145,7 @@ def _eval_result_to_dict(result) -> dict:
         "metrics": {
             "precision_at_1": result.precision_at_1,
             "recall_at_k": result.recall_at_k,
+            "server_recall_at_k": result.server_recall_at_k,
             "mrr": result.mrr,
             "ndcg_at_5": result.ndcg_at_5,
             "confusion_rate": result.confusion_rate,
@@ -211,6 +212,7 @@ def _format_results_table(
     metrics = [
         ("Precision@1", "precision_at_1"),
         ("Recall@K", "recall_at_k"),
+        ("Server Recall@K", "server_recall_at_k"),
         ("MRR", "mrr"),
         ("NDCG@5", "ndcg_at_5"),
         ("Confusion Rate", "confusion_rate"),
@@ -311,6 +313,7 @@ def _log_wandb_results(eval_results: list[EvalResult]) -> None:
         name = result.strategy_name
         log_data[f"{name}/precision_at_1"] = result.precision_at_1
         log_data[f"{name}/recall_at_k"] = result.recall_at_k
+        log_data[f"{name}/server_recall_at_k"] = result.server_recall_at_k
         log_data[f"{name}/mrr"] = result.mrr
         log_data[f"{name}/ndcg_at_5"] = result.ndcg_at_5
         if result.confusion_rate is not None:

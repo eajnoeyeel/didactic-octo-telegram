@@ -83,6 +83,7 @@ def _make_pq(
     rank_of_correct: int | None = 1,
     confidence: float = 0.9,
     retrieved_tool_ids: tuple[str, ...] | None = None,
+    correct_server_in_top_k: bool = False,
 ) -> PerQueryResult:
     return PerQueryResult(
         query_id=query_id,
@@ -92,6 +93,7 @@ def _make_pq(
         confidence=confidence,
         latency_ms=10.0,
         retrieved_tool_ids=retrieved_tool_ids or ("srv::a",),
+        correct_server_in_top_k=correct_server_in_top_k,
     )
 
 

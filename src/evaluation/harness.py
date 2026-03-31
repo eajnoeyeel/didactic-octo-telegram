@@ -17,6 +17,7 @@ from evaluation.metrics import (
     compute_ndcg_at_5,
     compute_precision_at_1,
     compute_recall_at_k,
+    compute_server_recall_at_k,
 )
 from models import GroundTruthEntry
 from pipeline.confidence import compute_confidence
@@ -81,6 +82,9 @@ class DefaultEvaluator(Evaluator):
 
             top_1_correct = bool(results and results[0].tool.tool_id == entry.correct_tool_id)
             in_top_k = entry.correct_tool_id in retrieved_ids
+            correct_server_in_top_k = any(
+                r.tool.server_id == entry.correct_server_id for r in results
+            )
 
             rank_of_correct: int | None = None
             for i, r in enumerate(results):
@@ -97,6 +101,7 @@ class DefaultEvaluator(Evaluator):
                     confidence=confidence,
                     latency_ms=latency_ms,
                     retrieved_tool_ids=retrieved_ids,
+                    correct_server_in_top_k=correct_server_in_top_k,
                 )
             )
             ndcg_scores.append(compute_ndcg_at_5(results, entry))
@@ -106,6 +111,7 @@ class DefaultEvaluator(Evaluator):
 
         p50, p95, p99, mean_lat = compute_latency_stats(latencies_ms)
         confusion = compute_confusion_rate(per_query)
+        server_recall = compute_server_recall_at_k(per_query)
         result = EvalResult(
             strategy_name=strategy_name,
             n_queries=len(queries),
@@ -121,6 +127,7 @@ class DefaultEvaluator(Evaluator):
             latency_p95=p95,
             latency_p99=p99,
             latency_mean=mean_lat,
+            server_recall_at_k=server_recall,
             per_query=tuple(per_query),
         )
         confusion_str = f"{confusion:.3f}" if confusion is not None else "N/A"
@@ -129,7 +136,8 @@ class DefaultEvaluator(Evaluator):
             f"evaluate done: P@1={result.precision_at_1:.3f}, "
             f"R@{top_k}={result.recall_at_k:.3f}, MRR={result.mrr:.3f}, "
             f"NDCG@5={result.ndcg_at_5:.3f}, ECE={ece_str}, "
-            f"Confusion={confusion_str}, Latency_p95={result.latency_p95:.1f}ms"
+            f"Confusion={confusion_str}, SrvR@K={server_recall:.3f}, "
+            f"Latency_p95={result.latency_p95:.1f}ms"
         )
         if n_failed > 0:
             logger.warning(f"evaluate: {n_failed}/{len(queries)} queries failed")

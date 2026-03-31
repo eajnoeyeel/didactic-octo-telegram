@@ -27,6 +27,7 @@ class PerQueryResult:
     confidence: float  # score of top-1 result (0.0 if empty)
     latency_ms: float
     retrieved_tool_ids: tuple[str, ...]
+    correct_server_in_top_k: bool = False  # correct server_id present in any top-k result
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,10 @@ class EvalResult:
     latency_p95: float
     latency_p99: float
     latency_mean: float
+
+    # Diagnostic: server-level recall (fraction of queries where correct server appeared in top-k)
+    # Useful for diagnosing SequentialStrategy Layer 1 loss (OQ-4)
+    server_recall_at_k: float = 0.0
 
     # Raw per-query data for post-hoc analysis (E4 A/B, E7 correlation)
     per_query: tuple[PerQueryResult, ...] = field(default_factory=tuple)
@@ -193,3 +198,15 @@ def compute_latency_stats(
         float(np.percentile(arr, 99)),
         float(np.mean(arr)),
     )
+
+
+def compute_server_recall_at_k(per_query: list[PerQueryResult]) -> float:
+    """Fraction of queries where the correct server appears in any top-k result.
+
+    Diagnoses SequentialStrategy Layer 1 loss: if the correct server is absent
+    from all top-k results, Layer 1 missed it entirely.  Compare against
+    FlatStrategy (which always scores 1.0 since it searches all tools globally).
+    """
+    if not per_query:
+        return 0.0
+    return sum(1 for r in per_query if r.correct_server_in_top_k) / len(per_query)

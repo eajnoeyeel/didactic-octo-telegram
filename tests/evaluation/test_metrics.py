@@ -16,6 +16,7 @@ from evaluation.metrics import (
     compute_ndcg_at_5,
     compute_precision_at_1,
     compute_recall_at_k,
+    compute_server_recall_at_k,
 )
 
 from .conftest import _make_gt, _make_pq, _make_result
@@ -278,3 +279,29 @@ class TestLatencyStats:
 
     def test_empty_returns_all_zeros(self):
         assert compute_latency_stats([]) == (0.0, 0.0, 0.0, 0.0)
+
+
+class TestServerRecallAtK:
+    def test_all_servers_found(self):
+        pq = [_make_pq(correct_server_in_top_k=True) for _ in range(5)]
+        assert compute_server_recall_at_k(pq) == pytest.approx(1.0)
+
+    def test_no_servers_found(self):
+        pq = [_make_pq(correct_server_in_top_k=False) for _ in range(5)]
+        assert compute_server_recall_at_k(pq) == pytest.approx(0.0)
+
+    def test_partial_server_recall(self):
+        pq = [
+            _make_pq(correct_server_in_top_k=True),
+            _make_pq(correct_server_in_top_k=True),
+            _make_pq(correct_server_in_top_k=False),
+            _make_pq(correct_server_in_top_k=False),
+        ]
+        assert compute_server_recall_at_k(pq) == pytest.approx(0.5)
+
+    def test_empty_returns_zero(self):
+        assert compute_server_recall_at_k([]) == pytest.approx(0.0)
+
+    def test_default_field_is_false(self):
+        pq = _make_pq()  # correct_server_in_top_k defaults to False
+        assert pq.correct_server_in_top_k is False
