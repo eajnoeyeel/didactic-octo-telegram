@@ -8,6 +8,7 @@ from loguru import logger
 from embedding.base import Embedder
 from models import SearchResult
 from pipeline.strategy import PipelineStrategy, StrategyRegistry
+from reranking.base import Reranker
 from retrieval.hybrid import reciprocal_rank_fusion
 from retrieval.qdrant_store import QdrantStore
 
@@ -36,12 +37,14 @@ class ParallelStrategy(PipelineStrategy):
         server_store: QdrantStore,
         top_k_servers: int = 5,
         rrf_k: int = 60,
+        reranker: Reranker | None = None,
     ) -> None:
         self.embedder = embedder
         self.tool_store = tool_store
         self.server_store = server_store
         self.top_k_servers = top_k_servers
         self.rrf_k = rrf_k
+        self.reranker = reranker
 
     async def search(self, query: str, top_k: int) -> list[SearchResult]:
         """Execute parallel 2-Layer retrieval with RRF fusion.
@@ -95,4 +98,6 @@ class ParallelStrategy(PipelineStrategy):
             for i, (tool_id, rrf_score) in enumerate(fused[:top_k])
         ]
         logger.debug(f"RRF fusion: {len(fused)} unique tools -> top {len(results)}")
+        if self.reranker is not None:
+            results = await self.reranker.rerank(query, results, top_k)
         return results

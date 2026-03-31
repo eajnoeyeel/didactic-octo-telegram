@@ -8,6 +8,7 @@ The query embedder must match.
 
 Usage:
     PYTHONPATH=src uv run python scripts/run_e0.py
+    PYTHONPATH=src uv run python scripts/run_e0.py --no-rerank
     PYTHONPATH=src uv run python scripts/run_e0.py --top-k 10
     PYTHONPATH=src uv run python scripts/run_e0.py --pool-size 50
     PYTHONPATH=src uv run python scripts/run_e0.py --sweep
@@ -44,6 +45,8 @@ from evaluation.metrics import EvalResult
 from pipeline.flat import FlatStrategy
 from pipeline.parallel import ParallelStrategy
 from pipeline.sequential import SequentialStrategy
+from reranking.base import Reranker
+from reranking.cohere_reranker import CohereReranker
 from retrieval.qdrant_store import QdrantStore
 
 load_dotenv()
@@ -161,6 +164,7 @@ def _build_result_payload(
     pool_size: int,
     top_k: int,
     results: list,
+    reranker_model: str | None = None,
 ) -> dict:
     """Build the complete JSON payload for one experiment run."""
     return {
@@ -170,6 +174,7 @@ def _build_result_payload(
             "pool_size": pool_size,
             "top_k": top_k,
             "embedding_model": E0_EMBEDDING_MODEL,
+            "reranker": reranker_model or "none",
             "gt_sources": ["seed_set", "mcp_atlas"],
         },
         "strategies": [_eval_result_to_dict(r) for r in results],
@@ -240,19 +245,23 @@ async def _run_strategies(
     server_store: QdrantStore,
     entries: list,
     top_k: int,
+    reranker: Reranker | None = None,
 ) -> list[EvalResult]:
     """Run requested strategies, return list of EvalResults."""
     results: list[EvalResult] = []
 
     for name in strategy_names:
         if name == "flat":
-            strategy = FlatStrategy(embedder=embedder, tool_store=tool_store)
+            strategy = FlatStrategy(
+                embedder=embedder, tool_store=tool_store, reranker=reranker
+            )
         elif name == "sequential":
             strategy = SequentialStrategy(
                 embedder=embedder,
                 tool_store=tool_store,
                 server_store=server_store,
                 top_k_servers=5,
+                reranker=reranker,
             )
         elif name == "parallel":
             strategy = ParallelStrategy(
@@ -260,6 +269,7 @@ async def _run_strategies(
                 tool_store=tool_store,
                 server_store=server_store,
                 top_k_servers=5,
+                reranker=reranker,
             )
         else:
             raise ValueError(f"Unknown strategy: {name}")
@@ -340,6 +350,23 @@ async def main(args: argparse.Namespace) -> None:
     )
     qdrant_client = AsyncQdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key)
 
+    # --- Setup reranker (if COHERE_API_KEY available and not disabled) ---
+    reranker: Reranker | None = None
+    if not args.no_rerank and settings.cohere_api_key:
+        reranker = CohereReranker(
+            api_key=settings.cohere_api_key,
+            model=settings.cohere_rerank_model,
+            max_rpm=args.cohere_rpm,
+        )
+        logger.info(
+            f"Reranker enabled: {settings.cohere_rerank_model} "
+            f"(rate limit: {args.cohere_rpm} rpm)"
+        )
+    elif args.no_rerank:
+        logger.info("Reranker disabled via --no-rerank flag")
+    else:
+        logger.warning("COHERE_API_KEY not set — running without reranker")
+
     sweep_payloads: list[dict] = []
 
     try:
@@ -383,6 +410,7 @@ async def main(args: argparse.Namespace) -> None:
                         "pool_size": actual_pool_size,
                         "top_k": args.top_k,
                         "embedding_model": E0_EMBEDDING_MODEL,
+                        "reranker": settings.cohere_rerank_model if reranker else "none",
                         "gt_sources": ["seed_set", "mcp_atlas"],
                         "n_queries": len(entries),
                     },
@@ -390,7 +418,8 @@ async def main(args: argparse.Namespace) -> None:
 
             # Run evaluation
             eval_results = await _run_strategies(
-                strategy_names, embedder, tool_store, server_store, entries, args.top_k
+                strategy_names, embedder, tool_store, server_store, entries, args.top_k,
+                reranker,
             )
 
             # --- W&B: log results + finish ---
@@ -403,11 +432,13 @@ async def main(args: argparse.Namespace) -> None:
             logger.info(output)
 
             # Build JSON payload
+            reranker_model = settings.cohere_rerank_model if reranker else None
             payload = _build_result_payload(
                 experiment="E0",
                 pool_size=actual_pool_size,
                 top_k=args.top_k,
                 results=eval_results,
+                reranker_model=reranker_model,
             )
             sweep_payloads.append(payload)
 
@@ -416,10 +447,12 @@ async def main(args: argparse.Namespace) -> None:
                 EVAL_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
                 with EVAL_LOG_PATH.open("w") as f:
                     f.write(output)
+                    reranker_label = settings.cohere_rerank_model if reranker else "none"
                     f.write(
                         f"\nPool: MCP-Zero ({actual_pool_size} servers)\n"
                         f"GT sources: seed_set ({GT_SEED_PATH}), mcp_atlas ({GT_ATLAS_PATH})\n"
                         f"Embedding: {E0_EMBEDDING_MODEL} ({E0_EMBEDDING_DIMENSION}-dim)\n"
+                        f"Reranker: {reranker_label}\n"
                         f"Entries used: {len(entries)} (covered by pool)\n"
                     )
                 logger.info(f"Results saved to {EVAL_LOG_PATH}")
@@ -457,6 +490,17 @@ if __name__ == "__main__":
         "--sweep",
         action="store_true",
         help="Run E5 scale sweep: pool sizes [5, 20, 50, 100, 200, 308]",
+    )
+    parser.add_argument(
+        "--no-rerank",
+        action="store_true",
+        help="Disable Cohere reranker (embedding-only baseline)",
+    )
+    parser.add_argument(
+        "--cohere-rpm",
+        type=int,
+        default=10,
+        help="Cohere API rate limit in requests per minute (default: 10 for Trial key)",
     )
     parser.add_argument(
         "--no-wandb",

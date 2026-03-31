@@ -184,6 +184,42 @@ class TestParallelStrategy:
         # Still returns tools from the unfiltered search (List A only)
         assert len(results) == 3
 
+    async def test_search_calls_reranker_when_provided(
+        self, mock_embedder, mock_server_store, mock_tool_store
+    ):
+        """When reranker is provided, it must be called with (query, rrf_results, top_k)."""
+        mock_reranker = AsyncMock()
+        reranked = [make_result("srv1", "tool_a", score=0.95)]
+        mock_reranker.rerank = AsyncMock(return_value=reranked)
+
+        strategy = ParallelStrategy(
+            embedder=mock_embedder,
+            tool_store=mock_tool_store,
+            server_store=mock_server_store,
+            reranker=mock_reranker,
+        )
+        results = await strategy.search("find github tool", top_k=3)
+
+        mock_reranker.rerank.assert_called_once()
+        call_args = mock_reranker.rerank.call_args
+        assert call_args[0][0] == "find github tool"  # query
+        assert len(call_args[0][1]) == 3  # rrf_results (top_k=3)
+        assert call_args[0][2] == 3  # top_k
+        assert results == reranked
+
+    async def test_search_skips_reranker_when_none(
+        self, mock_embedder, mock_server_store, mock_tool_store
+    ):
+        """When reranker is None, RRF results are returned unchanged."""
+        strategy = ParallelStrategy(
+            embedder=mock_embedder,
+            tool_store=mock_tool_store,
+            server_store=mock_server_store,
+            reranker=None,
+        )
+        results = await strategy.search("test", top_k=4)
+        assert len(results) == 4
+
     def test_registered_as_parallel(self):
         assert "parallel" in StrategyRegistry.list_strategies()
         assert StrategyRegistry.get("parallel") is ParallelStrategy

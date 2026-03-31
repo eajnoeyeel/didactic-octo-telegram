@@ -141,6 +141,45 @@ class TestSequentialStrategy:
         with pytest.raises(ValueError, match="top_k must be positive"):
             await strategy.search("test", top_k=0)
 
+    async def test_search_calls_reranker_when_provided(
+        self, mock_embedder, mock_server_store, mock_tool_store
+    ):
+        """When a reranker is provided, it must be called and its output returned."""
+        reranked_results = [make_result("srv1", "reranked_tool", score=0.95)]
+        mock_reranker = AsyncMock()
+        mock_reranker.rerank = AsyncMock(return_value=reranked_results)
+
+        strategy = SequentialStrategy(
+            embedder=mock_embedder,
+            tool_store=mock_tool_store,
+            server_store=mock_server_store,
+            reranker=mock_reranker,
+        )
+        results = await strategy.search("find github tool", top_k=3)
+
+        mock_reranker.rerank.assert_called_once()
+        call_args = mock_reranker.rerank.call_args
+        assert call_args[0][0] == "find github tool"  # query
+        assert len(call_args[0][1]) == 2  # merged results (srv1 + srv2)
+        assert call_args[0][2] == 3  # top_k
+        assert results == reranked_results
+
+    async def test_search_skips_reranker_when_none(
+        self, mock_embedder, mock_server_store, mock_tool_store
+    ):
+        """When reranker is None, merged results are returned directly."""
+        strategy = SequentialStrategy(
+            embedder=mock_embedder,
+            tool_store=mock_tool_store,
+            server_store=mock_server_store,
+            reranker=None,
+        )
+        results = await strategy.search("test", top_k=3)
+
+        assert len(results) == 2
+        assert results[0].tool.server_id == "srv1"
+        assert results[1].tool.server_id == "srv2"
+
     def test_registered_as_sequential(self):
         assert "sequential" in StrategyRegistry.list_strategies()
         assert StrategyRegistry.get("sequential") is SequentialStrategy

@@ -1,5 +1,8 @@
 """Cohere Rerank 3 implementation."""
 
+import asyncio
+import time
+
 import cohere
 from loguru import logger
 
@@ -8,12 +11,24 @@ from reranking.base import Reranker
 
 
 class CohereReranker(Reranker):
-    """Reranker using Cohere Rerank 3 API."""
+    """Reranker using Cohere Rerank 3 API.
 
-    def __init__(self, api_key: str, model: str = "rerank-v3.5") -> None:
+    Includes a token-bucket rate limiter to stay within API rate limits.
+    Default: 10 requests/minute (Cohere Trial key limit).
+    """
+
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "rerank-v3.5",
+        max_rpm: int = 10,
+    ) -> None:
         self._client = cohere.AsyncClientV2(api_key=api_key)
         self._model = model
-        logger.info(f"CohereReranker initialized with model={model!r}")
+        self._max_rpm = max_rpm
+        self._min_interval = 60.0 / max_rpm if max_rpm > 0 else 0.0
+        self._last_call_time = 0.0
+        logger.info(f"CohereReranker initialized with model={model!r}, max_rpm={max_rpm}")
 
     @property
     def model(self) -> str:
@@ -39,6 +54,14 @@ class CohereReranker(Reranker):
             return []
 
         documents = [f"{r.tool.tool_name}: {r.tool.description or ''}" for r in results]
+
+        # Rate limiting: wait if we're calling too fast
+        if self._min_interval > 0:
+            now = time.monotonic()
+            elapsed = now - self._last_call_time
+            if elapsed < self._min_interval:
+                await asyncio.sleep(self._min_interval - elapsed)
+            self._last_call_time = time.monotonic()
 
         try:
             response = await self._client.rerank(

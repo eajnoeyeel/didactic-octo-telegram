@@ -67,6 +67,30 @@ class TestFlatStrategy:
         with pytest.raises(ValueError, match="top_k must be positive"):
             await strategy.search("test", top_k=0)
 
+    async def test_search_calls_reranker_when_provided(self, mock_embedder, mock_tool_store):
+        """FlatStrategy delegates to reranker and returns reranked results."""
+        reranked = [make_search_result(1, 0.95), make_search_result(0, 0.85)]
+        mock_reranker = AsyncMock()
+        mock_reranker.rerank = AsyncMock(return_value=reranked)
+
+        strategy = FlatStrategy(
+            embedder=mock_embedder, tool_store=mock_tool_store, reranker=mock_reranker
+        )
+        results = await strategy.search("find a github tool", top_k=3)
+
+        store_results = [make_search_result(0), make_search_result(1, 0.8)]
+        mock_reranker.rerank.assert_called_once_with("find a github tool", store_results, 3)
+        assert results == reranked
+
+    async def test_search_skips_reranker_when_none(self, mock_embedder, mock_tool_store):
+        """When reranker is None, results come directly from the store without reranking."""
+        strategy = FlatStrategy(embedder=mock_embedder, tool_store=mock_tool_store, reranker=None)
+        results = await strategy.search("test query", top_k=3)
+
+        assert len(results) == 2
+        assert results[0].score == 0.9
+        assert results[1].score == 0.8
+
     def test_registered_as_flat(self):
         assert "flat" in StrategyRegistry.list_strategies()
         assert StrategyRegistry.get("flat") is FlatStrategy
