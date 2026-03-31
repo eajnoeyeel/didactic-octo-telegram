@@ -10,6 +10,15 @@
 
 ---
 
+## Resume Notes
+
+- 2026-03-31 rejected branch `feat/desc-opt-performance-recovery` is **not** an implementation base.
+- Only its failure taxonomy is retained: `weakened_action_object`, `generic_category_insertion`, `unrelated_qualifier`, `length_bloat`, `intent_dilution`.
+- `0.75` rerun and `0.70` fallback both failed, so **do not resume by lowering similarity threshold**.
+- If a future change increases accepted rewrites but lowers aggregate `P@1`/`Recall@10`/`MRR`, stop and classify examples before any further prompt tuning.
+
+---
+
 ### Task 1: Add Gate-Rejection Inventory Tooling
 
 **Files:**

@@ -48,6 +48,7 @@
 | 2026-03-29 | Historical retrieval regression 확인 | `gt_optimized_descriptions.jsonl`, `retrieval_ab_report.json` | `optimized_description`를 그대로 임베딩하면 `P@1`이 하락할 수 있음 |
 | 2026-03-30 | Root cause analysis | `docs/analysis/description-optimizer-root-cause-analysis.md` | 문제는 GEO 자체보다 retrieval 경로 불일치, 보상 왜곡, sibling contamination |
 | 2026-03-30 | Retrieval-aligned refactor + MCP-Zero validation | `mcp_zero_gt_filtered.jsonl`, `mcp_zero_gt_optimized_descriptions.jsonl`, `mcp_zero_query_level_eval.json`, `mcp_zero_retrieval_ab_report.json` | `retrieval_description` 중심 refactor는 query-level `P@1`, `MRR`을 개선했지만 gate reject가 25/32로 높음 |
+| 2026-03-31 | Performance-recovery side branch (`feat/desc-opt-performance-recovery`) | rejected branch, failure taxonomy only retained | accepted rewrite 수는 `7 -> 14`로 늘었지만 aggregate retrieval은 `P@1 0.3315 -> 0.2584`, `Recall@10 0.6629 -> 0.6236`, `MRR 0.4383 -> 0.3876`로 악화. 후속 rerun에서도 `0.75`, `0.70` 모두 실패하여 threshold tuning 중단 결론 확정 |
 | 2026-03-31 | 문서/데이터 정리 + backlog 이동 | 이 문서, 루트 계획 업데이트, superseded artifact 삭제 | feature는 보존하되 현재 로드맵에서는 마지막 backlog로 고정 |
 
 ---
@@ -71,6 +72,37 @@
 - GEO score를 hard gate로 되돌리기
 - sibling tool name을 직접 나열하는 disambiguation 실험 반복
 - 새로운 prompt variation을 먼저 만들고 나중에 gate reject 원인을 해석하기
+- gate throughput만 늘리기 위해 anchor/parameter boilerplate를 허용하는 완화 실험 반복
+
+### 2026-03-31 rejected performance-recovery branch에서 남긴 교훈
+
+`feat/desc-opt-performance-recovery`는 prompt와 quality gate를 더 공격적으로 조정해 accepted rewrite 수를 늘리려는 시도였다. aggregate retrieval이 악화됐으므로 코드는 채택하지 않고, 아래 taxonomy만 재개 시 참고 규칙으로 남긴다.
+
+| taxonomy | 의미 | 재개 시 금지/주의 |
+|----------|------|------------------|
+| `weakened_action_object` | 핵심 동사/목적어 anchor가 약해짐 | 원문 action/object phrase를 access-path 설명으로 대체하지 말 것 |
+| `generic_category_insertion` | 구체 명사를 넓은 범주 명사로 치환 | `data`, `resource`, `system`, `content` 같은 일반명사 확대 금지 |
+| `unrelated_qualifier` | 검색 의도와 무관한 qualifier 추가 | `optional parameters`, `requires path`류 boilerplate 추가 금지 |
+| `length_bloat` | retrieval text가 불필요하게 길어짐 | single-sentence, short anchor 원칙 유지 |
+| `intent_dilution` | grounded지만 query intent보다 넓어짐 | parameter scaffolding이 core action/object보다 앞서지 않게 할 것 |
+
+이 브랜치의 코드는 merge하지 않았고, worktree/branch는 문서 흡수 후 삭제했다.
+
+### performance-recovery validation에서 추가로 확정된 운영 규칙
+
+- `0.75` rerun: `24 success / 8 gate_rejected`였지만 query-level weighted 기준 `Recall@10 -0.0225`, `MRR -0.0022`로 실패
+- `0.70` fallback: `29 success / 3 gate_rejected`였지만 `Recall@10 -0.0843`, `MRR -0.0436`, `P@1 -0.0225`로 더 악화
+- 따라서 **threshold tuning은 여기서 중단**한다.
+- 이후 재개 세션은 "더 많이 통과시키기"보다 accepted text quality와 collision localization에 집중한다.
+- perf-recovery 기준 similarity-only reject가 대부분이었지만, 이를 이유로 threshold를 더 낮추는 방향은 금지한다.
+- 계속 watch할 도구:
+  - `calculator::calculate`
+  - `exa::web_search_exa`
+  - `github::create_issue`
+  - `filesystem::read_file`
+  - `github::list_issues`
+  - `airtable::list_records`
+  - `fetch::fetch`
 
 ---
 
