@@ -13,3 +13,5 @@ data/external/mcp-atlas/
 
 # Experiment results (generated, not committed)
 data/results/
+# W&B run logs
+wandb/
