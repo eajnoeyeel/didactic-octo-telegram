@@ -1,31 +1,32 @@
 # Ground Truth Schema — Pydantic 모델, JSON 예시, 검증 규칙
 
-> 최종 업데이트: 2026-03-22
+> 최종 업데이트: 2026-03-29
 > 설계 개요/Seed 전략: `./ground-truth-design.md`
+> ADR: `../adr/0012-per-step-ground-truth-decomposition.md`
 
 ---
 
 ## Pydantic 모델
 
 ```python
-from pydantic import BaseModel, Field
-from enum import Enum
-from typing import Optional
+from pydantic import BaseModel, Field, field_validator, model_validator, ValidationInfo
+from enum import StrEnum
+from typing import Literal
 
 
-class Difficulty(str, Enum):
+class Difficulty(StrEnum):
     EASY = "easy"        # 명시적 키워드 매칭 (e.g., "search papers" → search_papers)
     MEDIUM = "medium"    # 의미적 유사 (e.g., "find academic research" → search_papers)
     HARD = "hard"        # 모호/다의적 (e.g., "help me with my research" → 여러 후보)
 
 
-class Ambiguity(str, Enum):
+class Ambiguity(StrEnum):
     LOW = "low"          # 정답이 하나로 명확
     MEDIUM = "medium"    # 2-3개 후보, 최선 구분 가능
     HIGH = "high"        # 여러 Tool이 비슷하게 적합
 
 
-class Category(str, Enum):
+class Category(StrEnum):
     SEARCH = "search"
     CODE = "code"
     DATABASE = "database"
@@ -36,11 +37,17 @@ class Category(str, Enum):
     GENERAL = "general"
 
 
+TOOL_ID_SEPARATOR = "::"
+
+
 class GroundTruthEntry(BaseModel):
-    """단일 Ground Truth 엔트리 — 하나의 (쿼리, 정답) 쌍"""
+    """단일 Ground Truth 엔트리 — 하나의 (쿼리, 정답 tool) 쌍.
+
+    모든 GT는 single-tool / single-step (ADR-0012).
+    """
 
     # 필수 필드 — 모든 지표 계산에 필요
-    query_id: str = Field(description="고유 ID, e.g., 'gt-search-001'")
+    query_id: str = Field(description="고유 ID, e.g., 'gt-search-001', 'gt-atlas-042-s00'")
     query: str = Field(description="자연어 쿼리")
     correct_server_id: str = Field(description="정답 MCP 서버 ID")
     correct_tool_id: str = Field(
@@ -53,19 +60,37 @@ class GroundTruthEntry(BaseModel):
     ambiguity: Ambiguity
 
     # 메타데이터 — 품질 관리
-    source: str = Field(
-        description="'manual_seed' | 'llm_synthetic' | 'llm_verified'"
-    )
+    source: Literal[
+        "manual_seed",
+        "llm_synthetic",
+        "llm_verified",
+        "external_mcp_atlas",
+        "external_mcp_zero",
+    ] = Field(description="Origin of this ground truth entry")
     manually_verified: bool = Field(default=False)
     author: str = Field(description="작성자 ID 또는 'gpt-4o-mini' 등")
     created_at: str = Field(description="ISO 8601 날짜")
+    task_type: Literal["single_step"] = Field(
+        default="single_step",
+        description="모든 GT는 single_step (ADR-0012 per-step 분해)"
+    )
+
+    # Lineage 필드 — MCP-Atlas 원본 추적 (ADR-0012)
+    origin_task_id: str | None = Field(
+        default=None,
+        description="MCP-Atlas 원본 task ID (e.g., 'atlas-task-042'). Seed set은 None."
+    )
+    step_index: int | None = Field(
+        default=None,
+        description="원본 trajectory 내 위치 (0-indexed). Seed set은 None."
+    )
 
     # 선택 필드 — NDCG graded relevance용
-    alternative_tools: Optional[list[str]] = Field(
+    alternative_tools: list[str] | None = Field(
         default=None,
         description="부분 관련 대안 Tool ID 목록 (relevance_grade=1)"
     )
-    notes: Optional[str] = Field(
+    notes: str | None = Field(
         default=None, description="어노테이션 메모"
     )
 ```
@@ -85,24 +110,26 @@ class GroundTruthEntry(BaseModel):
 | `alternative_tools` | NDCG@5 graded relevance (정답=2, 대안=1, 기타=0) |
 | `manually_verified` | seed set vs synthetic 구분, 품질 기준점 |
 | `source` | 데이터 품질 추적 |
+| `origin_task_id` | MCP-Atlas per-step 분해 추적 |
+| `step_index` | 원본 trajectory 내 위치 추적 |
 
 ---
 
 ## JSON 예시 (JSONL 형식)
 
-**Easy** — 키워드 직접 매칭:
+**Easy** — 키워드 직접 매칭 (self seed):
 ```jsonl
-{"query_id":"gt-search-001","query":"find recent papers about transformer architectures","correct_server_id":"semantic_scholar","correct_tool_id":"semantic_scholar::search_papers","difficulty":"easy","category":"search","ambiguity":"low","source":"manual_seed","manually_verified":true,"author":"iyeonjae","created_at":"2026-03-20","alternative_tools":["mcp_arxiv::search_arxiv"],"notes":"키워드 'papers'가 명시적으로 매칭됨"}
+{"query_id":"gt-search-001","query":"find recent papers about transformer architectures","correct_server_id":"semantic_scholar","correct_tool_id":"semantic_scholar::search_papers","difficulty":"easy","category":"search","ambiguity":"low","source":"manual_seed","manually_verified":true,"author":"iyeonjae","created_at":"2026-03-20","task_type":"single_step","origin_task_id":null,"step_index":null,"alternative_tools":["mcp_arxiv::search_arxiv"],"notes":"키워드 'papers'가 명시적으로 매칭됨"}
 ```
 
-**Medium** — 의미적 연결:
+**Hard** — 모호/다의적 (self seed):
 ```jsonl
-{"query_id":"gt-search-002","query":"I need academic research on attention mechanisms","correct_server_id":"semantic_scholar","correct_tool_id":"semantic_scholar::search_papers","difficulty":"medium","category":"search","ambiguity":"medium","source":"manual_seed","manually_verified":true,"author":"iyeonjae","created_at":"2026-03-20","alternative_tools":["mcp_arxiv::search_arxiv"],"notes":"'academic research'가 의미적으로 papers와 연결"}
+{"query_id":"gt-search-003","query":"help me with my research","correct_server_id":"semantic_scholar","correct_tool_id":"semantic_scholar::search_papers","difficulty":"hard","category":"search","ambiguity":"high","source":"manual_seed","manually_verified":true,"author":"iyeonjae","created_at":"2026-03-20","task_type":"single_step","origin_task_id":null,"step_index":null,"alternative_tools":["mcp_arxiv::search_arxiv","google_scholar::search"],"notes":"'research'가 모호 — 논문? 웹 검색? 데이터 분석?"}
 ```
 
-**Hard** — 모호/다의적:
+**External (MCP-Atlas per-step 분해)** — human-authored 기반:
 ```jsonl
-{"query_id":"gt-search-003","query":"help me with my research","correct_server_id":"semantic_scholar","correct_tool_id":"semantic_scholar::search_papers","difficulty":"hard","category":"search","ambiguity":"high","source":"manual_seed","manually_verified":true,"author":"iyeonjae","created_at":"2026-03-20","alternative_tools":["mcp_arxiv::search_arxiv","google_scholar::search"],"notes":"'research'가 모호 — 논문? 웹 검색? 데이터 분석?"}
+{"query_id":"gt-atlas-042-s00","query":"Search for Python repositories on GitHub with more than 1000 stars","correct_server_id":"github","correct_tool_id":"github::search_repositories","difficulty":"medium","category":"code","ambiguity":"low","source":"external_mcp_atlas","manually_verified":true,"author":"scale_ai+llm_decomposed","created_at":"2026-03-29","task_type":"single_step","origin_task_id":"atlas-task-042","step_index":0,"alternative_tools":null,"notes":"MCP-Atlas task per-step 분해 (step 0 of 3)"}
 ```
 
 ---
@@ -163,7 +190,7 @@ def load_ground_truth(
 
 
 def merge_ground_truth(*paths: Path) -> list[GroundTruthEntry]:
-    """여러 JSONL 파일 합침 (seed + synthetic).
+    """여러 JSONL 파일 합침 (seed + mcp_atlas + synthetic).
     query_id 중복 검사 수행."""
     ...
 
@@ -180,8 +207,9 @@ def split_by_difficulty(
 ## 검증 규칙
 
 ### query_id 형식
-- 패턴: `gt-{category}-{number}` (e.g., `gt-search-001`)
+- Seed set: `gt-{category}-{number}` (e.g., `gt-search-001`)
 - A/B 테스트 쿼리: `gt-ab-{server}-{number}` (e.g., `gt-ab-arxiv-001`)
+- MCP-Atlas per-step 분해: `gt-atlas-{task:03d}-s{step:02d}` (e.g., `gt-atlas-042-s00`)
 - 전체 셋에서 unique해야 함
 
 ### tool_id 형식
@@ -193,7 +221,10 @@ def split_by_difficulty(
 - `difficulty`가 hard이면 `ambiguity`는 medium 또는 high
 - `ambiguity`가 medium 이상이면 `alternative_tools`는 비어 있지 않아야 함
 - `source`가 `manual_seed`이면 `manually_verified`는 True
+- `source`가 `external_mcp_atlas`이면 `manually_verified`는 True, `author`는 `"scale_ai+llm_decomposed"`
+- `source`가 `external_mcp_atlas`이면 `origin_task_id`와 `step_index`는 non-null
 - `created_at`은 유효한 ISO 8601 날짜
+- `task_type`은 항상 `"single_step"` (ADR-0012)
 
 ### JSONL 형식 규칙
 - 한 줄 = 한 엔트리 (줄바꿈 없음)

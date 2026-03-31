@@ -56,6 +56,7 @@ class MCPTool(BaseModel):
     tool_name: str
     tool_id: str
     description: str | None = None
+    retrieval_description: str | None = None
     input_schema: dict | None = None
 
     @computed_field
@@ -135,12 +136,28 @@ class GroundTruthEntry(BaseModel):
     ambiguity: Ambiguity
 
     # Provenance
-    source: Literal["manual_seed", "llm_synthetic", "llm_verified"] = Field(
-        description="Origin of this ground truth entry"
-    )
+    source: Literal[
+        "manual_seed",
+        "llm_synthetic",
+        "llm_verified",
+        "external_mcp_atlas",
+        "external_mcp_zero",
+    ] = Field(description="Origin of this ground truth entry")
     manually_verified: bool = False
     author: str = Field(description="Author ID or model name")
     created_at: str = Field(description="ISO 8601 date")
+
+    # ADR-0012: task type and lineage
+    task_type: Literal["single_step"] = Field(
+        default="single_step", description="Always single_step (ADR-0012)"
+    )
+    origin_task_id: str | None = Field(
+        default=None, description="MCP-Atlas original task ID (null for seed/synthetic)"
+    )
+    step_index: int | None = Field(
+        default=None,
+        description="0-indexed step position in original task (null for seed/synthetic)",
+    )
 
     # Optional — graded relevance for NDCG@5
     alternative_tools: list[str] | None = None
@@ -170,4 +187,13 @@ class GroundTruthEntry(BaseModel):
         # manual_seed must be manually verified
         if self.source == "manual_seed" and not self.manually_verified:
             raise ValueError("source='manual_seed' entries must have manually_verified=True")
+        # external_mcp_atlas (human-authored) must be manually verified
+        if self.source == "external_mcp_atlas" and not self.manually_verified:
+            raise ValueError("source='external_mcp_atlas' entries must have manually_verified=True")
+        # external_mcp_atlas requires lineage fields (ADR-0012)
+        if self.source == "external_mcp_atlas":
+            if self.origin_task_id is None or self.step_index is None:
+                raise ValueError(
+                    "source='external_mcp_atlas' entries must have origin_task_id and step_index"
+                )
         return self

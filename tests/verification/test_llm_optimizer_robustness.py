@@ -55,8 +55,9 @@ class TestMalformedJSON:
         optimizer = LLMDescriptionOptimizer(client=client)
         report = _make_report()
 
-        with pytest.raises(ValueError, match="optimized_description"):
-            await optimizer.optimize(report)
+        result = await optimizer.optimize(report)
+        assert result["optimized_description"] == "desc"
+        assert result["retrieval_description"] == "desc"
 
     async def test_missing_search_description_key(self) -> None:
         content = json.dumps({"optimized_description": "value", "wrong": "desc"})
@@ -110,6 +111,7 @@ class TestExtraKeysInResponse:
         result = await optimizer.optimize(report)
 
         assert result["optimized_description"] == "Optimized tool description."
+        assert result["retrieval_description"] == "Search-ready description."
         assert result["search_description"] == "Search-ready description."
         assert "extra_field" not in result
 
@@ -131,6 +133,7 @@ class TestEmptyDescriptions:
         result = await optimizer.optimize(report)
 
         assert result["optimized_description"] == ""
+        assert result["retrieval_description"] == "Some search desc"
         assert result["search_description"] == "Some search desc"
 
     async def test_very_long_response(self) -> None:
@@ -148,6 +151,7 @@ class TestEmptyDescriptions:
         result = await optimizer.optimize(report)
 
         assert len(result["optimized_description"]) >= 2500
+        assert result["retrieval_description"] == "Short search description."
         assert result["search_description"] == "Short search description."
 
 

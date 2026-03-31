@@ -94,7 +94,6 @@ async def main() -> None:
         optimizer=optimizer,
         embedder=embedder,
         gate=gate,
-        skip_threshold=0.75,
     )
 
     # 최적화 실행
@@ -130,7 +129,7 @@ async def main() -> None:
             "tool_id": tid,
             "original_description": tool.description,
             "optimized_description": result.optimized_description,
-            "search_description": result.search_description,
+            "retrieval_description": result.retrieval_description,
             "geo_score_before": result.geo_score_before,
             "geo_score_after": result.geo_score_after,
             "status": result.status.value,
@@ -148,10 +147,8 @@ async def main() -> None:
     # 요약
     success = sum(1 for r in results if r["status"] == "success")
     rejected = sum(1 for r in results if r["status"] == "gate_rejected")
-    skipped = sum(1 for r in results if r["status"] == "skipped")
     logger.info(
-        f"Results: {success} success, {rejected} gate_rejected, "
-        f"{skipped} skipped / {len(results)} total"
+        f"Results: {success} success, {rejected} gate_rejected / {len(results)} total"
     )
     logger.info(f"Saved to {OUTPUT_PATH}")
 

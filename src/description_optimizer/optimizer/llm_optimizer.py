@@ -15,7 +15,7 @@ from description_optimizer.optimizer.prompts import (
 
 
 class LLMDescriptionOptimizer(DescriptionOptimizer):
-    """Optimizes tool descriptions using GPT-4o-mini with dimension-aware prompting."""
+    """Optimizes tool descriptions using GPT-4o-mini with retrieval-aware prompting."""
 
     def __init__(
         self,
@@ -32,14 +32,14 @@ class LLMDescriptionOptimizer(DescriptionOptimizer):
         report: AnalysisReport,
         context: OptimizationContext | None = None,
     ) -> dict[str, str]:
-        """Optimize a description based on its GEO analysis report.
+        """Optimize a description for retrieval while keeping GEO diagnostics available.
 
         Args:
             report: AnalysisReport with dimension scores.
             context: Optional grounding context with input_schema and sibling tools.
 
         Returns:
-            Dict with 'optimized_description' and 'search_description'.
+            Dict with 'optimized_description' and 'retrieval_description'.
         """
         weak_dims = report.weak_dimensions(threshold=0.5)
         dim_scores = {s.dimension: s.score for s in report.dimension_scores}
@@ -78,9 +78,23 @@ class LLMDescriptionOptimizer(DescriptionOptimizer):
             logger.error(f"Failed to parse LLM response as JSON: {content[:200]}")
             raise
 
-        if "optimized_description" not in result or "search_description" not in result:
+        retrieval_description = (
+            result["retrieval_description"]
+            if "retrieval_description" in result
+            else result.get("search_description")
+        )
+        optimized_description = (
+            result["optimized_description"]
+            if "optimized_description" in result
+            else retrieval_description
+        )
+
+        if optimized_description is None or retrieval_description is None:
             logger.error(f"LLM response missing required keys: {list(result.keys())}")
-            msg = "LLM response must contain 'optimized_description' and 'search_description'"
+            msg = (
+                "LLM response must contain 'optimized_description' and "
+                "'retrieval_description' (or legacy 'search_description')"
+            )
             raise ValueError(msg)
 
         logger.info(
@@ -88,10 +102,12 @@ class LLMDescriptionOptimizer(DescriptionOptimizer):
             f"weak_dims={weak_dims}, "
             f"grounded={'yes' if context else 'no'}, "
             f"original_len={len(report.original_description)}, "
-            f"optimized_len={len(result['optimized_description'])}"
+            f"optimized_len={len(optimized_description)}, "
+            f"retrieval_len={len(retrieval_description)}"
         )
 
         return {
-            "optimized_description": result["optimized_description"],
-            "search_description": result["search_description"],
+            "optimized_description": optimized_description,
+            "retrieval_description": retrieval_description,
+            "search_description": retrieval_description,
         }

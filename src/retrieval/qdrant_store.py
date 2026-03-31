@@ -34,7 +34,38 @@ class QdrantStore:
             raise
         existing = [c.name for c in collections.collections]
         if self.collection_name in existing:
-            logger.info(f"Collection '{self.collection_name}' already exists")
+            # Validate existing collection schema matches expected dimension/distance
+            try:
+                info = await self.client.get_collection(self.collection_name)
+                config = info.config.params.vectors
+                if isinstance(config, VectorParams):
+                    existing_dim = config.size
+                    existing_dist = config.distance
+                elif isinstance(config, dict) and "" in config:
+                    existing_dim = config[""].size
+                    existing_dist = config[""].distance
+                else:
+                    logger.warning(
+                        f"Collection '{self.collection_name}' has unexpected vector config type. "
+                        "Skipping schema validation."
+                    )
+                    return
+                if existing_dim != dimension:
+                    raise ValueError(
+                        f"Collection '{self.collection_name}' dimension mismatch: "
+                        f"expected {dimension}, found {existing_dim}. "
+                        "Delete the collection or use matching embedding_dimension."
+                    )
+                if existing_dist != Distance.COSINE:
+                    raise ValueError(
+                        f"Collection '{self.collection_name}' distance mismatch: "
+                        f"expected COSINE, found {existing_dist}."
+                    )
+            except ValueError:
+                raise
+            except Exception as e:
+                logger.warning(f"Could not validate collection schema: {e}")
+            logger.info(f"Collection '{self.collection_name}' already exists (dim={dimension} OK)")
             return
         try:
             await self.client.create_collection(
@@ -47,6 +78,10 @@ class QdrantStore:
         logger.info(f"Created collection '{self.collection_name}' (dim={dimension})")
 
     async def upsert_tools(self, tools: list[MCPTool], vectors: list[np.ndarray]) -> None:
+        if len(tools) != len(vectors):
+            raise ValueError(
+                f"tools/vectors length mismatch: {len(tools)} tools vs {len(vectors)} vectors"
+            )
         points = [
             PointStruct(
                 id=self.generate_point_id(tool.tool_id),
@@ -126,6 +161,10 @@ class QdrantStore:
 
     async def upsert_servers(self, servers: list[MCPServer], vectors: list[np.ndarray]) -> None:
         """Upsert server-level embeddings into the server collection (mcp_servers)."""
+        if len(servers) != len(vectors):
+            raise ValueError(
+                f"servers/vectors length mismatch: {len(servers)} servers vs {len(vectors)} vectors"
+            )
         points = [
             PointStruct(
                 id=self.generate_point_id(server.server_id),
@@ -149,6 +188,8 @@ class QdrantStore:
 
     @staticmethod
     def build_tool_text(tool: MCPTool) -> str:
+        if tool.retrieval_description:
+            return f"{tool.tool_name}: {tool.retrieval_description}"
         if tool.description:
             return f"{tool.tool_name}: {tool.description}"
         return tool.tool_name
@@ -160,6 +201,7 @@ class QdrantStore:
             "server_id": tool.server_id,
             "tool_name": tool.tool_name,
             "description": tool.description,
+            "retrieval_description": tool.retrieval_description,
             "input_schema": tool.input_schema,
         }
 
@@ -171,6 +213,7 @@ class QdrantStore:
                 tool_name=payload["tool_name"],
                 tool_id=payload["tool_id"],
                 description=payload.get("description"),
+                retrieval_description=payload.get("retrieval_description"),
                 input_schema=payload.get("input_schema"),
             )
         except (KeyError, Exception) as e:

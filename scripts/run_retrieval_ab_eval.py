@@ -1,9 +1,6 @@
-"""Retrieval 3-Way Evaluation — P@1 비교 (원본 vs search_description vs optimized_description).
+"""Retrieval A/B Evaluation — retrieval text 비교 (원본 vs 최적화 description).
 
-3-way A/B 검증:
-  - Condition A: Original description (Control)
-  - Condition B: search_description (Treatment A — PRIMARY, ~23 words, retrieval-optimized)
-  - Condition C: optimized_description (Treatment B — secondary, ~94 words, human-readable)
+Description 최적화의 궁극적 검증: "최적화된 retrieval description이 실제 검색 성능을 높이는가?"
 
 Usage:
     PYTHONPATH=src uv run python scripts/run_retrieval_ab_eval.py \
@@ -58,15 +55,19 @@ async def load_ground_truth(gt_path: Path) -> dict[str, list[str]]:
 
 
 async def load_optimized(opt_path: Path) -> dict[str, str]:
-    """최적화된 description 로드 (성공 건만)."""
+    """최적화된 retrieval description 로드 (성공 건만, legacy fallback 지원)."""
     optimized: dict[str, str] = {}
     with open(opt_path) as f:
         for line in f:
             entry = json.loads(line.strip())
-            if not line.strip():
-                continue
-            if entry.get("status") == "success" and entry.get("optimized_description"):
-                optimized[entry["tool_id"]] = entry["optimized_description"]
+            if entry.get("status") == "success":
+                retrieval_text = (
+                    entry.get("retrieval_description")
+                    or entry.get("search_description")
+                    or entry.get("optimized_description")
+                )
+                if retrieval_text:
+                    optimized[entry["tool_id"]] = retrieval_text
     return optimized
 
 
@@ -87,6 +88,7 @@ async def compute_retrieval_scores(
     embedder: "Embedder",
     tool_descriptions: dict[str, str],
     relevant_queries: dict[str, list[str]],
+    top_k: int,
 ) -> dict[str, dict]:
     """임베딩 기반 검색 성능 측정 (인메모리 코사인 유사도)."""
     tool_ids = list(tool_descriptions.keys())
@@ -119,9 +121,11 @@ async def compute_retrieval_scores(
             ranks.append(rank)
 
         p_at_1 = sum(1 for r in ranks if r == 1) / len(ranks) if ranks else 0
+        recall_at_k = sum(1 for r in ranks if r <= top_k) / len(ranks) if ranks else 0
         mrr = sum(1.0 / r for r in ranks) / len(ranks) if ranks else 0
         results[tool_id] = {
             "p_at_1": p_at_1,
+            "recall_at_k": recall_at_k,
             "mrr": mrr,
             "avg_rank": sum(ranks) / len(ranks) if ranks else 0,
             "n_queries": len(ranks),
@@ -158,9 +162,11 @@ async def main(args: argparse.Namespace) -> None:
     settings = Settings()
     embedder = OpenAIEmbedder(api_key=settings.openai_api_key)
 
-    # Condition A: 원본 description (Control)
-    logger.info("=== Condition A: Original descriptions (Control) ===")
-    scores_original = await compute_retrieval_scores(embedder, tool_descriptions, relevant_queries)
+    # Condition A: 원본 description
+    logger.info("=== Condition A: Original descriptions ===")
+    scores_original = await compute_retrieval_scores(
+        embedder, tool_descriptions, relevant_queries, top_k=args.top_k
+    )
 
     # Condition B: search_description (Treatment A — PRIMARY)
     logger.info("=== Condition B: search_description (Treatment A — PRIMARY) ===")
@@ -176,55 +182,38 @@ async def main(args: argparse.Namespace) -> None:
     for tool_id, opt_desc in optimized_descriptions.items():
         if tool_id in optimized_pool:
             optimized_pool[tool_id] = opt_desc
-    scores_optimized = await compute_retrieval_scores(embedder, optimized_pool, relevant_queries)
-
-    # 3-way 비교 리포트
-    shared_tools = (
-        set(scores_original.keys()) & set(scores_search.keys()) & set(scores_optimized.keys())
-    )
-    logger.info(
-        f"Shared tools: {len(shared_tools)} "
-        f"(orig={len(scores_original)}, search={len(scores_search)}, opt={len(scores_optimized)})"
+    scores_optimized = await compute_retrieval_scores(
+        embedder, optimized_pool, relevant_queries, top_k=args.top_k
     )
 
-    def _aggregate(scores: dict[str, dict], tools: set[str]) -> tuple[float, float]:
-        p1_vals = [scores[t]["p_at_1"] for t in tools]
-        mrr_vals = [scores[t]["mrr"] for t in tools]
-        return float(np.mean(p1_vals)), float(np.mean(mrr_vals))
-
-    p1_orig, mrr_orig = _aggregate(scores_original, shared_tools)
-    p1_search, mrr_search = _aggregate(scores_search, shared_tools)
-    p1_opt, mrr_opt = _aggregate(scores_optimized, shared_tools)
-
-    delta_search_p1 = p1_search - p1_orig
-    delta_search_mrr = mrr_search - mrr_orig
-    delta_opt_p1 = p1_opt - p1_orig
-    delta_opt_mrr = mrr_opt - mrr_orig
+    # 비교 리포트
+    shared_tools = set(scores_original.keys()) & set(scores_optimized.keys())
+    p1_orig = [scores_original[t]["p_at_1"] for t in shared_tools]
+    p1_opt = [scores_optimized[t]["p_at_1"] for t in shared_tools]
+    recall_orig = [scores_original[t]["recall_at_k"] for t in shared_tools]
+    recall_opt = [scores_optimized[t]["recall_at_k"] for t in shared_tools]
+    mrr_orig = [scores_original[t]["mrr"] for t in shared_tools]
+    mrr_opt = [scores_optimized[t]["mrr"] for t in shared_tools]
 
     logger.info("=" * 60)
     logger.info("RETRIEVAL 3-WAY EVALUATION REPORT")
     logger.info("=" * 60)
     logger.info(f"Tools evaluated: {len(shared_tools)}")
-    logger.info(f"Condition A (Original):           P@1={p1_orig:.4f}, MRR={mrr_orig:.4f}")
-    logger.info(f"Condition B (search_description): P@1={p1_search:.4f}, MRR={mrr_search:.4f}")
-    logger.info(f"Condition C (optimized_description): P@1={p1_opt:.4f}, MRR={mrr_opt:.4f}")
     logger.info(
-        f"Delta B-A (Search vs Orig):    P@1={delta_search_p1:+.4f}, MRR={delta_search_mrr:+.4f}"
+        f"Condition A (Original):  Recall@{args.top_k}={np.mean(recall_orig):.4f}, "
+        f"MRR={np.mean(mrr_orig):.4f}, P@1={np.mean(p1_orig):.4f}"
     )
-    logger.info(f"Delta C-A (Optimized vs Orig): P@1={delta_opt_p1:+.4f}, MRR={delta_opt_mrr:+.4f}")
+    logger.info(
+        f"Condition B (Optimized): Recall@{args.top_k}={np.mean(recall_opt):.4f}, "
+        f"MRR={np.mean(mrr_opt):.4f}, P@1={np.mean(p1_opt):.4f}"
+    )
 
-    # Per-tool 비교: Search vs Original
-    search_improved = sum(
-        1 for t in shared_tools if scores_search[t]["p_at_1"] > scores_original[t]["p_at_1"]
-    )
-    search_degraded = sum(
-        1 for t in shared_tools if scores_search[t]["p_at_1"] < scores_original[t]["p_at_1"]
-    )
-    search_same = len(shared_tools) - search_improved - search_degraded
-    logger.info(
-        f"Search vs Orig per-tool: {search_improved} improved, "
-        f"{search_degraded} degraded, {search_same} same"
-    )
+    delta_recall = np.mean(recall_opt) - np.mean(recall_orig)
+    delta_p1 = np.mean(p1_opt) - np.mean(p1_orig)
+    delta_mrr = np.mean(mrr_opt) - np.mean(mrr_orig)
+    logger.info(f"Delta Recall@{args.top_k}: {delta_recall:+.4f}")
+    logger.info(f"Delta P@1: {delta_p1:+.4f}")
+    logger.info(f"Delta MRR: {delta_mrr:+.4f}")
 
     # Per-tool 비교: Optimized vs Original
     opt_improved = sum(
@@ -239,67 +228,49 @@ async def main(args: argparse.Namespace) -> None:
         f"{opt_degraded} degraded, {opt_same} same"
     )
 
-    # 결과 판정
-    def _judge(label: str, delta: float) -> None:
-        if delta >= 0.05:
-            logger.info(f"RESULT [{label}]: IMPROVES retrieval (+5pp or more)")
-        elif delta >= 0:
-            logger.info(f"RESULT [{label}]: MARGINAL positive effect")
-        else:
-            logger.info(f"RESULT [{label}]: DEGRADES retrieval — investigate")
-
-    _judge("Search", delta_search_p1)
-    _judge("Optimized", delta_opt_p1)
+    if delta_recall > 0 and delta_mrr >= 0:
+        logger.info("RESULT: Optimization IMPROVES retrieval on primary metrics")
+    elif delta_recall >= 0 and delta_mrr >= 0:
+        logger.info("RESULT: Optimization is neutral-to-positive on retrieval")
+    else:
+        logger.info("RESULT: Optimization DEGRADES retrieval — investigate")
 
     # 결과 JSON 저장
     output_path = (
         Path(args.output)
         if args.output
-        else Path("data/verification/retrieval_3way_ab_report.json")
+        else Path("data/verification/retrieval_ab_report.json")
     )
     report = {
         "n_tools": len(shared_tools),
         "n_queries": sum(scores_original[t]["n_queries"] for t in shared_tools),
+        "k_used": args.top_k,
         "condition_a": {
             "name": "original",
-            "p_at_1": p1_orig,
-            "mrr": mrr_orig,
+            "recall_at_k": float(np.mean(recall_orig)),
+            "p_at_1": float(np.mean(p1_orig)),
+            "mrr": float(np.mean(mrr_orig)),
         },
         "condition_b": {
-            "name": "search_description",
-            "p_at_1": p1_search,
-            "mrr": mrr_search,
+            "name": "retrieval_description",
+            "recall_at_k": float(np.mean(recall_opt)),
+            "p_at_1": float(np.mean(p1_opt)),
+            "mrr": float(np.mean(mrr_opt)),
         },
-        "condition_c": {
-            "name": "optimized_description",
-            "p_at_1": p1_opt,
-            "mrr": mrr_opt,
-        },
-        "delta_search_vs_orig": {
-            "p_at_1": delta_search_p1,
-            "mrr": delta_search_mrr,
-        },
-        "delta_optimized_vs_orig": {
-            "p_at_1": delta_opt_p1,
-            "mrr": delta_opt_mrr,
-        },
-        "per_tool_search_vs_orig": {
-            "improved": search_improved,
-            "degraded": search_degraded,
-            "same": search_same,
-        },
-        "per_tool_optimized_vs_orig": {
-            "improved": opt_improved,
-            "degraded": opt_degraded,
-            "same": opt_same,
-        },
+        "delta_recall_at_k": float(delta_recall),
+        "delta_p_at_1": float(delta_p1),
+        "delta_mrr": float(delta_mrr),
+        "per_tool_improved": improved,
+        "per_tool_degraded": degraded,
+        "per_tool_same": same,
         "per_tool_details": {
             t: {
                 "original_p1": scores_original[t]["p_at_1"],
                 "search_p1": scores_search[t]["p_at_1"],
                 "optimized_p1": scores_optimized[t]["p_at_1"],
-                "delta_search_p1": scores_search[t]["p_at_1"] - scores_original[t]["p_at_1"],
-                "delta_optimized_p1": scores_optimized[t]["p_at_1"] - scores_original[t]["p_at_1"],
+                "original_recall_at_k": scores_original[t]["recall_at_k"],
+                "optimized_recall_at_k": scores_optimized[t]["recall_at_k"],
+                "delta_p1": scores_optimized[t]["p_at_1"] - scores_original[t]["p_at_1"],
                 "original_mrr": scores_original[t]["mrr"],
                 "search_mrr": scores_search[t]["mrr"],
                 "optimized_mrr": scores_optimized[t]["mrr"],
@@ -322,6 +293,7 @@ if __name__ == "__main__":
         "--optimized",
         default="data/verification/grounded_optimization_results.jsonl",
     )
+    parser.add_argument("--top-k", type=int, default=10, help="Recall@K cutoff")
     parser.add_argument("--output", default=None, help="Report JSON output path")
     parsed = parser.parse_args()
     asyncio.run(main(parsed))

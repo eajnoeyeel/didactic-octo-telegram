@@ -1,5 +1,6 @@
 # Open Questions & TODOs
-> 구현 전에 반드시 해결해야 할 미결 사항들
+> 2026-03-19 기준 working notes. 현재 blockers의 canonical list는 `docs/plan/checklist.md`.
+> historical mentoring memo이며, 최신 의사결정은 `docs/adr/*`, `docs/design/*`를 따른다.
 > 최종 업데이트: 2026-03-19
 
 ---
@@ -56,7 +57,7 @@
 
 - [ ] 각 Pool 유형에 어떤 MCP 서버를 넣을지 목록 작성 (수동)
 - [ ] 직접 만드는 MCP 서버 (OQ-3 참고)를 Description Quality 실험용 Pool에 포함
-- [ ] Pool 크기별 실험 (5 / 20 / 50 / 100) — `build_index.py` 실행 시 `--pool-size` 파라미터로 조절
+- [ ] Pool 크기별 실험 (5 / 20 / 50 / 100 / 200 / 308) — `build_index.py --pool-size` (tool 수 기준 truncation)
 
 ### 2-3. Ground Truth Generation 계획
 - [ ] **수동 seed set 50개 먼저 작성** (구현 전에 시작 가능)

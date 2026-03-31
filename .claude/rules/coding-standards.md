@@ -8,7 +8,7 @@
 | Package Manager | uv |
 | Web Framework | FastAPI |
 | Vector Store | Qdrant Cloud (free tier) |
-| Embedding | BGE-M3 or OpenAI text-embedding-3-small |
+| Embedding | BGE-M3, OpenAI text-embedding-3-small, OpenAI text-embedding-3-large (E2 실험 결정, voyage-code-2 금지) |
 | Reranker | Cohere Rerank 3 |
 | Validation | Pydantic v2 |
 | Testing | pytest + pytest-asyncio (asyncio_mode="auto") |
@@ -152,8 +152,8 @@ async with httpx.AsyncClient() as client:
 uv sync                          # Install dependencies
 uv add <package>                 # Add dependency
 
-# Run server
-uv run uvicorn src.api.main:app --reload
+# Run server (planned; `src/api/main.py` not present yet)
+# uv run uvicorn src.api.main:app --reload
 
 # Tests
 uv run pytest tests/ -v
@@ -168,7 +168,8 @@ uv run ruff format src/ tests/
 uv run python scripts/collect_data.py
 uv run python scripts/build_index.py --pool-size 50
 uv run python scripts/generate_ground_truth.py
-uv run python scripts/run_experiments.py --experiment E1
+uv run python scripts/run_e0.py
+# uv run python scripts/run_experiments.py --experiment E1  # planned
 ```
 
 ## Code Review Checklist

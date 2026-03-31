@@ -87,19 +87,17 @@ async def main(args: argparse.Namespace) -> None:
         optimizer=optimizer,
         embedder=embedder,
         gate=gate,
-        skip_threshold=args.skip_threshold,
     )
 
     results = await pipeline.run_batch_with_tools(tools_with_siblings)
 
     # Summary
     success = sum(1 for r in results if r.status == OptimizationStatus.SUCCESS)
-    skipped = sum(1 for r in results if r.status == OptimizationStatus.SKIPPED)
     failed = sum(1 for r in results if r.status == OptimizationStatus.FAILED)
     rejected = sum(1 for r in results if r.status == OptimizationStatus.GATE_REJECTED)
 
     logger.info(
-        f"Optimization complete: {success} success, {skipped} skipped, "
+        f"Optimization complete: {success} success, "
         f"{failed} failed, {rejected} gate-rejected"
     )
 

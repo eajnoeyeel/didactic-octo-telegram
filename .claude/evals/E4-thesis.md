@@ -3,6 +3,7 @@
 > Most important experiment. Must pass for CTO demo.
 > Grader type: Code (McNemar's test) + Model (GEO score validation)
 > Depends on E1 best strategy selected.
+> External validation: Description Smells 논문 (arxiv:2602.18914) — description 품질 → 선택률 인과 관계 사전 검증 (+11.6%, p<0.001). 우리 차별점: smell 유무 비교가 아닌 GEO 기법을 통한 체계적 개선 방법론 제시.
 
 ## Success Criteria
 
@@ -13,22 +14,29 @@
 - [ ] McNemar's test p-value computed
 - [ ] Spearman(geo_score, selection_rate) computed across all Pool tools
 - [ ] OLS regression R² computed (6 GEO dimensions → selection_rate)
+- [ ] Description Smells 4D scores computed for comparison (Accuracy/Functionality/Completeness/Conciseness)
 
 ## Evidence Triangulation Gate
 
-Pass if ≥ 2 of 3:
-```
-1. A/B Lift > 30%                    (causal)
-2. Spearman r_s > 0.6, p < 0.05     (correlational)
-3. OLS R² > 0.4                      (explanatory)
-```
+Per `docs/design/metrics-rubric.md` §Evidence Triangulation:
 
-McNemar's test: p < 0.05 required independently.
+```
+Criteria:
+  1. A/B Lift > 30%, McNemar p < 0.05  (causal — Primary)
+  2. Spearman r_s > 0.6, p < 0.05     (correlational)
+  3. OLS R² > 0.4                      (explanatory)
+
+Judgment (metrics-rubric.md §Evidence Triangulation):
+  3개 모두 통과  → 강한 증거
+  Primary + 1개  → 보통 증거
+  Primary만 통과 → 약한 증거
+  Primary 미통과 → 테제 기각
+```
 
 ## Regression Criteria
 
 - [ ] Best strategy from E1 reproduces E1 Precision@1 within ±2%p (pass^3 = 1.00)
-- [ ] Same 80 GT queries used
+- [ ] Same ~230-320 GT queries used (MCP-Atlas per-step + self seed 80, all single-step)
 
 ## Metric Targets
 
@@ -52,10 +60,11 @@ Risk: HIGH — over-optimizing Version B inflates lift artificially
 ## CLI
 
 ```bash
-uv run python scripts/run_experiments.py --experiment E4 --pool description-quality
+# 계획됨 (`scripts/run_experiments.py` 구현 후):
+# uv run python scripts/run_experiments.py --experiment E4 --pool description-quality
 ```
 
 ## pass@k
 
 - Capability: pass@1 (single run, deterministic metrics)
-- Evidence gate: ≥ 2/3 triangulation criteria met
+- Evidence gate: Primary required + ≥ 1/2 remaining for moderate evidence

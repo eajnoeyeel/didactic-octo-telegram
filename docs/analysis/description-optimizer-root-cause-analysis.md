@@ -4,6 +4,8 @@
 > Branch: `feat/description-optimizer`
 > Scope: grounded 최적화 이후에도 남아 있는 `GEO improvement != retrieval improvement` 문제 분석
 
+> Note: 이 문서는 2026-03-29 historical regression artifact를 분석한 문서다. `retrieval_description` canonicalization 이후의 최신 MCP-Zero 검증 결과는 `docs/analysis/description-optimizer-mcp-zero-validation-20260330.md`를 기준으로 본다. 최신 결과에서는 `P@1`과 `MRR`이 개선되었고, 현재 bottleneck은 gate throughput으로 이동했다.
+
 ---
 
 ## 1. 결론 요약

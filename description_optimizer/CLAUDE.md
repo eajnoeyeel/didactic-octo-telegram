@@ -2,7 +2,7 @@
 
 > **이 파일은 규칙(conventions, constraints)과 참조 포인터만 둔다.** 상세 컨텍스트는 각 문서에 분리.
 > 매 세션마다 전체 로드되므로 prompt bloat 방지를 위해 간결하게 유지할 것.
-> 최종 업데이트: 2026-03-29
+> 최종 업데이트: 2026-03-30
 
 ---
 
@@ -16,9 +16,9 @@
 
 ## 서브프로젝트 한줄 요약
 
-Description Optimizer — Provider가 MCP 서버/도구를 등록할 때 description을 진단하고, LLM으로 자동 최적화하여 retrieval 정확도(P@1)를 높이는 기능. GEO Score는 진단 보조 지표로 사용.
+Description Optimizer — Provider가 MCP 서버/도구를 등록할 때 원본 description을 retrieval-oriented text로 최적화하여 RAG 검색 품질을 높이는 기능.
 
-**목표**: 최적화된 description 사용 시 Precision@1 +10%p 이상 향상 (vs 원본 description)
+**목표**: 최적화된 `retrieval_description` 사용 시 RAG 검색의 `Recall@K` / `MRR` 향상 (vs 원본 description)
 
 **핵심 테제**: "Description 최적화 → 검색 선택률 향상" (Paper A/B/F로 검증됨)
 
@@ -26,14 +26,18 @@ Description Optimizer — Provider가 MCP 서버/도구를 등록할 때 descrip
 
 ## 현재 상태 (2026-03-30)
 
-**Branch:** `feat/description-optimizer` — Phase 2 구현 완료, GEO-P@1 불일치 근본원인 분석 완료
+**Branch:** `feat/description-optimizer`
 
-**핵심 발견 (2026-03-30):**
-- P@1 A/B 결과: Original 0.5417 → Optimized 0.4722 (δP@1 = -0.069)
-- 근본원인: (1) 평가/검색 경로가 `search_description`이 아닌 `optimized_description`을 사용, (2) GEO 휴리스틱이 retrieval에 불리한 패턴 보상, (3) disambiguation이 sibling 오염으로 작동
-- 상세: `docs/analysis/description-optimizer-root-cause-analysis.md`
+**핵심 변경사항 (2026-03-30):**
+- canonical retrieval field를 `retrieval_description`으로 전환
+- GEO 기반 skip 제거, GEO는 diagnostic-only로 강등
+- Quality Gate의 active 기준을 retrieval text 보존/유사도/환각/오염 방지로 재정렬
+- retrieval A/B 평가 스크립트가 `retrieval_description`을 우선 사용하고 `Recall@K`를 1차 지표로 기록
+- `mcp_zero` 기반 오프라인 검증 완료: filtered GT 178 queries / 32 tools / 10 servers
+- latest query-level result: `P@1 0.2753 → 0.3427`, `Recall@10 0.6517 → 0.6629`, `MRR 0.4136 → 0.4439`
+- current bottleneck: GT tools 32개 중 optimizer `success`는 7개, 25개는 gate reject
 
-**다음 단계:** retrieval 경로를 `search_description` 기준으로 재정렬 → 3-way A/B 평가 (original vs optimized vs search) → GEO를 diagnostic metric으로 격하
+**다음 단계:** gate reject 25건 유형화 → similarity threshold/contamination 기준 재조정 → long-tail rank regression 제어
 
 ---
 
@@ -41,14 +45,19 @@ Description Optimizer — Provider가 MCP 서버/도구를 등록할 때 descrip
 
 | 파일 | 내용 |
 |------|------|
-| `data/verification/retrieval_ab_report.json` | **P@1 A/B 평가 결과** — per-tool breakdown 포함 (새 세션 시작점) |
-| `data/verification/gt_optimized_descriptions.jsonl` | GT 도구 최적화 결과 (18 success, 18 rejected) |
+| `data/verification/mcp_zero_gt_filtered.jsonl` | MCP-Zero pool 교집합 GT (178 queries, 32 tools) |
+| `data/verification/mcp_zero_gt_optimized_descriptions.jsonl` | MCP-Zero GT 도구 최적화 결과 (7 success, 25 rejected) |
+| `data/verification/mcp_zero_retrieval_ab_report.json` | tool-average retrieval A/B 결과 |
+| `data/verification/mcp_zero_query_level_eval.json` | **query-level primary evaluation** — `Recall@10`, `MRR`, `P@1`, bootstrap CI |
+| `docs/analysis/description-optimizer-mcp-zero-validation-20260330.md` | 최신 MCP-Zero 검증 보고서 |
+| `data/verification/retrieval_ab_report.json` | historical retrieval A/B 결과 (pre-refactor artifact) |
+| `data/verification/gt_optimized_descriptions.jsonl` | historical GT 최적화 결과 (18 success, 18 rejected) |
 | `docs/analysis/grounded-ab-comparison-report.md` | A/B 비교 보고서 + 연구 방향 |
-| `docs/analysis/description-optimizer-root-cause-analysis.md` | **근본원인 분석 SOT** (2026-03-30) — 평가/검색 경로 불일치, GEO 보상 왜곡, disambiguation 오염 |
+| `docs/analysis/description-optimizer-root-cause-analysis.md` | historical regression 근본원인 분석 |
 | `docs/progress/grounded-optimization-handoff.md` | 구현 완료 내역 (Task 1-10 커밋 + 상세) |
 | `docs/superpowers/plans/2026-03-29-description-optimizer-grounded-optimization.md` | 구현 계획서 |
-| `description_optimizer/docs/research-analysis.md` | 학술적 근거 분석, 논문 비교, 검증 설계 |
-| `description_optimizer/docs/evaluation-design.md` | 평가 전략 상세 (A/B Test, Quality Gate, Semantic Preservation) |
+| `description_optimizer/docs/research-analysis.md` | 학술적 근거 분석 + 최신 empirical validation |
+| `description_optimizer/docs/evaluation-design.md` | 평가 전략 상세 (A/B Test, Quality Gate, significance) |
 | 루트 `CLAUDE.md` | 프로젝트 전체 규칙 (상위 참조) |
 | 루트 `docs/design/metrics-rubric.md` | GEO Score 6차원 정의 (SOT) |
 
@@ -61,23 +70,22 @@ Provider → Register MCP Server/Tools
     ↓
 Description Optimizer Pipeline
     ↓ Phase 1: Analyze           ↓ Phase 2: Optimize
-    GEO Score Diagnosis          LLM Rewriter (grounded/ungrounded)
-    (6-dimension heuristic)      (input_schema + sibling tools)
+    GEO diagnostic only          LLM Rewriter (grounded/query-aware)
+    (optional quality report)    (schema + target-only retrieval text)
     ↓                            ↓
     Quality Report               optimized_description
-                                 search_description (embedding용)
+                                 retrieval_description (embedding용 canonical text)
     ↓
-    Quality Gate (현재 5-gate: GEO비회귀 + Similarity + Hallucination + Info Preservation + Faithfulness)
-    → 목표: GEO gate 제거 → 4-gate로 전환, GEO는 diagnostic metric only
+    Quality Gate (Similarity + Hallucination + Info Preservation + Contamination)
     ↓
-    Store: original + optimized + search descriptions
+    Store: original + retrieval descriptions
 ```
 
 ### ABC Pattern
 
 - `DescriptionAnalyzer` ABC — GEO Score 분석 (Heuristic / LLM-as-Judge)
 - `DescriptionOptimizer` ABC — 재작성 (LLM / Rule-based), `optimize(report, context=None)`
-- `QualityGate` — 현재 5-gate 시스템 (GEO 비회귀 + 의미 유사도 + 환각 탐지 + 정보 보존 + RAGAS faithfulness). **목표**: GEO gate 제거 → 4-gate로 전환, GEO는 diagnostic metric으로만 사용.
+- `QualityGate` — retrieval text 안전성 검증 (의미 유사도, 환각 탐지, 정보 보존, sibling contamination)
 
 ### Grounded Optimization (신규, 2026-03-29)
 
@@ -97,24 +105,31 @@ Description Optimizer Pipeline
 - **P@1 A/B 평가**: `scripts/run_retrieval_ab_eval.py` — 원본 vs 최적화 인메모리 검색 비교
 - **리서치 종합**: `description_optimizer/docs/research-phase2-synthesis.md`
 
-## P@1 A/B 평가 결과 (2026-03-29)
+## Retrieval 검증 결과
 
-- **Original P@1: 0.5417, Optimized P@1: 0.4722, Delta: -0.0694**
-- 36 tools (18 optimized, 18 gate-rejected → 원본 유지)
-- Per-tool: 1 improved, 3 degraded, 32 same
-- **근본원인**: (1) 평가가 search_description이 아닌 optimized_description을 임베딩, (2) GEO 휴리스틱이 길이 팽창/sibling 오염을 보상, (3) disambiguation이 분리가 아닌 오염으로 작동. 상세: `docs/analysis/description-optimizer-root-cause-analysis.md`
-- 상세: `data/verification/retrieval_ab_report.json`
+### Latest MCP-Zero Validation (2026-03-30)
+
+- dataset: `mcp_zero` pool + filtered GT `178 queries / 32 tools / 10 servers`
+- optimizer coverage: `7 success / 25 gate_rejected`
+- query-level primary metrics:
+  - `P@1`: `0.2753 → 0.3427` (`+0.0674`)
+  - `Recall@10`: `0.6517 → 0.6629` (`+0.0112`)
+  - `MRR`: `0.4136 → 0.4439` (`+0.0304`)
+- 해석: top-1 / top-few retrieval은 개선됐지만, gate reject가 많아 전체 효과가 제한적이며 long-tail rank는 아직 불안정
+
+### Historical Regression (2026-03-29)
+
+- `optimized_description` 임베딩 기준 `P@1`이 하락했던 historical artifact
+- 현재 canonical input은 `retrieval_description`
+- 상세: `data/verification/retrieval_ab_report.json`, `docs/analysis/description-optimizer-root-cause-analysis.md`
 
 ## 미해결 과제 (우선순위순)
 
-1. ~~**P@1 end-to-end 검증**~~ — 완료. δP@1 = -0.069
-2. ~~**GEO-P@1 불일치 근본원인 분석**~~ — 완료 (2026-03-30). `docs/analysis/description-optimizer-root-cause-analysis.md`
-3. **[최우선] Retrieval 경로 재정렬** — `search_description`을 실제 임베딩/평가 경로에 연결
-   - 평가: original vs optimized_description vs search_description 3-way A/B
-   - retrieval 전용 텍스트(`search_description`)가 실제 P@1을 개선하는지 검증
-4. **GEO를 diagnostic metric으로 전환** — hard gate에서 제외, 진단 보조로만 사용
-5. **disambiguation 재설계** — sibling 이름 나열 → target-only qualifier 중심
-6. **RAGAS faithfulness 파이프라인 통합**: 현재 gate만 구현됨, 최적화 루프에 통합 필요
+1. gate tuning 이후 `retrieval_description` artifact 재생성 및 재평가
+2. gate reject 25건의 similarity threshold 민감도 분석
+3. long-tail rank regression이 큰 쿼리(`exa`, `calculator`) 회귀 분석
+4. query-aware prompt와 target-only disambiguation 추가 실험
+5. GEO diagnostic 리포트와 retrieval metric 상관 재측정
 
 ---
 
@@ -123,7 +138,7 @@ Description Optimizer Pipeline
 - 루트 `CLAUDE.md`의 모든 제약 조건을 상속 (async only, loguru, pytest-asyncio 등)
 - **원본 description은 절대 삭제하지 않음** — 항상 보존
 - **Semantic Preservation**: cosine similarity >= 0.75 유지
-- **Quality Gate**: 현재 5-gate (GEO 비회귀 + 의미 유사도 + 환각 탐지 + 정보 보존 + RAGAS faithfulness). **목표**: GEO gate 제거 → 4-gate 전환.
+- **Quality Gate**: retrieval-safe checks only. GEO 하락은 reject 사유가 아님.
 - **비용 제약**: GPT-4o-mini 사용, tool당 ~$0.001
 - **기존 파이프라인 호환**: `MCPTool.description`은 변경하지 않고 별도 필드 추가
 
@@ -146,12 +161,13 @@ PYTHONPATH=src uv run python scripts/run_grounded_ab_comparison.py
 # GT 도구 최적화 (grounded)
 PYTHONPATH=src uv run python scripts/optimize_gt_tools.py
 
-# P@1 A/B 평가 (원본 vs 최적화 embedding 검색)
+# Retrieval A/B 평가 (원본 vs retrieval_description embedding 검색)
 PYTHONPATH=src uv run python scripts/run_retrieval_ab_eval.py \
-    --tools data/raw/servers.jsonl \
-    --ground-truth data/ground_truth/seed_set.jsonl \
-    --optimized data/verification/gt_optimized_descriptions.jsonl \
-    --output data/verification/retrieval_ab_report.json
+    --tools data/raw/mcp_zero_servers.jsonl \
+    --ground-truth data/verification/mcp_zero_gt_filtered.jsonl \
+    --optimized data/verification/mcp_zero_gt_optimized_descriptions.jsonl \
+    --top-k 10 \
+    --output data/verification/mcp_zero_retrieval_ab_report.json
 ```
 
 ---
@@ -160,6 +176,6 @@ PYTHONPATH=src uv run python scripts/run_retrieval_ab_eval.py \
 
 루트 `CLAUDE.md` 및 `.claude/rules/coding-standards.md` 참조. 추가 규칙:
 
-- 최적화 결과 모델: `OptimizedDescription(BaseModel)` — original, optimized, search, geo_score_before, geo_score_after
+- 최적화 결과 모델: `OptimizedDescription(BaseModel)` — original, optimized, retrieval, geo_score_before, geo_score_after
 - Prompt 템플릿: `src/description_optimizer/optimizer/prompts.py` (grounded/ungrounded 분기)
 - 모든 LLM 호출은 `AsyncOpenAI` 사용

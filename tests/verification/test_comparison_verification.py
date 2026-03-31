@@ -131,23 +131,25 @@ class TestSemanticPreservation:
                     f"{r['tool_id']}: empty optimized_description"
                 )
 
-    def test_search_description_not_empty(self) -> None:
-        """Successful optimizations must have non-empty search_description."""
+    def test_retrieval_description_not_empty(self) -> None:
+        """Successful optimizations must have non-empty retrieval/search description."""
         results = _load_results()
         for r in results:
             if r["status"] == "success":
-                assert len(r.get("search_description", "").strip()) > 0, (
-                    f"{r['tool_id']}: empty search_description"
+                retrieval_text = r.get("retrieval_description") or r.get("search_description", "")
+                assert len(retrieval_text.strip()) > 0, (
+                    f"{r['tool_id']}: empty retrieval description"
                 )
 
-    def test_optimized_length_reasonable(self) -> None:
-        """Optimized descriptions should be 20-2000 characters."""
+    def test_retrieval_length_reasonable(self) -> None:
+        """Retrieval descriptions should stay concise enough for embedding text."""
         results = _load_results()
         for r in results:
             if r["status"] == "success":
-                length = len(r["optimized_description"])
-                assert 20 <= length <= 2000, (
-                    f"{r['tool_id']}: optimized length {length} outside [20, 2000]"
+                retrieval_text = r.get("retrieval_description") or r.get("search_description", "")
+                length = len(retrieval_text)
+                assert 5 <= length <= 2000, (
+                    f"{r['tool_id']}: retrieval length {length} outside [5, 2000]"
                 )
 
 

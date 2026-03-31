@@ -5,16 +5,26 @@
 
 ---
 
+## 전략 변경 (2026-03-28) — ADR-0011
+
+외부 데이터셋 활용 결정: 자체 Synthetic GT 품질 문제 → 고품질 외부 데이터로 대체/보완.
+- **Tool Pool**: Smithery 8 servers → MCP-Zero 308 servers (2,797 tools)
+- **Ground Truth**: self seed 80 + MCP-Atlas per-step 분해 ~150-240 = ~230-320 primary GT (all single-step, ADR-0012). Synthetic 838은 보조.
+- **Description 평가**: GEO 6D + Description Smells 4D 병행 (E7 비교)
+- 상세: `docs/handoff/external-data-strategy-20260328.md`, `docs/adr/0011-external-dataset-strategy.md`
+
+---
+
 ## 요약
 
 | 항목 | 현재 상태 |
 |------|-----------|
 | 완료된 Phase | Phase 0 ~ Phase 5, Description Optimizer Grounded Optimization |
-| 진행중 | **disambiguation 재설계 v2** (코드 완료, P@1 0.375 — 과도한 제거 확인) |
+| 진행중 | **Description Optimizer retrieval-aligned 구현 반영 후 MCP-Zero 검증 결과 정리 및 gate tuning 준비** |
 | 다음 Phase | Phase 6 (Reranker) + OQ-2 (Pool 크롤링/인덱싱) |
-| 테스트 | **389 passed** (main 233 + desc-optimizer 156) |
+| 테스트 | **description-optimizer targeted 230 passed** (2026-03-30) |
 | 커버리지 | **92%** (feat/description-optimizer 기준) |
-| Lint/Format | PASS (ruff check + ruff format) |
+| Lint/Format | changed-file `ruff check` PASS, repo-wide ruff는 `scripts/run_e0.py` 기존 이슈 존재 |
 | 외부 서비스 | Qdrant Docker 로컬 + Smithery API + OpenAI API 실제 연동 검증 완료 |
 | PR | #1 (core-pipeline), #2 (ground-truth) 머지 완료 |
 
@@ -24,21 +34,10 @@
 |------|------|
 | Grounded Optimization | 10 tasks 구현 완료 |
 | A/B 비교 (30 tools) | 완료 — 환각 제거 성공, GEO scorer 한계 발견 |
-| **P@1 A/B 평가** | **완료 — δP@1 = -0.069 (검색 성능 저하)** |
-| **핵심 발견** | 근본원인 확인: retrieval 경로 불일치 + GEO 보상 왜곡 (분석 완료 2026-03-30) |
-| 3-way A/B 평가 | 완료 — search/optimized 모두 δP@1=-0.069, sibling 오염 근본원인 |
-| 근본원인 분석 | **완료** — `docs/analysis/description-optimizer-root-cause-analysis.md` |
-| **disambiguation v2** | 완료 — sibling 이름 제거 성공, 그러나 P@1 0.375 (v1 0.472보다 악화) |
-| **다음 단계** | sibling context 재도입 (이름 없이 카운트/카테고리만) 또는 description 최적화 중단 판단 |
-| 상세 보고서 | `data/verification/retrieval_3way_ab_gt_report_v2.json` |
-
-**Disambiguation v2 실험 결과 (2026-03-30):**
-- 29 success tools, 0 sibling contamination (목표 달성)
-- median P@1: 0.0→1.0 (optimized) — sibling 오염 제거로 정확히 회복
-- 전체 P@1: original 0.5417, search 0.3750, optimized 0.3750
-- v1 대비: search δP@1 -0.097 악화 (v1 -0.069 → v2 -0.167)
-- 새 degradation 5건: modulo, find_duplicates, getGroups, create_branch, GET_POST_COMMENTS
-- **결론**: sibling 이름 제거는 정당하나, context 완전 제거는 과도한 조치. 중간 지점 필요
+| **Historical P@1 A/B** | 완료 — `optimized_description` 임베딩 기준 δP@1 = -0.069 |
+| **핵심 발견** | GEO↑ but retrieval↓: 프록시 메트릭과 실제 retrieval objective 불일치 |
+| **현재 방향** | `retrieval_description` canonicalization 완료, MCP-Zero 기준 query-level 재검증 완료 |
+| 상세 보고서 | `docs/analysis/description-optimizer-mcp-zero-validation-20260330.md` |
 
 **P@1 A/B 평가 상세 (2026-03-29):**
 - 36 GT 도구 최적화 → 18 success, 18 gate-rejected
@@ -46,6 +45,19 @@
 - Per-tool: 1 improved (`github::list_issues`), 3 degraded (`math-mcp::median`, `math-mcp::round`, `instagram::GET_USER_MEDIA`), 32 same
 - **근본원인**: (1) search_description 미사용 (2) GEO 보상 왜곡 (3) disambiguation 오염 — 분석 완료, `docs/analysis/description-optimizer-root-cause-analysis.md`
 - 가설: (a) GEO 차원 무관성 (b) 길이→임베딩 희석 (c) sibling 혼동
+
+**MCP-Zero Offline Validation (2026-03-30):**
+- 평가 셋: `data/raw/mcp_zero_servers.jsonl` + filtered GT `178 queries / 32 tools / 10 servers`
+- optimizer 결과: `7 success / 25 gate_rejected`
+- query-level primary metrics:
+  - `P@1`: `0.2753 → 0.3427` (`+0.0674`)
+  - `Recall@10`: `0.6517 → 0.6629` (`+0.0112`)
+  - `MRR`: `0.4136 → 0.4439` (`+0.0304`)
+- 통계 신호:
+  - `delta P@1` 95% CI: `[+0.0281, +0.1067]`
+  - `delta MRR` 95% CI: `[+0.0069, +0.0529]`
+  - `delta Recall@10` 95% CI: `[-0.0112, +0.0393]`
+- **결론**: retrieval-aligned 방향 전환은 유효. 다만 gate reject 비율이 높아 전체 효과가 제한적이며, 다음 bottleneck은 gate throughput과 long-tail regression control이다.
 
 ---
 
@@ -73,7 +85,7 @@
 | MCP 직접 연결 | `src/data/mcp_connector.py` | **100%** |
 | 서버 선별기 | `src/data/server_selector.py` | 100% |
 | 수집 스크립트 | `scripts/collect_data.py` | - |
-| 시드 데이터 | `data/raw/servers.jsonl` (3 서버, 58 도구) | - |
+| 시드 데이터 | `data/raw/servers.jsonl` (50행) | - |
 
 **통합 테스트로 검증된 항목** (`tests/integration/test_smithery_integration.py`):
 - 실제 Smithery Registry API (`https://registry.smithery.ai`)에 접속하여 검증
@@ -137,7 +149,7 @@
 **Seed Set 구성** (80개):
 - 8 카테고리 × 10개 = 80 엔트리
 - 난이도 분포: Easy 4 : Medium 4 : Hard 2
-- 5개 서버: `EthanHenrickson/math-mcp`, `@anthropic/claude-code`, `@smithery-ai/github`, `@anthropic/fetch-mcp`, `@anthropic/filesystem-mcp`
+- 8개 서버: `EthanHenrickson/math-mcp`, `arxiv`, `brave-search`, `clay-inc/clay-mcp`, `github`, `instagram`, `postgres`, `yahoo-finance`
 
 **Synthetic GT 구성** (838개, 2026-03-26 생성):
 - 8개 서버, 89개 도구 × ~10 쿼리 (일부 validation 실패로 skip)
@@ -178,6 +190,16 @@
 - `harness.py`: async 오케스트레이터, `strategy.search()` 1회/쿼리 호출, `compute_confidence()`로 신뢰도 추출
 - `asyncio_mode="auto"` 활용 — `@pytest.mark.asyncio` 불필요
 
+### Phase 5.5: 외부 데이터 + Reranker 스캐폴딩 — 부분 완료
+
+| 산출물 | 파일 | 상태 |
+|--------|------|------|
+| MCP-Zero import 스크립트 | `scripts/import_mcp_zero.py` | 파일 존재, canonical input 검증 필요 |
+| MCP-Atlas 변환 스크립트 | `scripts/convert_mcp_atlas.py` | 파일 존재, ADR-0012 per-step target state 미완료 |
+| Reranker ABC + Cohere 구현 | `src/reranking/base.py`, `src/reranking/cohere_reranker.py` | 파일 존재, 파이프라인 통합/테스트 미완료 |
+
+이 섹션은 "파일 존재"와 "Phase 완료"를 구분하기 위해 추가했다. 완료된 Phase는 여전히 0~5이며, 위 항목은 다음 작업의 부분 산출물이다.
+
 ---
 
 ## 인프라 현황
@@ -203,7 +225,7 @@
 ## 테스트 현황
 
 ```
-233 passed, 0 skipped
+260 passed, 0 skipped
 전체 커버리지: 98.56%
 ```
 
@@ -211,7 +233,7 @@
 
 ```
 tests/
-├── unit/                  # 단위 테스트 (159개) — 외부 서비스 불필요
+├── unit/                  # 단위 테스트 (~190개) — 외부 서비스 불필요
 │   ├── test_config.py
 │   ├── test_models.py
 │   ├── test_crawler.py

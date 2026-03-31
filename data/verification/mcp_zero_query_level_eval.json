@@ -1,0 +1,276 @@
+{
+  "n_queries": 178,
+  "n_tools": 32,
+  "optimized_tools": 7,
+  "top_k": 10,
+  "query_level_original": {
+    "p_at_1": 0.2752808988764045,
+    "recall_at_10": 0.651685393258427,
+    "mrr": 0.41355402511377765,
+    "avg_rank": 188.75842696629215,
+    "median_rank": 3.5
+  },
+  "query_level_optimized": {
+    "p_at_1": 0.34269662921348315,
+    "recall_at_10": 0.6629213483146067,
+    "mrr": 0.4439046713059597,
+    "avg_rank": 206.58988764044943,
+    "median_rank": 4.0
+  },
+  "delta": {
+    "p_at_1": 0.06741573033707865,
+    "recall_at_10": 0.011235955056179692,
+    "mrr": 0.03035064619218203,
+    "avg_rank": 17.831460674157285,
+    "median_rank": 0.5
+  },
+  "discordant_counts": {
+    "top1_win": 13,
+    "top1_loss": 1,
+    "top10_win": 3,
+    "top10_loss": 1,
+    "rank_improved": 35,
+    "rank_degraded": 23,
+    "rank_same": 120
+  },
+  "significance": {
+    "top1_exact_binom_p": 0.0018310546875,
+    "top10_exact_binom_p": 0.625,
+    "delta_p_at_1_95ci": [
+      0.02808988764044945,
+      0.1067415730337079
+    ],
+    "delta_recall_at_10_95ci": [
+      -0.011235955056179803,
+      0.0393258426966292
+    ],
+    "delta_mrr_95ci": [
+      0.0069231434222840425,
+      0.05291923692579102
+    ]
+  },
+  "top_query_improvements": [
+    {
+      "query_id": "gt-atlas-015-s03",
+      "tool_id": "exa::web_search_exa",
+      "original_rank": 1452,
+      "optimized_rank": 700,
+      "rank_delta": 752,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-014-s00",
+      "tool_id": "exa::web_search_exa",
+      "original_rank": 1619,
+      "optimized_rank": 1212,
+      "rank_delta": 407,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-043-s04",
+      "tool_id": "exa::web_search_exa",
+      "original_rank": 1709,
+      "optimized_rank": 1468,
+      "rank_delta": 241,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-059-s00",
+      "tool_id": "exa::web_search_exa",
+      "original_rank": 911,
+      "optimized_rank": 687,
+      "rank_delta": 224,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-057-s02",
+      "tool_id": "exa::web_search_exa",
+      "original_rank": 2366,
+      "optimized_rank": 2177,
+      "rank_delta": 189,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-053-s15",
+      "tool_id": "exa::web_search_exa",
+      "original_rank": 120,
+      "optimized_rank": 38,
+      "rank_delta": 82,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-003-s00",
+      "tool_id": "exa::web_search_exa",
+      "original_rank": 685,
+      "optimized_rank": 646,
+      "rank_delta": 39,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-067-s00",
+      "tool_id": "memory::read_graph",
+      "original_rank": 43,
+      "optimized_rank": 21,
+      "rank_delta": 22,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-023-s01",
+      "tool_id": "filesystem::list_directory",
+      "original_rank": 25,
+      "optimized_rank": 12,
+      "rank_delta": 13,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-073-s01",
+      "tool_id": "filesystem::list_directory",
+      "original_rank": 22,
+      "optimized_rank": 10,
+      "rank_delta": 12,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": true
+    }
+  ],
+  "top_query_regressions": [
+    {
+      "query_id": "gt-atlas-036-s03",
+      "tool_id": "calculator::calculate",
+      "original_rank": 484,
+      "optimized_rank": 1830,
+      "rank_delta": -1346,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-075-s00",
+      "tool_id": "exa::web_search_exa",
+      "original_rank": 1290,
+      "optimized_rank": 2097,
+      "rank_delta": -807,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-058-s02",
+      "tool_id": "calculator::calculate",
+      "original_rank": 681,
+      "optimized_rank": 1302,
+      "rank_delta": -621,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-069-s04",
+      "tool_id": "exa::web_search_exa",
+      "original_rank": 1269,
+      "optimized_rank": 1682,
+      "rank_delta": -413,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-070-s00",
+      "tool_id": "exa::web_search_exa",
+      "original_rank": 160,
+      "optimized_rank": 546,
+      "rank_delta": -386,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-013-s02",
+      "tool_id": "calculator::calculate",
+      "original_rank": 30,
+      "optimized_rank": 398,
+      "rank_delta": -368,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-055-s00",
+      "tool_id": "exa::web_search_exa",
+      "original_rank": 1403,
+      "optimized_rank": 1714,
+      "rank_delta": -311,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-043-s00",
+      "tool_id": "exa::web_search_exa",
+      "original_rank": 2350,
+      "optimized_rank": 2529,
+      "rank_delta": -179,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-069-s01",
+      "tool_id": "exa::web_search_exa",
+      "original_rank": 799,
+      "optimized_rank": 943,
+      "rank_delta": -144,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    },
+    {
+      "query_id": "gt-atlas-015-s02",
+      "tool_id": "exa::web_search_exa",
+      "original_rank": 475,
+      "optimized_rank": 611,
+      "rank_delta": -136,
+      "original_top1": false,
+      "optimized_top1": false,
+      "original_top10": false,
+      "optimized_top10": false
+    }
+  ]
+}

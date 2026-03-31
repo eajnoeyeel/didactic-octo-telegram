@@ -1,6 +1,6 @@
 # Tool Preferences in Agentic LLMs are Unreliable
 
-> 출처: EMNLP 2025
+> 출처: EMNLP 2025 (arXiv:2505.18135)
 > 한 줄 요약: 도구 설명의 작은 편집만으로도 LLM의 도구 선택이 크게 변화하며, 설명은 중립 정보가 아닌 "설득 입력(persuasive input)"으로 작동함을 실증한 연구.
 
 ---

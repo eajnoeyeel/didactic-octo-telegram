@@ -20,13 +20,17 @@ These features are confirmed requirements but deferred to a follow-up plan after
 | **Strategy C: Taxonomy-gated** | Pending CTO mentoring confirmation (2026-03-25). `taxonomy_gated.py` stub file is in the structure map; implementation task added as Phase 13 (gated). |
 | **MCP Tool Server** (`find_best_tool` as MCP protocol Tool) | DP1 confirmed dual-exposure (REST + MCP). REST implemented in Phase 8. MCP Tool server is Phase 13 (after REST is stable). |
 
+| **Synthetic GT 추가 수동 검증** (838개) | MCP-Atlas 500 human-authored GT가 primary로 대체. Synthetic은 보조 자료로 격하. 추가 검증은 시간 대비 효율 낮음 (ADR-0011). |
+
 All features above WILL be implemented. This plan produces the core pipeline + Provider Analytics backend. UI and additional features ship in the next plan iteration.
 
 ---
 
 ## Phase 13: Gated Features (Post-Core, After CTO Mentoring 2026-03-25)
 
-> **Gate**: Do NOT start this phase until (a) Phases 0–12 are passing, AND (b) CTO mentoring on 2026-03-25 has confirmed Strategy C viability and MCP Tool server design.
+> **Gate**: Do NOT start this phase until (a) Phases 0–12 are passing, AND (b) CTO mentoring confirmation.
+>
+> **CTO 멘토링 결과 (2026-03-25)**: Strategy C(Taxonomy-gated)는 E1에서 A/B와 비교 후 결정. MCP Tool Server는 core pipeline 안정화 후 구현. Phase 13 gate 조건 (a) 유지 — Phases 0-12 완료 후 진행.
 >
 > **Pre-implementation reference**: `proxy_verification/docs/verification-report.md` — E2E 검증 완료 (6/6 PASS, 2026-03-22). MCP SDK import 경로, 도구 발견 패턴, 에러 전파 패턴, pytest-asyncio 호환성 이슈 해결책 포함.
 

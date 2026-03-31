@@ -1,13 +1,12 @@
 # Description Optimizer — Evaluation Design
 
 > 최종 업데이트: 2026-03-30
-> 근본원인 분석 반영: `docs/analysis/description-optimizer-root-cause-analysis.md`
 
 ---
 
 ## 평가 목표
 
-Description Optimizer가 실제로 검색 선택률(Precision@1)을 향상시키는지 검증.
+Description Optimizer가 실제 RAG retrieval 품질을 향상시키는지 검증.
 
 **핵심 원칙:**
 - P@1이 최종 판단 기준이다
@@ -20,45 +19,77 @@ Description Optimizer가 실제로 검색 선택률(Precision@1)을 향상시키
 - 모든 컴포넌트 단위 테스트 통과
 - Quality Gate 작동 검증 (4-gate: Similarity + Hallucination + Info Preservation + Faithfulness)
 
-### Stage 2: Description Quality Diagnosis (diagnostic only)
-- 최적화 전후 GEO Score 비교 — **진단 목적으로만 기록**
-- GEO Score 변화는 hard gate가 아님 (GEO 하락이 반드시 나쁜 것은 아님)
-- 참고: GEO +0.19 향상이 P@1 -0.069 하락과 동시에 발생한 사례 확인됨
+### Stage 2: Diagnostic Delta
+- GEO Score는 diagnostic-only로 기록
+- Retrieval 개선과의 상관 여부만 관찰
+- 성공/실패 판정에는 사용하지 않음
 
-### Stage 3: Semantic Preservation
-- Cosine similarity(original, optimized) >= 0.85
-- Cosine similarity(original, search) >= 0.75
+### Stage 3: Retrieval Text Safety
+- Cosine similarity(original, retrieval_description) >= 0.85
+- Hallucinated parameter 없음
+- sibling contamination 없음
+- LLM-as-Judge 의미 보존 검증 (future)
 
-### Stage 4: Offline A/B Test (Primary) — 3-way 비교
-
-| 조건 | 설명 | 인덱싱 텍스트 |
-|------|------|--------------|
-| Control | 원본 description | `tool.description` |
-| Treatment A | search description | `search_description` |
-| Treatment B | optimized description | `optimized_description` |
-
+### Stage 4: Offline A/B Test (Primary)
+- Control: 원본 description으로 embedding search
+- Treatment: `retrieval_description`으로 embedding search
 - 동일 Ground Truth 사용
-- **Primary: Control vs Treatment A** (search_description)의 P@1 delta
-- Secondary: Control vs Treatment B (optimized_description의 retrieval 영향 확인)
-- Per-query breakdown: degraded cases 집중 분석
+- `mcp_zero`처럼 raw pool에 라벨이 없으면 `seed_set + mcp_atlas`에서 pool 교집합 GT를 별도 생성
+- Primary readout: query-level `Recall@K`
+- Secondary: query-level `MRR`
+- Diagnostic: query-level `P@1`, tool-average breakdown
 
 ### Stage 5: Statistical Significance
-- McNemar's test (paired, binary outcome)
+- paired bootstrap CI (`Recall@K`, `MRR`, `P@1`)
+- discordant pair exact binomial test (`top1`, `topK`)
 - 유의수준: p < 0.05
-- 최소 효과 크기: +5%p Precision@1
+- 최소 효과 크기: Recall@K non-negative + MRR positive
+
+---
+
+## 최신 검증 상태 (2026-03-30, MCP-Zero)
+
+### Evaluation Set
+
+- Tool pool: `data/raw/mcp_zero_servers.jsonl`
+- Filtered GT: `data/verification/mcp_zero_gt_filtered.jsonl`
+- Queries: `178`
+- Correct tools: `32`
+- Servers: `10`
+
+### Optimization Coverage
+
+- Optimized GT tools: `32`
+- `success`: `7`
+- `gate_rejected`: `25`
+- Success tool이 실제로 영향 줄 수 있는 queries: `61/178`
+
+### Primary Query-Level Result
+
+| 지표 | Original | Optimized | Delta |
+|------|----------|-----------|-------|
+| `P@1` | `0.2753` | `0.3427` | `+0.0674` |
+| `Recall@10` | `0.6517` | `0.6629` | `+0.0112` |
+| `MRR` | `0.4136` | `0.4439` | `+0.0304` |
+
+### Significance
+
+- `delta P@1` 95% CI: `[+0.0281, +0.1067]`
+- `delta Recall@10` 95% CI: `[-0.0112, +0.0393]`
+- `delta MRR` 95% CI: `[+0.0069, +0.0529]`
+- exact binomial `p` for top-1 discordant pairs: `0.0018`
+
+### Current Interpretation
+
+- retrieval-aligned refactor는 `top-1`과 `MRR` 개선을 보였다.
+- `Recall@10`은 소폭 상승했지만 아직 강한 통계적 확신은 부족하다.
+- 현재 최대 병목은 retrieval objective 자체보다 `gate_rejected 25/32`로 나타난 gate throughput이다.
 
 ## 성공 기준
 
 | 지표 | 목표 | 방법 |
 |------|------|------|
-| P@1 delta (search_desc) | +5%p 이상 | 3-way A/B: Control vs Treatment A |
-| Semantic preservation | >= 0.85 cosine (optimized), >= 0.75 (search) | Embedding similarity |
-| No new degradation | 기존 degraded 3건 개선 또는 유지 | Per-query breakdown |
-| GEO Score delta | 기록만 (gate 아님) | Before/after comparison |
-
-## 이전 평가 결과 참조
-
-`optimized_description` 기반 2-way A/B (2026-03-29):
-- Original P@1: 0.5417, Optimized P@1: 0.4722 (δP@1 = -0.069)
-- 이 결과가 evaluation design 재설계의 동기
-- 상세: `data/verification/retrieval_ab_report.json`
+| Recall@K delta | > 0 | A/B test |
+| MRR delta | > 0 | A/B test |
+| Retrieval preservation | >= 0.85 cosine | Embedding similarity |
+| No regression | top-1 win > top-1 loss, long-tail degraded 사례 추적 | Query-level regression verification |

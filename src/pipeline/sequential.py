@@ -6,6 +6,7 @@ from loguru import logger
 from embedding.base import Embedder
 from models import SearchResult
 from pipeline.strategy import PipelineStrategy, StrategyRegistry
+from reranking.base import Reranker
 from retrieval.qdrant_store import QdrantStore
 
 
@@ -27,11 +28,13 @@ class SequentialStrategy(PipelineStrategy):
         tool_store: QdrantStore,
         server_store: QdrantStore,
         top_k_servers: int = 5,
+        reranker: Reranker | None = None,
     ) -> None:
         self.embedder = embedder
         self.tool_store = tool_store
         self.server_store = server_store
         self.top_k_servers = top_k_servers
+        self.reranker = reranker
 
     async def search(self, query: str, top_k: int) -> list[SearchResult]:
         """Execute 2-Layer retrieval for a query.
@@ -69,7 +72,10 @@ class SequentialStrategy(PipelineStrategy):
         logger.debug(f"Layer 2: {len(all_results)} total tool candidates")
 
         all_results.sort(key=lambda r: r.score, reverse=True)
-        return [
+        merged = [
             SearchResult(tool=r.tool, score=r.score, rank=i + 1)
             for i, r in enumerate(all_results[:top_k])
         ]
+        if self.reranker is not None:
+            merged = await self.reranker.rerank(query, merged, top_k)
+        return merged

@@ -1,28 +1,34 @@
 # 실험 상세 — E0-E7 Full Specs
 
-> 최종 업데이트: 2026-03-22
+> 최종 업데이트: 2026-03-29
 > 실험 허브 (요약/방법론): `./experiment-design.md`
 
 ---
 
 ## E0: 1-Layer vs 2-Layer 아키텍처 검증
 
-> E1의 전제 조건. 2-Layer가 이 규모(50-100 서버)에서 Precision@1을 높이는지 확인.
+> E1의 전제 조건. 2-Layer가 MCP-Zero 308 서버 규모에서 Precision@1을 높이는지 확인.
 
 | 조건 | 아키텍처 | 전략 | 임베딩 | Reranker | Pool |
 |------|----------|------|--------|----------|------|
-| E0-A | **1-Layer** (Tool 전체 직접 검색) | — | BGE-M3 | Cohere | Base (50) |
-| E0-B | **2-Layer** Sequential | Sequential | BGE-M3 | Cohere | Base (50) |
-| E0-C | **2-Layer** Parallel (RRF) | Parallel | BGE-M3 | Cohere | Base (50) |
+| E0-A | **1-Layer** (Tool 전체 직접 검색) | — | OpenAI text-embedding-3-small | Cohere | MCP-Zero (308) |
+| E0-B | **2-Layer** Sequential | Sequential | OpenAI text-embedding-3-small | Cohere | MCP-Zero (308) |
+| E0-C | **2-Layer** Parallel (RRF) | Parallel | OpenAI text-embedding-3-small | Cohere | MCP-Zero (308) |
+
+> **임베딩 선택 근거**: E0의 독립 변수는 아키텍처(1-Layer vs 2-Layer)이므로 임베딩은 통제 변인. 현재 구현된 `OpenAIEmbedder`(text-embedding-3-small)를 사용. BGE-M3는 E2에서 비교. MCP-Zero pre-computed `text-embedding-3-large` 벡터는 E2-C 조건에서 활용.
 
 - **측정**: Precision@1, Tool Recall@10, MRR, Latency (p50/p95), Server Classification Error Rate (E0-B만)
-- **판정**: E0-B 또는 E0-C가 E0-A 대비 Precision@1 **+5%p 이상** → 2-Layer 유효 → E1 진행
+- **판정**: E0-B가 E0-A 대비 Precision@1 **+5%p 이상** → 2-Layer 유효 → E1 진행. E0-C는 Phase 7(Parallel 구현) 이후 추가 실행.
 - **미달 시**: 2-Layer 복잡성 대비 이득 없음 → E1을 1-Layer 기준 재설계 (CTO 논의)
 
 ```bash
-python run_experiments.py --experiment E0 --architecture 1layer --pool base
-python run_experiments.py --experiment E0 --strategy sequential --pool base
-python run_experiments.py --experiment E0 --strategy parallel --pool base
+# 현재 구현됨:
+uv run python scripts/run_e0.py                # Flat + Sequential (Parallel은 Phase 7 이후)
+
+# 계획됨 (run_experiments.py 구현 후):
+# python run_experiments.py --experiment E0 --architecture 1layer --pool base
+# python run_experiments.py --experiment E0 --strategy sequential --pool base
+# python run_experiments.py --experiment E0 --strategy parallel --pool base
 ```
 
 ---
@@ -33,17 +39,18 @@ python run_experiments.py --experiment E0 --strategy parallel --pool base
 
 | 조건 | 전략 | 임베딩 | Reranker | Pool |
 |------|------|--------|----------|------|
-| E1-A | Sequential | BGE-M3 | Cohere | Base (50) |
-| E1-B | Parallel (RRF) | BGE-M3 | Cohere | Base (50) |
-| E1-C | Taxonomy-gated | BGE-M3 | Cohere | Base (50) |
+| E1-A | Sequential | BGE-M3 | Cohere | MCP-Zero (308) |
+| E1-B | Parallel (RRF) | BGE-M3 | Cohere | MCP-Zero (308) |
+| E1-C | Taxonomy-gated | BGE-M3 | Cohere | MCP-Zero (308) |
 
 - **측정**: Precision@1, Server Recall@K, Tool Recall@10, MRR, NDCG@5, Confusion Rate, Latency (p50/p95/p99)
 - **특수 측정 (Sequential만)**: Server Classification Error Rate 별도 로깅
 
 ```bash
-python run_experiments.py --experiment E1 --strategy sequential --pool base
-python run_experiments.py --experiment E1 --strategy parallel --pool base
-python run_experiments.py --experiment E1 --strategy taxonomy --pool base
+# 계획됨 (run_experiments.py + Parallel/Taxonomy 구현 후):
+# python run_experiments.py --experiment E1 --strategy sequential --pool base
+# python run_experiments.py --experiment E1 --strategy parallel --pool base
+# python run_experiments.py --experiment E1 --strategy taxonomy --pool base
 ```
 
 ### 결과 보고 형식
@@ -51,7 +58,7 @@ python run_experiments.py --experiment E1 --strategy taxonomy --pool base
 | 지표 | Sequential (A) | Parallel (B) | Taxonomy (C) | 최적 |
 |------|---------------|-------------|-------------|------|
 | Precision@1 | — | — | — | — |
-| Server Recall@3 | — | — | — | — |
+| Server Recall@5 | — | — | — | — |
 | Latency p95 | — | — | — | — |
 | Confusion Rate | — | — | — | — |
 
@@ -63,13 +70,14 @@ python run_experiments.py --experiment E1 --strategy taxonomy --pool base
 
 | 조건 | 전략 | 임베딩 | Reranker | Pool |
 |------|------|--------|----------|------|
-| E2-A | (E1 최적) | BGE-M3 | Cohere | Base (50) |
-| E2-B | (E1 최적) | OpenAI text-embedding-3-small | Cohere | Base (50) |
-| E2-C | (E1 최적) | Voyage voyage-3 | Cohere | Base (50) |
+| E2-A | (E1 최적) | BGE-M3 | Cohere | MCP-Zero (308) |
+| E2-B | (E1 최적) | OpenAI text-embedding-3-small | Cohere | MCP-Zero (308) |
+| E2-C | (E1 최적) | OpenAI text-embedding-3-large (MCP-Zero 제공, 3072D) | Cohere | MCP-Zero (308) |
 
 - **Primary**: Tool Recall@10
 - **Secondary**: Precision@1, Latency, 비용 (API call 수 x 단가)
 - **추가**: Cold start time (인덱스 빌드), 인덱스 크기, BGE-M3 sparse 기여도 (Dense-only vs Dense+Sparse)
+- **E2-D 참고**: MCP-Zero에서 사전 계산된 text-embedding-3-large 벡터 활용 (재임베딩 불필요, `data/external/mcp-zero/embeddings/`)
 
 ---
 
@@ -79,9 +87,9 @@ python run_experiments.py --experiment E1 --strategy taxonomy --pool base
 
 | 조건 | 전략 | 임베딩 | Reranker | Pool |
 |------|------|--------|----------|------|
-| E3-A | (E1 최적) | (E2 최적) | Cohere Rerank 3 단독 | Base (50) |
-| E3-B | (E1 최적) | (E2 최적) | Cohere + LLM fallback (gap < threshold) | Base (50) |
-| E3-C | (E1 최적) | (E2 최적) | LLM-as-Judge 단독 | Base (50) |
+| E3-A | (E1 최적) | (E2 최적) | Cohere Rerank 3 단독 | MCP-Zero (308) |
+| E3-B | (E1 최적) | (E2 최적) | Cohere + LLM fallback (gap < threshold) | MCP-Zero (308) |
+| E3-C | (E1 최적) | (E2 최적) | LLM-as-Judge 단독 | MCP-Zero (308) |
 
 - **측정**: Precision@1 향상폭 (vs no-reranker baseline), Latency 증가, 비용
 - **Confidence 분기 최적화 (E3-B 세부)**:
@@ -94,6 +102,7 @@ python run_experiments.py --experiment E1 --strategy taxonomy --pool base
 ## E4: Description 품질 → 선택률 인과 관계 (테제 검증)
 
 > **이 프로젝트에서 가장 중요한 실험.**
+> 외부 검증: Description Smells 논문 (arxiv:2602.18914)이 description 품질 → 선택률 인과 관계를 사전 검증 (+11.6% 개선, p<0.001). 우리의 차별점: smell 유무 비교가 아닌 GEO 기법을 통한 체계적 개선 방법론 제시.
 
 ### Version A / B 작성 기준 (GEO 기반)
 
@@ -161,6 +170,8 @@ model = sm.OLS(y, sm.add_constant(X)).fit()
 | E5-B | 20 서버 | Base subset |
 | E5-C | 50 서버 | Base Pool |
 | E5-D | 100 서버 | Expanded Pool |
+| E5-E | 200 서버 | MCP-Zero subset |
+| E5-F | 308 서버 | MCP-Zero 전체 |
 
 - **측정**: Pool 크기별 Precision@1 저하 곡선, Latency 증가율, Confusion Rate 증가율
 - **가설**: Pool 커지면 유사 Tool 증가 → Confusion Rate 상승, Precision@1 하락. 저하 속도는 전략에 따라 다름
@@ -169,11 +180,13 @@ model = sm.OLS(y, sm.add_constant(X)).fit()
 
 ## E6: Pool 유사도 실험
 
+> MCPAgentBench (arxiv:2512.24565) distractor 접근법 참고: 정답 tool + 비슷한 distractor tool 혼합으로 체계적 ambiguity 평가.
+
 | 조건 | Pool 유형 | 목적 |
 |------|----------|------|
 | E6-Low | Low Similarity Pool | Confusion Rate 최저 베이스라인 |
 | E6-Base | Base Pool | 일반적 조건 |
-| E6-High | High Similarity Pool | Confusion Rate 스트레스 테스트 |
+| E6-High | High Similarity Pool (MCP-Zero에서 유사 서버 선별) | Confusion Rate 스트레스 테스트 |
 
 - **Primary**: Confusion Rate 변화
 - **Secondary**: Precision@1, NDCG@5
@@ -184,8 +197,9 @@ model = sm.OLS(y, sm.add_constant(X)).fit()
 
 | 조건 | 점수 방식 |
 |------|----------|
-| E7-A | 정규식 휴리스틱 (`geo_score.py`) |
-| E7-B | LLM-based (GPT-4o-mini, 1-5점) |
+| E7-A | 정규식 휴리스틱 (`geo_score.py`) — GEO 6D |
+| E7-B | LLM-based (GPT-4o-mini, 1-5점) — GEO 6D |
+| E7-C | Description Smells 4D (Accuracy/Functionality/Completeness/Conciseness) — 외부 루브릭 |
 
 - **측정**:
   - Spearman(geo_score, selection_rate) — 어느 방식이 selection_rate와 더 상관 있는가
@@ -196,12 +210,15 @@ model = sm.OLS(y, sm.add_constant(X)).fit()
 
 ---
 
-## 실험 자동화 — CLI 인터페이스
+## 실험 자동화 — CLI 인터페이스 (계획)
+
+> `scripts/run_experiments.py`는 아직 미구현. 현재는 `scripts/run_e0.py`만 사용 가능.
 
 ```bash
-python run_experiments.py --experiment E1 --strategy sequential --embedding bge-m3 --reranker cohere --pool base --ground-truth data/ground-truth/seed_set.jsonl
-python run_experiments.py --experiment E1 --all-conditions          # 전체 매트릭스
-python run_experiments.py --experiment E1 --strategy sequential --difficulty hard  # 특정 난이도
+# 계획된 CLI (Phase 10 이후):
+# python run_experiments.py --experiment E1 --strategy sequential --embedding bge-m3 --reranker cohere --pool base --ground-truth data/ground_truth/seed_set.jsonl
+# python run_experiments.py --experiment E1 --all-conditions          # 전체 매트릭스
+# python run_experiments.py --experiment E1 --strategy sequential --difficulty hard  # 특정 난이도
 ```
 
 ## 실험 출력 형식

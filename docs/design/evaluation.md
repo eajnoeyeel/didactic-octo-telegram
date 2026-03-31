@@ -1,7 +1,7 @@
 # 평가 체계 참조 허브
 
-> 최종 업데이트: 2026-03-21
-> 이 문서는 평가 체계의 경량 요약 + 상세 문서 포인터입니다.
+> 최종 업데이트: 2026-03-29
+> 이 문서는 평가 체계의 경량 요약 + 상세 문서 포인터입니다. 최신 실험 의존관계와 GT 정의는 `experiment-design.md`, `ground-truth-design.md`를 따른다.
 
 ---
 
@@ -9,9 +9,9 @@
 
 | 파일 | 내용 | 언제 읽는가 |
 |------|------|-------------|
-| [metrics-rubric.md](metrics-rubric.md) | 11개 지표 정의, 임계값, 시각화 방법 | 지표 계산/구현 시. **평가 코드의 source of truth** |
-| [ground-truth-design.md](ground-truth-design.md) | Pydantic 스키마, JSONL 형식, 80개 seed set, synthetic 생성 + Quality Gate | Ground Truth 작성/검증 시 |
-| [experiment-design.md](experiment-design.md) | E1-E7 실험 매트릭스, 통제 변인, CLI 스펙, W&B 연동, Threats to Validity | 실험 설계/실행/결과 해석 시 |
+| [metrics-rubric.md](metrics-rubric.md) | 11개 지표 정의, 임계값, 시각화 방법 | 지표 설계/구현 시. **target metric rubric** (구현 현황: `src/evaluation/metrics.py`) |
+| [ground-truth-design.md](ground-truth-design.md) | Pydantic 스키마, JSONL 형식, self seed 80 + MCP-Atlas per-step primary GT + synthetic 보조 | Ground Truth 작성/검증 시 |
+| [experiment-design.md](experiment-design.md) | E0-E7 실험 매트릭스, 통제 변인, CLI 스펙, 외부 데이터 반영 타임라인 | 실험 설계/실행/결과 해석 시 |
 
 ---
 
@@ -45,22 +45,24 @@
 ## 실험 의존관계 그래프
 
 ```
-E1 (전략 비교)
-  └─► E2 (임베딩 모델) ─ E1 최적 전략 고정
-        └─► E3 (Reranker) ─ E1+E2 고정
-              ├─► E4 (Description A/B) ★ 테제 검증
-              ├─► E5 (Pool 스케일)
-              └─► E6 (Pool 유사도)
+E0 (1-Layer vs 2-Layer)
+  └─► E1 (전략 비교)
+        └─► E2 (임베딩 모델)
+              └─► E3 (Reranker)
+                    ├─► E4 (Description A/B) ★ 테제 검증
+                    ├─► E5 (Pool 스케일)
+                    └─► E6 (Pool 유사도)
 
-E7 (GEO 점수 방법) ─ OQ-1 해결 후 독립 실행
+E7 (GEO 점수 방법 비교) ─ E4 selection data와 함께 해석
 ```
 
 | 실험 | 독립 변인 | Primary Metric | 시기 |
 |------|-----------|----------------|------|
-| E1 | 검색 전략 (A/B/C) | Precision@1 | Week 2 |
+| E0 | 아키텍처 (1-Layer / 2-Layer) | Precision@1 | 외부 데이터 통합 직후 |
+| E1 | 검색 전략 (A/B/C) | Precision@1 | Week 3 |
 | E2 | 임베딩 모델 | Tool Recall@10 | Week 3 |
-| E3 | Reranker 타입 | Precision@1 lift | Week 3 |
+| E3 | Reranker 타입 | Precision@1 lift | Week 4 |
 | E4 | Description 품질 (A/B) | Selection Rate Lift | Week 4 |
-| E5 | Pool 크기 (5/20/50/100) | Precision@1 degradation | Week 4 |
+| E5 | Pool 크기 (5/20/50/100/200/308) | Precision@1 degradation | Week 4 |
 | E6 | Pool 유사도 (Low/Base/High) | Confusion Rate | Week 4 |
-| E7 | GEO 점수 방법 (regex/LLM) | Human agreement | TBD |
+| E7 | GEO 점수 방법 (휴리스틱/LLM/Smells 4D) | Spearman + Human agreement | Week 5 |

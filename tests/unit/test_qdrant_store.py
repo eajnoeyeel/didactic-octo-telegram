@@ -17,6 +17,7 @@ def sample_tool() -> MCPTool:
         tool_name="search_issues",
         tool_id="@smithery-ai/github::search_issues",
         description="Search GitHub issues by query",
+        retrieval_description="github search issues bug report",
         input_schema={
             "type": "object",
             "properties": {
@@ -37,8 +38,18 @@ def tool_no_description() -> MCPTool:
 
 
 class TestBuildToolText:
-    def test_with_description(self, sample_tool):
+    def test_prefers_retrieval_description(self, sample_tool):
         text = QdrantStore.build_tool_text(sample_tool)
+        assert text == "search_issues: github search issues bug report"
+
+    def test_falls_back_to_description(self):
+        tool = MCPTool(
+            server_id="@smithery-ai/github",
+            tool_name="search_issues",
+            tool_id="@smithery-ai/github::search_issues",
+            description="Search GitHub issues by query",
+        )
+        text = QdrantStore.build_tool_text(tool)
         assert text == "search_issues: Search GitHub issues by query"
 
     def test_without_description(self, tool_no_description):
@@ -53,11 +64,13 @@ class TestToolToPayload:
         assert payload["server_id"] == "@smithery-ai/github"
         assert payload["tool_name"] == "search_issues"
         assert payload["description"] == "Search GitHub issues by query"
+        assert payload["retrieval_description"] == "github search issues bug report"
         assert payload["input_schema"] is not None
 
     def test_none_description(self, tool_no_description):
         payload = QdrantStore.tool_to_payload(tool_no_description)
         assert payload["description"] is None
+        assert payload["retrieval_description"] is None
 
 
 class TestPayloadToTool:
@@ -68,6 +81,7 @@ class TestPayloadToTool:
         assert restored.server_id == sample_tool.server_id
         assert restored.tool_name == sample_tool.tool_name
         assert restored.description == sample_tool.description
+        assert restored.retrieval_description == sample_tool.retrieval_description
 
     def test_raises_on_missing_key(self):
         bad_payload = {"server_id": "srv"}  # missing tool_name, tool_id

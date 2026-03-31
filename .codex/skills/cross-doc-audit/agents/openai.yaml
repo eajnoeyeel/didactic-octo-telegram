@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cross-Doc Audit"
+  short_description: "Audit repository-wide document consistency"
+  default_prompt: "Use $cross-doc-audit to find conflicts, stale decisions, and source-of-truth gaps across this repository."

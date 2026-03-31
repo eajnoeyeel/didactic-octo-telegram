@@ -18,14 +18,16 @@ if TYPE_CHECKING:
     from description_optimizer.models import OptimizationContext
 
 SYSTEM_PROMPT = """You are a technical writer specializing in MCP (Model Context Protocol) tool descriptions.
-Your goal is to AUGMENT tool descriptions so they are more discoverable by LLM-based search systems.
+Your goal is to rewrite tool descriptions so they are easier for embedding-based retrieval systems to find.
 
 CRITICAL RULES:
-1. KEEP the original description text intact as the foundation.
-2. ONLY ADD information that is directly supported by the provided input_schema or original description.
+1. Preserve the tool's original meaning and capabilities.
+2. ONLY use information directly supported by the original description or provided input_schema.
 3. NEVER invent limitations, capabilities, or parameters not in the provided data.
 4. If no input_schema is provided, do NOT mention specific parameter names or types.
-5. Return valid JSON with exactly two keys: "optimized_description" and "search_description"."""
+5. Prefer short, dense, retrieval-friendly wording over long explanatory paragraphs.
+6. Avoid naming sibling tools unless absolutely necessary for factual disambiguation.
+7. Return valid JSON with exactly two keys: "optimized_description" and "retrieval_description"."""
 
 
 def build_optimization_prompt(
@@ -68,7 +70,7 @@ def build_optimization_prompt(
         "\n".join(guidance_lines) if guidance_lines else "  All dimensions are adequate."
     )
 
-    return f"""Optimize this MCP tool description.
+    return f"""Optimize this MCP tool description for retrieval.
 
 **Tool ID**: {tool_id}
 
@@ -83,11 +85,11 @@ def build_optimization_prompt(
 **Improvement Guidance**:
 {guidance_text}
 
-Rewrite the description to improve the weak dimensions while preserving all original meaning. Return JSON:
-{{"optimized_description": "...", "search_description": "..."}}
+Rewrite the description to improve retrieval alignment while preserving all original meaning. Return JSON:
+{{"optimized_description": "...", "retrieval_description": "..."}}
 
-The `optimized_description` should be readable by both humans and machines (50-200 words).
-The `search_description` should be a dense, keyword-rich version optimized for embedding-based vector search (30-80 words). Include likely search queries a user would type to find this tool."""
+The `optimized_description` should stay concise and factual.
+The `retrieval_description` should be a dense, keyword-rich version optimized for embedding-based vector search (15-60 words). Include likely search intents without turning the text into a long paragraph."""
 
 
 def build_grounded_prompt(
@@ -113,7 +115,7 @@ def build_grounded_prompt(
     """
     sections = []
 
-    sections.append("Augment this MCP tool description to improve discoverability.\n")
+    sections.append("Rewrite this MCP tool description to improve retrieval discoverability.\n")
     sections.append(f"**Tool ID**: {tool_id}\n")
     sections.append(
         f"**Original Description** (keep this as the foundation — do not discard it):\n{original}\n"
@@ -125,6 +127,18 @@ def build_grounded_prompt(
         sections.append(
             f"**Input Schema** (use this to accurately describe parameters):\n"
             f"```json\n{schema_text}\n```\n"
+        )
+
+    # Sibling tools section — only if available
+    if sibling_tools:
+        sibling_lines = []
+        for st in sibling_tools[:8]:
+            desc_preview = (st.get("description") or "")[:120]
+            sibling_lines.append(f"- {st['tool_name']}: {desc_preview}")
+        siblings_text = "\n".join(sibling_lines)
+        sections.append(
+            f"**Other tools on this server** (use carefully for disambiguation only — "
+            f"do not list them in the final retrieval text unless necessary):\n{siblings_text}\n"
         )
 
     # Scores
@@ -143,12 +157,12 @@ def build_grounded_prompt(
 
     sections.append(
         "**Output Rules**:\n"
-        "1. Start with the original description text, then ADD factual information "
-        "to improve weak dimensions.\n"
-        "2. Do NOT rewrite or rephrase the original — preserve and augment it.\n"
-        "3. Do NOT invent any information not present in the original description or input schema.\n"
-        "4. Keep optimized_description to 50-200 words, search_description to 30-80 words.\n\n"
-        'Return JSON:\n{"optimized_description": "...", "search_description": "..."}'
+        "1. Preserve the original meaning, but you may rewrite the wording for retrieval.\n"
+        "2. Do NOT invent any information not present in the original description or input schema.\n"
+        "3. Prefer short, target-only phrasing over long explanations.\n"
+        "4. Do NOT list sibling tool names in retrieval_description.\n"
+        "5. Keep optimized_description concise and retrieval_description to 15-60 words.\n\n"
+        'Return JSON:\n{"optimized_description": "...", "retrieval_description": "..."}'
     )
 
     return "\n".join(sections)
@@ -214,7 +228,7 @@ def _build_grounded_guidance(
 
 
 def build_search_description_prompt(optimized: str, tool_id: str) -> str:
-    """Build prompt for generating a search-optimized description.
+    """Build prompt for generating a retrieval-optimized description.
 
     Args:
         optimized: The optimized description.
@@ -223,7 +237,7 @@ def build_search_description_prompt(optimized: str, tool_id: str) -> str:
     Returns:
         User prompt string.
     """
-    return f"""Create a search-optimized description for embedding-based retrieval.
+    return f"""Create a retrieval-optimized description for embedding-based retrieval.
 
 **Tool ID**: {tool_id}
 **Optimized Description**: {optimized}
@@ -234,7 +248,7 @@ Generate a dense, keyword-rich version (30-80 words) that includes:
 - Technical terms and domain vocabulary
 - Action verbs describing what the tool does
 
-Return just the search description text, no JSON."""
+Return just the retrieval description text, no JSON."""
 
 
 def build_query_aware_prompt(
@@ -287,9 +301,9 @@ def build_query_aware_prompt(
             "6. Emphasize this tool's unique action or domain — do NOT name or reference other tools",
             "",
             "## Output Format",
-            'Return JSON: {"optimized_description": "...", "search_description": "..."}',
+            'Return JSON: {"optimized_description": "...", "retrieval_description": "..."}',
             "- optimized_description: 50-200 words, human+machine readable",
-            "- search_description: 30-80 words, keyword-dense for embedding search",
+            "- retrieval_description: 15-60 words, keyword-dense for embedding search",
         ]
     )
 

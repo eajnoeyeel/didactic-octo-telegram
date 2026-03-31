@@ -9,79 +9,76 @@
 
 | 항목 | 상태 |
 |------|------|
-| 브랜치 | `feat/description-optimizer` (main에서 분기) |
-| 테스트 | **396 passed** (description optimizer + verification + evaluation) |
-| Lint | PASS |
-| Phase 1 (Core) | Task 1-10 완료 ✅ |
-| Phase 2 (Grounded) | boundary→fluency, RAGAS, doc2query, P@1 A/B 완료 ✅ |
-| P@1 A/B 평가 | **δP@1 = -0.069 (검색 성능 저하 확인)** |
-| 3-way A/B 평가 | **δP@1 = 0.000 (search) / -0.069 (gt_opt) — sibling 오염 확인** |
-| 근본원인 분석 | **완료** (2026-03-30) |
-| **현재 단계** | **disambiguation 재설계 → 3-way A/B 재검증** |
-
-### 핵심 발견
-
-Grounded optimization은 환각 제거에 성공했으나, retrieval alignment 미해결:
-- GEO +0.19 향상이 P@1 -0.069 하락으로 이어짐
-- 근본원인: `search_description`이 retrieval 경로에 연결되지 않음 + GEO 보상 왜곡
-- 3-way A/B 결과: search_description도 동일하게 저하 — 길이가 아닌 sibling 오염이 원인
-- 상세: `docs/analysis/description-optimizer-root-cause-analysis.md`
+| 구현 상태 | retrieval-aligned refactor 반영 완료 |
+| canonical field | `retrieval_description` |
+| GEO 역할 | diagnostic-only |
+| 최신 검증 | MCP-Zero filtered GT 기준 offline validation 완료 |
+| targeted verification | `230 passed` |
+| lint 상태 | changed-file `ruff check` PASS |
 
 ---
 
-## Phase 1 완료 작업 (2026-03-28)
+## 이번 단계에서 완료된 일
 
-### Task 1: Data Models — ✅ 완료
-- `src/description_optimizer/__init__.py`
-- `src/description_optimizer/models.py` — DimensionScore, AnalysisReport, OptimizedDescription, OptimizationStatus
-- `tests/unit/test_description_optimizer/test_models.py` — 11 tests
+### 1. Retrieval-aligned refactor
 
-### Task 2: DescriptionAnalyzer ABC + HeuristicAnalyzer — ✅ 완료
-- `src/description_optimizer/analyzer/__init__.py`
-- `src/description_optimizer/analyzer/base.py` — DescriptionAnalyzer ABC
-- `src/description_optimizer/analyzer/heuristic.py` — 6차원 regex 기반 GEO 스코어링
-- `tests/unit/test_description_optimizer/test_heuristic_analyzer.py` — 16 tests
+- `MCPTool`에 `retrieval_description` 추가
+- indexing/search path가 `retrieval_description -> description` 순으로 텍스트 선택
+- GEO 기반 skip 제거
+- Quality Gate를 retrieval-safe checks 중심으로 재정렬
+- evaluation/reporting이 `Recall@K`, `MRR`, `P@1`을 기록하도록 정리
 
-### Task 3: DescriptionOptimizer ABC + LLM Optimizer — ✅ 완료
-- `src/description_optimizer/optimizer/__init__.py`
-- `src/description_optimizer/optimizer/base.py` — DescriptionOptimizer ABC
-- `src/description_optimizer/optimizer/prompts.py` — 6차원 맞춤 프롬프트 템플릿
-- `src/description_optimizer/optimizer/llm_optimizer.py` — GPT-4o-mini 기반 재작성
-- `tests/unit/test_description_optimizer/test_llm_optimizer.py` — 7 tests
+### 2. MCP-Zero 검증용 artifact 생성
 
-### Task 4: Quality Gate — ✅ 완료
-- `src/description_optimizer/quality_gate.py` — GateResult, FullGateResult, QualityGate
-- GEO Score 비하락 검증 + cosine similarity >= 0.85 검증
-- `tests/unit/test_description_optimizer/test_quality_gate.py` — 8 tests
+- filtered GT 생성:
+  - `data/verification/mcp_zero_gt_filtered.jsonl`
+  - `178 queries / 32 tools / 10 servers`
+- GT tool optimization 결과 생성:
+  - `data/verification/mcp_zero_gt_optimized_descriptions.jsonl`
+  - `7 success / 25 gate_rejected`
 
-### Task 5: Optimization Pipeline — ✅ 완료
-- `src/description_optimizer/pipeline.py` — analyze → (skip?) → optimize → re-analyze → gate
-- skip_threshold=0.75, batch 처리 지원
-- `tests/unit/test_description_optimizer/test_pipeline.py` — 10 tests
+### 3. 최신 성능 검증
 
-### Task 6: CLI Script — ✅ 완료
-- `scripts/optimize_descriptions.py` — --dry-run, --skip-threshold, --input, --output
+Primary query-level readout:
 
-### Task 7: Evaluation Tests — ✅ 완료
-- `tests/evaluation/test_optimizer_evaluation.py` — GEO Score 차별화 검증 (4 tests)
-- `description_optimizer/docs/evaluation-design.md` — 5단계 평가 설계
+| Metric | Original | Optimized | Delta |
+|--------|----------|-----------|-------|
+| `P@1` | `0.2753` | `0.3427` | `+0.0674` |
+| `Recall@10` | `0.6517` | `0.6629` | `+0.0112` |
+| `MRR` | `0.4136` | `0.4439` | `+0.0304` |
 
-### Task 8: Integration Test — ✅ 완료
-- `tests/integration/test_description_optimizer_integration.py` — mock LLM + real analyzer/gate (2 tests)
-
-### Task 9: Full Test Suite + Lint — ✅ 완료
-- 58 tests passing, lint clean
-
-### Task 10: Documentation — ✅ 완료
+보강 해석:
+- top-1 discordant pairs: `13 win / 1 loss`
+- `delta P@1` 95% CI: `[+0.0281, +0.1067]`
+- `delta MRR` 95% CI: `[+0.0069, +0.0529]`
+- `delta Recall@10` 95% CI: `[-0.0112, +0.0393]`
 
 ---
 
-## 핵심 문서 참조
+## 현재 해석
+
+1. retrieval-aligned 방향 전환 자체는 유효했다.
+2. 개선은 주로 top-1 / top-few ranking에서 관찰된다.
+3. 전체 효과가 제한적인 이유는 optimizer 성능보다 `gate_rejected 25/32`가 더 큰 병목이기 때문이다.
+4. 일부 long-tail query에서는 rank가 악화되어 추가 회귀 통제가 필요하다.
+
+---
+
+## 다음 우선순위
+
+1. gate reject 25건을 유형별로 분해한다.
+2. similarity threshold `0.75`의 민감도를 재검증한다.
+3. long-tail regression이 큰 `exa`, `calculator` 계열 쿼리를 별도 분석한다.
+4. `Recall@10` 개선을 더 안정적으로 만들 수 있는 prompt/gate 조합을 찾는다.
+
+---
+
+## 핵심 참조 문서
 
 | 문서 | 용도 |
 |------|------|
-| `docs/superpowers/plans/2026-03-28-description-optimizer.md` | **구현 계획 (SOT)** |
-| `description_optimizer/CLAUDE.md` | 서브프로젝트 규칙, 아키텍처 |
-| `description_optimizer/docs/research-analysis.md` | 학술적 근거 |
-| `description_optimizer/docs/evaluation-design.md` | 평가 설계 |
-| `docs/analysis/description-optimizer-root-cause-analysis.md` | **근본원인 분석 SOT** (2026-03-30) |
+| `description_optimizer/CLAUDE.md` | 서브프로젝트 운영 요약 |
+| `description_optimizer/docs/evaluation-design.md` | 평가 기준 및 최신 결과 |
+| `description_optimizer/docs/research-analysis.md` | 학술 근거 + empirical validation |
+| `docs/analysis/description-optimizer-mcp-zero-validation-20260330.md` | 최신 MCP-Zero 검증 보고서 |
+| `docs/analysis/description-optimizer-root-cause-analysis.md` | historical regression 분석 |

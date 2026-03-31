@@ -5,8 +5,8 @@ description: Plan or run multi-step experiment workflows such as E0-E7, compare 
 
 # Experiment Orchestration
 
-1. Verify the runnable surface first. In the current repo, `scripts/run_experiments.py` and `src/evaluation/` are not present, so many experiment requests are design/planning tasks rather than executable workflows.
-2. If the harness is absent, do not fabricate commands or results. Reframe the task as design, gap analysis, or implementation planning.
+1. Verify the runnable surface first. Currently available: `scripts/run_e0.py` (Flat + Sequential), `src/evaluation/` (harness + metrics). `scripts/run_experiments.py` (full E0-E7 CLI)는 아직 미구현.
+2. E0 이외의 실험 요청은 design/planning task로 취급. 존재하지 않는 command/결과를 만들지 말 것.
 3. If/when experiment code exists, keep dependency order explicit:
    - E0 -> E1 -> E2 -> E3
    - E4 / E5 / E6 can run in parallel only after the shared prerequisites exist

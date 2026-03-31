@@ -1,7 +1,8 @@
 # MCP Selection Optimizer — 기획/설계 통합 검토
 
 > 최종 업데이트: 2026-03-22
-> 목적: 14개 문서의 핵심 요약 + 검토 포인트 인덱스. 상세 분석은 각 원본 문서 참조.
+> historical snapshot. 현재 SOT가 아니다.
+> 현재 기준은 `docs/AGENTS.md`, `docs/design/*`, `docs/adr/*`, `docs/plan/checklist.md`, `docs/progress/status-report.md`를 따른다.
 
 ---
 

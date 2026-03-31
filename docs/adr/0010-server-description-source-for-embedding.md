@@ -1,8 +1,9 @@
 # ADR-0010: 서버 설명 텍스트 출처 — MCP instructions vs Smithery description
 
 **Date**: 2026-03-27
-**Status**: proposed
+**Status**: accepted (data source updated by ADR-0011, core concern remains)
 **Deciders**: E0 실험 설계 검토 과정에서 도출
+**ADR-0011 영향**: Tool Pool이 MCP-Zero(308 servers)로 전환됨. 그러나 본 ADR의 핵심 concern — "서버 설명 텍스트 품질이 E0 결과를 오염시키는 confound" — 은 미해결. MCP-Zero의 `server_description`/`server_summary`가 Smithery 마케팅 카피와 동일 수준이면 confound 여전히 존재. MCP-Zero 서버 설명 품질 확인 후 enriched description arm 필요 여부 결정.
 
 ## Context
 
