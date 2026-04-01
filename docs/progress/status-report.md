@@ -1,7 +1,7 @@
 # MCP Discovery Platform — 진행 현황 보고서
 
-> 최종 업데이트: 2026-03-31
-> 브랜치: `main` + `feat/description-optimizer` (정리 완료, 재개 보류)
+> 최종 업데이트: 2026-03-29
+> 브랜치: `main`
 
 ---
 
@@ -19,45 +19,13 @@
 
 | 항목 | 현재 상태 |
 |------|-----------|
-| 완료된 Phase | Phase 0 ~ Phase 5, Description Optimizer branch-side implementation/validation 정리 완료 |
-| 진행중 | **Phase 6 (Reranker) 준비 + OQ-2 외부 데이터/인덱싱 정리** |
-| 다음 Phase | Phase 6 (Reranker) + E0 + Pool 인덱싱 |
-| 테스트 | **description-optimizer targeted 230 passed** (2026-03-30) |
-| 커버리지 | **92%** (feat/description-optimizer 기준) |
-| Lint/Format | changed-file `ruff check` PASS, repo-wide ruff는 `scripts/run_e0.py` 기존 이슈 존재 |
+| 완료된 Phase | Phase 0 ~ Phase 5 |
+| 다음 Phase | Phase 6 통합/검증 + 외부 데이터 통합 정렬 (MCP-Zero + MCP-Atlas) |
+| 테스트 | **260 passed**, 0 skipped |
+| 커버리지 | **98.56%** (목표 80%+ 대폭 초과) |
+| Lint/Format | PASS (ruff check + ruff format) |
 | 외부 서비스 | Qdrant Docker 로컬 + Smithery API + OpenAI API 실제 연동 검증 완료 |
 | PR | #1 (core-pipeline), #2 (ground-truth) 머지 완료 |
-
-### Description Optimizer 정리 상태 (deferred)
-
-| 항목 | 상태 |
-|------|------|
-| Grounded Optimization | 10 tasks 구현 완료 |
-| Branch 실험 요약 | Smithery sample A/B → rooted cause 분석 → MCP-Zero retrieval validation까지 완료 |
-| **최신 결론** | `retrieval_description` 중심 전환은 유효하지만, 현재 병목은 `gate throughput`과 long-tail regression control |
-| **현재 상태** | 구현/실험 기록 보존 후 **최종 backlog로 이동** |
-| 재개 기준 문서 | `description_optimizer/docs/development-history.md` |
-| 상세 보고서 | `docs/analysis/description-optimizer-mcp-zero-validation-20260330.md`, `docs/analysis/description-optimizer-root-cause-analysis.md` |
-
-**P@1 A/B 평가 상세 (2026-03-29):**
-- 36 GT 도구 최적화 → 18 success, 18 gate-rejected
-- Original P@1: 0.5417, Optimized P@1: 0.4722, **δP@1 = -0.069**
-- Per-tool: 1 improved (`github::list_issues`), 3 degraded (`math-mcp::median`, `math-mcp::round`, `instagram::GET_USER_MEDIA`), 32 same
-- **근본원인**: (1) search_description 미사용 (2) GEO 보상 왜곡 (3) disambiguation 오염 — 분석 완료, `docs/analysis/description-optimizer-root-cause-analysis.md`
-- 가설: (a) GEO 차원 무관성 (b) 길이→임베딩 희석 (c) sibling 혼동
-
-**MCP-Zero Offline Validation (2026-03-30):**
-- 평가 셋: `data/raw/mcp_zero_servers.jsonl` + filtered GT `178 queries / 32 tools / 10 servers`
-- optimizer 결과: `7 success / 25 gate_rejected`
-- query-level primary metrics:
-  - `P@1`: `0.2753 → 0.3427` (`+0.0674`)
-  - `Recall@10`: `0.6517 → 0.6629` (`+0.0112`)
-  - `MRR`: `0.4136 → 0.4439` (`+0.0304`)
-- 통계 신호:
-  - `delta P@1` 95% CI: `[+0.0281, +0.1067]`
-  - `delta MRR` 95% CI: `[+0.0069, +0.0529]`
-  - `delta Recall@10` 95% CI: `[-0.0112, +0.0393]`
-- **결론**: retrieval-aligned 방향 전환은 유효. 다만 gate reject 비율이 높아 전체 효과가 제한적이며, 다음 bottleneck은 gate throughput과 long-tail regression control이다.
 
 ---
 
@@ -330,25 +298,17 @@ tests/
 
 ## 다음 단계
 
-### 우선순위 1: 기존 파이프라인 진행
-1. **OQ-2: 임베딩 인덱스 빌드** — `scripts/collect_data.py` + `scripts/build_index.py --pool-size 50`
-2. **E0 실험** — `evaluate(flat_strategy, gt_queries)` vs `evaluate(sequential_strategy, gt_queries)`
-3. **Phase 6** — Cohere reranker 파이프라인 연결 + 단위 테스트
-
-### 우선순위 2: 후속 backlog 준비
-1. `description_optimizer`는 문서/데이터 정리 완료 상태로 유지
-2. 재개 시 `description_optimizer/docs/development-history.md` 기준으로 gate reject 분석부터 시작
+### 즉시 가능 (외부 서비스 불필요)
+1. **OQ-2: 임베딩 인덱스 빌드** — `scripts/collect_data.py` + `scripts/build_index.py --pool-size 50`으로 Pool 50 인덱싱
+2. **E0 실험** — `evaluate(flat_strategy, gt_queries)` vs `evaluate(sequential_strategy, gt_queries)` 비교 (Phase 5 완료로 unblocked)
 
 ### 백로그
 
+> OpenAI API 키 확보 완료 (2026-03-25). 통합 테스트 활성화 완료.
+
 | 우선순위 | 항목 | 상태 |
 |---------|------|------|
-| ~~높음~~ | ~~GEO Scorer 개선 리서치~~ | **완료** (근본원인 분석으로 대체) |
-| ~~높음~~ | ~~Grounded Optimization 구현 (10 tasks)~~ | **완료** (2026-03-29) |
-| ~~높음~~ | ~~`openai_embedder.py` 통합 테스트 활성화~~ | **완료** |
-| ~~높음~~ | ~~Synthetic GT 생성 실행~~ — 838개 생성 | **완료** |
-| ~~높음~~ | ~~Retrieval 경로 재정렬 + 3-way A/B 평가~~ | **완료** (sibling 오염 확인) |
+| ~~높음~~ | ~~`openai_embedder.py` 통합 테스트 활성화 (skip 6개 해소)~~ | **완료** |
+| ~~높음~~ | ~~Synthetic GT 생성 실행 (`scripts/generate_ground_truth.py`)~~ — 838개 생성 | **완료** |
 | 높음 | 임베딩 인덱스 빌드 (`scripts/build_index.py`) | 대기 |
 | 중간 | E0 실험: 1-Layer vs 2-Layer 검증 | Phase 5 완료 후 |
-| 낮음 | Description Optimizer 재개 (`gate` 튜닝, disambiguation 재설계, E4/E7) | **최종 backlog** |
-| ~~중간~~ | ~~Precision@1 end-to-end 평가~~ | **완료** (δP@1=-0.069) |

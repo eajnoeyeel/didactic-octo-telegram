@@ -1,6 +1,5 @@
 # Description Optimizer — Grounded Optimization Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 > **Status: IMPLEMENTATION COMPLETE (2026-03-29).** 10 tasks 구현 완료, 389 tests, 92% coverage.
 > **A/B 비교 완료.** Grounded가 실질적 품질 우수하나 GEO scorer Goodhart's Law 문제 발견.
 > **다음 단계:** 논문 리서치 → GEO scorer 개선. 상세: `docs/analysis/grounded-ab-comparison-report.md`

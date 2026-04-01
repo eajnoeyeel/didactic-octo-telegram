@@ -126,7 +126,6 @@
 ## 백로그
 
 > OpenAI API 키 확보 완료 (2026-03-25).
-> 2026-03-31 업데이트: `description-optimizer` 후속 개발은 마지막 backlog로 이동. 재개 시 `description_optimizer/docs/development-history.md`부터 읽는다.
 
 | # | 항목 | 의존 Phase | 우선순위 | 상태 |
 |---|------|-----------|---------|------|
@@ -134,7 +133,6 @@
 | ~~2~~ | ~~Synthetic GT 생성 실행 (`scripts/generate_ground_truth.py`)~~ | Phase 4 | ~~높음~~ | **완료** |
 | 3 | 임베딩 인덱스 빌드 (`scripts/build_index.py`) | Phase 2 | 높음 | 대기 |
 | 4 | E0 실험: 1-Layer vs 2-Layer 검증 | Phase 5 | 중간 | 대기 |
-| 5 | Description Optimizer 재개 (`gate` 튜닝, disambiguation 재설계, E4/E7) | Phase 13 + E0-E3/E5-E6 | 낮음 | **최종 backlog** |
 
 ---
 
@@ -158,7 +156,6 @@
 - [ ] Cohere Rerank 3, Cohere + LLM fallback (threshold sweep), LLM-as-Judge 비교
 
 ### E4: Description A/B — 테제 검증 (Week 4, 핵심)
-> 실행 상태 업데이트 (2026-03-31): `description-optimizer` 후속 개발과 함께 **최종 backlog**로 이동. 현재는 스펙만 보존한다.
 - [ ] Version A (Poor) vs Version B (Good) 평가
 - [ ] McNemar's test, Spearman, OLS Regression R²
 - [ ] Evidence Triangulation: 3개 중 2개 이상 통과 여부
@@ -170,7 +167,6 @@
 - [ ] Low/Base/High Similarity Pool에서 Confusion Rate, Precision@1, NDCG@5
 
 ### E7: GEO 점수 비교 (OQ-1 해결 후)
-> 실행 상태 업데이트 (2026-03-31): E4 재개 이후 follow-up으로만 진행한다.
 - [ ] 휴리스틱 vs LLM vs Description Smells 4D Spearman 비교 + Human agreement (20-30개)
 
 ---

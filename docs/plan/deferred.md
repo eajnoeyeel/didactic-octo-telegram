@@ -19,23 +19,10 @@ These features are confirmed requirements but deferred to a follow-up plan after
 | **Feedback Loop Dashboard** (PM-3) | Requires aggregator (Phase 9) + UI. Post-core. |
 | **Strategy C: Taxonomy-gated** | Pending CTO mentoring confirmation (2026-03-25). `taxonomy_gated.py` stub file is in the structure map; implementation task added as Phase 13 (gated). |
 | **MCP Tool Server** (`find_best_tool` as MCP protocol Tool) | DP1 confirmed dual-exposure (REST + MCP). REST implemented in Phase 8. MCP Tool server is Phase 13 (after REST is stable). |
+
 | **Synthetic GT 추가 수동 검증** (838개) | MCP-Atlas 500 human-authored GT가 primary로 대체. Synthetic은 보조 자료로 격하. 추가 검증은 시간 대비 효율 낮음 (ADR-0011). |
-| **Description Optimizer continuation** (gate tuning, disambiguation redesign, E4/E7 thesis validation) | Branch-side code와 evidence는 보존하되, 추가 개발은 core retrieval pipeline과 Provider Analytics가 안정화된 뒤에 재개한다. **현재 로드맵에서는 마지막 backlog 항목**으로 고정하며, 재개 시 `description_optimizer/docs/development-history.md`와 `docs/superpowers/plans/2026-03-31-description-optimizer-resume-backlog.md`를 먼저 읽는다. |
 
 All features above WILL be implemented. This plan produces the core pipeline + Provider Analytics backend. UI and additional features ship in the next plan iteration.
-
----
-
-## Final Backlog Anchor — Description Optimizer
-
-- **상태:** 2026-03-31 기준 보류. 현재 구현과 실험 산출물은 정리 완료했고 삭제하지 않는다.
-- **재개 조건:** Phase 6-13의 핵심 파이프라인이 안정화되고, E0-E3/E5-E6의 기본 retrieval 실험이 끝난 이후.
-- **첫 읽기 순서:**
-  1. `description_optimizer/docs/development-history.md`
-  2. `docs/analysis/description-optimizer-mcp-zero-validation-20260330.md`
-  3. `docs/analysis/description-optimizer-root-cause-analysis.md`
-  4. `docs/superpowers/plans/2026-03-31-description-optimizer-resume-backlog.md`
-- **재개 원칙:** `optimized_description` 임베딩 재도입, GEO hard gate 복귀, sibling-name disambiguation 실험은 그대로 반복하지 않는다.
 
 ---
 
