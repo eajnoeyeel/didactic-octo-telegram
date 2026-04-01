@@ -3,6 +3,8 @@
 > 최종 업데이트: 2026-03-29
 > 이 문서는 평가 체계의 경량 요약 + 상세 문서 포인터입니다. 최신 실험 의존관계와 GT 정의는 `experiment-design.md`, `ground-truth-design.md`를 따른다.
 
+> 실행 상태 업데이트 (2026-03-31): E4/E7과 `description-optimizer` 후속 개발은 현재 실행 우선순위에서 제외하고, post-core final backlog로 보존한다.
+
 ---
 
 ## 상세 문서
@@ -62,7 +64,7 @@ E7 (GEO 점수 방법 비교) ─ E4 selection data와 함께 해석
 | E1 | 검색 전략 (A/B/C) | Precision@1 | Week 3 |
 | E2 | 임베딩 모델 | Tool Recall@10 | Week 3 |
 | E3 | Reranker 타입 | Precision@1 lift | Week 4 |
-| E4 | Description 품질 (A/B) | Selection Rate Lift | Week 4 |
+| E4 | Description 품질 (A/B) | Selection Rate Lift | Post-core backlog |
 | E5 | Pool 크기 (5/20/50/100/200/308) | Precision@1 degradation | Week 4 |
 | E6 | Pool 유사도 (Low/Base/High) | Confusion Rate | Week 4 |
-| E7 | GEO 점수 방법 (휴리스틱/LLM/Smells 4D) | Spearman + Human agreement | Week 5 |
+| E7 | GEO 점수 방법 (휴리스틱/LLM/Smells 4D) | Spearman + Human agreement | E4 후 backlog |

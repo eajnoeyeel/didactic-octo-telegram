@@ -345,7 +345,16 @@ async def main(args: argparse.Namespace) -> None:
     else:
         pool_sizes = [args.pool_size]  # None = all servers
 
-    # --- Setup shared components (reused across sweep iterations) ---
+    # Filter to entries whose correct_server_id is in the index
+    indexed_servers = set(json.loads(line)["server_id"] for line in open("data/raw/servers.jsonl"))
+    entries = [e for e in entries if e.correct_server_id in indexed_servers]
+    logger.info(f"GT: {len(entries)} entries (manually_verified + server in index)")
+
+    if not entries:
+        logger.error("No GT entries covered by current index. Re-crawl missing servers.")
+        return
+
+    # --- Setup shared components ---
     embedder = OpenAIEmbedder(
         api_key=settings.openai_api_key,
         model=E0_EMBEDDING_MODEL,
@@ -463,15 +472,46 @@ async def main(args: argparse.Namespace) -> None:
     finally:
         await qdrant_client.close()
 
-    # --- Save JSON results ---
-    if args.sweep:
-        sweep_data = {"results": sweep_payloads}
-        _save_json(sweep_data, RESULTS_DIR / "e5_scale_sweep.json")
-        # Print sweep summary table
-        logger.info(_format_sweep_table(sweep_payloads))
-    else:
-        if sweep_payloads:
-            _save_json(sweep_payloads[0], RESULTS_DIR / "e0_result.json")
+    # --- Print results ---
+    header = (
+        f"\n{'=' * 60}\nE0 EXPERIMENT RESULTS  (n={len(entries)}, top_k={args.top_k})\n{'=' * 60}"
+    )
+
+    def row(metric: str, f: float, s: float, delta: bool = True) -> str:
+        d = f" {s - f:>+8.3f}" if delta else ""
+        return f"{metric:<20} {f:>14.3f} {s:>20.3f}{d}"
+
+    def row_ms(metric: str, f: float, s: float) -> str:
+        return f"{metric:<20} {f:>14.1f} {s:>20.1f}"
+
+    rows = [
+        f"{'Metric':<20} {'FlatStrategy':>14} {'SequentialStrategy':>20} {'Delta':>8}",
+        f"{'-' * 20} {'-' * 14} {'-' * 20} {'-' * 8}",
+        row("Precision@1", flat_result.precision_at_1, seq_result.precision_at_1),
+        row("Recall@K", flat_result.recall_at_k, seq_result.recall_at_k),
+        row("MRR", flat_result.mrr, seq_result.mrr),
+        row("NDCG@5", flat_result.ndcg_at_5, seq_result.ndcg_at_5),
+        row("Confusion Rate", flat_result.confusion_rate, seq_result.confusion_rate, delta=False),
+        row("ECE", flat_result.ece, seq_result.ece, delta=False),
+        row_ms("Latency p50 (ms)", flat_result.latency_p50, seq_result.latency_p50),
+        row_ms("Latency mean (ms)", flat_result.latency_mean, seq_result.latency_mean),
+    ]
+    output = header + "\n" + "\n".join(rows) + "\n"
+    print(output)
+
+    # --- Save log ---
+    EVAL_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with EVAL_LOG_PATH.open("w") as f:
+        f.write(output)
+        f.write(
+            f"\nNote: Seed Set only (n={len(entries)}, 4 servers: "
+            "instagram, EthanHenrickson/math-mcp, clay-inc/clay-mcp, github)\n"
+        )
+        f.write(
+            "Missing from GT: arxiv, brave-search, postgres, yahoo-finance"
+            " (removed from Smithery)\n"
+        )
+    logger.info(f"Results saved to {EVAL_LOG_PATH}")
 
 
 if __name__ == "__main__":

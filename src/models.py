@@ -56,6 +56,7 @@ class MCPTool(BaseModel):
     tool_name: str
     tool_id: str
     description: str | None = None
+    retrieval_description: str | None = None
     input_schema: dict | None = None
 
     @computed_field
