@@ -9,6 +9,12 @@
 
 - [ ] Version A pool constructed (Smithery original descriptions)
 - [ ] Version B pool constructed (GEO 기법 적용: Statistics Addition, Fluency Optimization, Cite Sources)
+  - ✅ stats (Statistics Addition): 수치/커버리지/성능 데이터 추가
+  - ✅ precision (Cite Sources/Technical Terms): 표준/API/프로토콜 정확도
+  - ✅ clarity (Fluency Optimization): 첫 문장 구조 명확화
+  - ⬜ disambiguation: Version B에서 의도적으로 미개선 (독립 변수 격리)
+  - ⬜ parameter_coverage: Version B에서 미개선
+  - ⬜ boundary: Version B에서 미개선
 - [ ] Identical query set run against both pools
 - [ ] Lift = (P@1_B - P@1_A) / P@1_A × 100% computed
 - [ ] McNemar's test p-value computed
@@ -36,7 +42,7 @@ Judgment (metrics-rubric.md §Evidence Triangulation):
 ## Regression Criteria
 
 - [ ] Best strategy from E1 reproduces E1 Precision@1 within ±2%p (pass^3 = 1.00)
-- [ ] Same ~230-320 GT queries used (MCP-Atlas per-step + self seed 80, all single-step)
+- [ ] Same 474개 총 GT (194개 pool covered, all single-step) used
 
 ## Metric Targets
 

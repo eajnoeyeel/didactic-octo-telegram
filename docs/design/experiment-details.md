@@ -11,11 +11,11 @@
 
 | 조건 | 아키텍처 | 전략 | 임베딩 | Reranker | Pool |
 |------|----------|------|--------|----------|------|
-| E0-A | **1-Layer** (Tool 전체 직접 검색) | — | OpenAI text-embedding-3-small | Cohere | MCP-Zero (308) |
-| E0-B | **2-Layer** Sequential | Sequential | OpenAI text-embedding-3-small | Cohere | MCP-Zero (308) |
-| E0-C | **2-Layer** Parallel (RRF) | Parallel | OpenAI text-embedding-3-small | Cohere | MCP-Zero (308) |
+| E0-A | **1-Layer** (Tool 전체 직접 검색) | — | OpenAI text-embedding-3-large (3072D, MCP-Zero precomputed) | Cohere | MCP-Zero (308) |
+| E0-B | **2-Layer** Sequential | Sequential | OpenAI text-embedding-3-large (3072D, MCP-Zero precomputed) | Cohere | MCP-Zero (308) |
+| E0-C | **2-Layer** Parallel (RRF) | Parallel | OpenAI text-embedding-3-large (3072D, MCP-Zero precomputed) | Cohere | MCP-Zero (308) |
 
-> **임베딩 선택 근거**: E0의 독립 변수는 아키텍처(1-Layer vs 2-Layer)이므로 임베딩은 통제 변인. 현재 구현된 `OpenAIEmbedder`(text-embedding-3-small)를 사용. BGE-M3는 E2에서 비교. MCP-Zero pre-computed `text-embedding-3-large` 벡터는 E2-C 조건에서 활용.
+> **임베딩 선택 근거**: E0의 독립 변수는 아키텍처(1-Layer vs 2-Layer)이므로 임베딩은 통제 변인. MCP-Zero에서 사전 계산된 `text-embedding-3-large` (3072D) 벡터를 사용 (재임베딩 불수행). BGE-M3 및 text-embedding-3-small은 E2에서 비교.
 
 - **측정**: Precision@1, Tool Recall@10, MRR, Latency (p50/p95), Server Classification Error Rate (E0-B만)
 - **판정**: E0-B가 E0-A 대비 Precision@1 **+5%p 이상** → 2-Layer 유효 → E1 진행. E0-C는 Phase 7(Parallel 구현) 이후 추가 실행.
@@ -45,6 +45,7 @@ uv run python scripts/run_e0.py                # Flat + Sequential (Parallel은 
 
 - **측정**: Precision@1, Server Recall@K, Tool Recall@10, MRR, NDCG@5, Confusion Rate, Latency (p50/p95/p99)
 - **특수 측정 (Sequential만)**: Server Classification Error Rate 별도 로깅
+- **통계 검정 (권장)**: 전략 간 Precision@1 차이가 10%p 미만일 때 Cochran's Q test → post-hoc McNemar으로 유의성 확인. 10%p 이상이면 수치 자체로 판단 가능. (`src/analytics/statistical.py` 활용, `experiment-design.md §통계적 검증 적용 계획` 기준)
 
 ```bash
 # 계획됨 (run_experiments.py + Parallel/Taxonomy 구현 후):
@@ -115,6 +116,17 @@ Version B는 GEO 논문 상위 3기법을 적용하여 작성:
 | Fluency Optimization | 첫 문장에 핵심 기능, 구조적 문장 | "Converts PDF to searchable text. Supports OCR for scanned documents." |
 | Cite Sources | 지원 표준/프로토콜 명시 | "Implements RSS 2.0 and Atom 1.0 feed parsing" |
 
+**Version B 개선 항목 (GEO 6D 기준)**:
+- ✅ stats (Statistics Addition): 수치/커버리지/성능 데이터 추가
+- ✅ precision (Cite Sources/Technical Terms): 표준/API/프로토콜 정확도
+- ✅ clarity (Fluency Optimization): 첫 문장 구조 명확화
+- ⬜ disambiguation: Version B에서 의도적으로 미개선 (독립 변수 격리)
+- ⬜ parameter_coverage: Version B에서 미개선
+- ⬜ boundary: Version B에서 미개선
+
+**Spearman correlation 계산 범위**: 6D 전체 사용.
+개선된 3개 차원에서 높은 r_s 기대; 미개선 3개는 E7에서 검증.
+
 > **E7과의 연결**: E7이 먼저 완료된 경우, E7에서 검증된 채점 방식으로 Version A/B의 점수 차이를 정량화하여 E4 보고서에 포함.
 
 ### 4-1. A/B Selection Rate Lift (Primary — Causal)
@@ -166,12 +178,18 @@ model = sm.OLS(y, sm.add_constant(X)).fit()
 
 | 조건 | Pool 크기 | Pool 유형 |
 |------|----------|----------|
-| E5-A | 5 서버 | Base subset |
-| E5-B | 20 서버 | Base subset |
-| E5-C | 50 서버 | Base Pool |
-| E5-D | 100 서버 | Expanded Pool |
-| E5-E | 200 서버 | MCP-Zero subset |
-| E5-F | 308 서버 | MCP-Zero 전체 |
+| E5-A | 5 서버 | base_pool.json[:5] — GT-first |
+| E5-B | 20 서버 | base_pool.json[:20] |
+| E5-C | 50 서버 | base_pool.json[:50] (base pool) |
+| E5-D | 100 서버 | base_pool.json[:100] |
+| E5-E | 200 서버 | base_pool.json[:200] |
+| E5-F | 292 서버 | base_pool.json (전체) |
+
+**Pool ordering (GT-first)**: `data/tool-pools/base_pool.json`은 GT-covered 서버 우선 정렬
+(11개 GT-covered 서버 먼저, 나머지 281개 MCP-Zero 서버 알파벳순).
+pool[:N] 슬라이스가 항상 GT coverage를 최대화하여 E5 Precision@1 저하 곡선이
+GT 고갈이 아닌 실제 pool difficulty를 반영하도록 보장.
+pool_size ≥ 11이면 GT coverage 194 entries로 안정화. `scripts/build_base_pool.py` 참조.
 
 - **측정**: Pool 크기별 Precision@1 저하 곡선, Latency 증가율, Confusion Rate 증가율
 - **가설**: Pool 커지면 유사 Tool 증가 → Confusion Rate 상승, Precision@1 하락. 저하 속도는 전략에 따라 다름

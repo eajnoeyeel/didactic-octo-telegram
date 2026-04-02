@@ -68,28 +68,26 @@ RESULTS_DIR = Path("data/results")
 SWEEP_SIZES: list[int] = [5, 20, 50, 100, 200, 308]
 STRATEGY_CHOICES: list[str] = ["flat", "sequential", "parallel", "all"]
 
+BASE_POOL_PATH = Path("data/tool-pools/base_pool.json")
 
-def _load_pool_server_ids(pool_path: Path, pool_size: int | None = None) -> list[str]:
-    """Load server IDs from MCP-Zero pool JSONL, optionally taking first N (alphabetical)."""
-    if not pool_path.exists():
-        raise FileNotFoundError(f"Pool file not found: {pool_path}")
-    server_ids: set[str] = set()
-    for line in pool_path.read_text().splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        server_ids.add(json.loads(line)["server_id"])
 
-    sorted_ids = sorted(server_ids)
+def _load_pool_server_ids(pool_size: int | None = None) -> list[str]:
+    """Load server IDs in GT-first order from base_pool.json.
+
+    Ordering: GT-covered servers first (by GT entry count desc), then
+    remaining MCP-Zero servers alphabetically. Ensures pool[:N] maximizes
+    GT coverage — required for E5 pool-scale sweep validity.
+    """
+    if not BASE_POOL_PATH.exists():
+        raise FileNotFoundError(
+            f"base_pool.json not found at {BASE_POOL_PATH}. "
+            "Run: uv run python scripts/build_base_pool.py"
+        )
+    ordered: list[str] = json.loads(BASE_POOL_PATH.read_text())
     if pool_size is not None:
-        sorted_ids = sorted_ids[:pool_size]
-
-    logger.info(
-        f"Pool: {len(sorted_ids)} servers"
-        + (f" (subset of {len(server_ids)})" if pool_size is not None else "")
-        + f" loaded from {pool_path}"
-    )
-    return sorted_ids
+        ordered = ordered[:pool_size]
+    logger.info(f"Loaded {len(ordered)}-server pool from {BASE_POOL_PATH}")
+    return ordered
 
 
 def _load_and_filter_gt(pool_server_ids: list[str]) -> list:
@@ -373,17 +371,22 @@ async def main(args: argparse.Namespace) -> None:
     sweep_payloads: list[dict] = []
 
     try:
-        tool_store = QdrantStore(
-            client=qdrant_client, collection_name=settings.qdrant_collection_name
-        )
         server_store = QdrantStore(client=qdrant_client, collection_name="mcp_servers")
 
         for pool_size in pool_sizes:
             logger.info(f"\n{'=' * 40}\nPool size: {pool_size or 'ALL'}\n{'=' * 40}")
 
-            # Load pool (subset or all)
-            pool_server_ids = _load_pool_server_ids(POOL_PATH, pool_size=pool_size)
+            # Load pool (subset or all) — GT-first ordering from base_pool.json
+            pool_server_ids = _load_pool_server_ids(pool_size=pool_size)
             actual_pool_size = len(pool_server_ids)
+
+            # Tool store with pool filter — restricts Qdrant search to active pool servers
+            # (fixes E5 validity: without this, Qdrant returns tools from all 292 servers)
+            tool_store = QdrantStore(
+                client=qdrant_client,
+                collection_name=settings.qdrant_collection_name,
+                pool_server_ids=pool_server_ids,
+            )
 
             # Load & filter GT
             entries = _load_and_filter_gt(pool_server_ids)

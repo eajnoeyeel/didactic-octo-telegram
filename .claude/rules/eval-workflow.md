@@ -111,6 +111,6 @@ docs/
   - 서버/도구 ID 변환: `github_search_repositories` → `github::search_repositories` (첫 번째 `_` 분리)
   - query_id 네이밍: `gt-atlas-{task:03d}-s{step:02d}`
 - Synthetic: LLM 생성 후 Human review 필수 — MCP-Atlas 채택으로 보조 역할로 격하
-- 실험 간 동일한 GT 사용 (독립 변수 1개 원칙): MCP-Atlas per-step 분해 150~240 + self seed 80 = ~230~320개 primary (all single-step)
+- 실험 간 동일한 GT 사용 (독립 변수 1개 원칙): 474개 총 (MCP-Atlas per-step 394 + seed 80), pool covered 194개 primary (all single-step)
 - 외부 GT도 동일 JSONL 포맷으로 변환 후 사용 — 형식 통일 원칙 유지
 - JSONL 형식: `data/ground_truth/` (seed_set.jsonl, mcp_atlas.jsonl, synthetic.jsonl)

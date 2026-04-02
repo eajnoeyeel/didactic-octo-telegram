@@ -8,7 +8,9 @@
 - [ ] `src/pipeline/flat.py` (1-Layer) executes without error — **implemented**
 - [ ] `src/pipeline/sequential.py` (2-Layer Sequential) executes without error — **implemented**
 - [ ] `src/pipeline/parallel.py` (2-Layer Parallel) executes without error — **implemented**
-- [ ] Precision@1 measured on MCP-Atlas per-step ~150-240 + self seed 80 GT queries (~230-320 total, all single-step)
+- [ ] Precision@1 measured on 474개 총 GT (MCP-Atlas per-step 394 + seed 80), pool covered 194개 (all single-step)
+- [ ] Embedding: text-embedding-3-large (3072D, MCP-Zero precomputed vectors; re-embedding 불수행)
+- [ ] Pool: `data/tool-pools/base_pool.json` (GT-first order), full 292-server pool
 - [ ] Results logged to W&B run tagged `E0`
 
 > **Note**: `run_e0.py`는 Flat + Sequential + Parallel 모두 실행. CohereReranker(rerank-v3.5) 기본 활성화.

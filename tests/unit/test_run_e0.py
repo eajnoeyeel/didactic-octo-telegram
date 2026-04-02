@@ -27,33 +27,62 @@ from evaluation.metrics import EvalResult
 
 
 class TestLoadPoolServerIds:
-    """Test deterministic server subset selection."""
+    """Test GT-first pool loading from base_pool.json."""
 
-    def _write_pool(self, tmp_path: Path, server_ids: list[str]) -> Path:
-        """Write a minimal JSONL pool file."""
-        pool_path = tmp_path / "pool.jsonl"
-        lines = [json.dumps({"server_id": sid, "name": sid, "tools": []}) for sid in server_ids]
-        pool_path.write_text("\n".join(lines))
+    def _write_base_pool(self, tmp_path: Path, server_ids: list[str]) -> Path:
+        """Write a base_pool.json file with GT-first ordered server IDs."""
+        pool_path = tmp_path / "base_pool.json"
+        pool_path.write_text(json.dumps(server_ids))
         return pool_path
 
-    def test_no_pool_size_returns_all_sorted(self, tmp_path: Path) -> None:
-        pool_path = self._write_pool(tmp_path, ["charlie", "alpha", "bravo"])
-        result = _load_pool_server_ids(pool_path, pool_size=None)
-        assert result == ["alpha", "bravo", "charlie"]
+    def test_no_pool_size_returns_all(self, tmp_path: Path) -> None:
+        import run_e0 as run_e0_module
 
-    def test_pool_size_returns_first_n_sorted(self, tmp_path: Path) -> None:
-        pool_path = self._write_pool(tmp_path, ["delta", "charlie", "alpha", "bravo"])
-        result = _load_pool_server_ids(pool_path, pool_size=2)
-        assert result == ["alpha", "bravo"]
+        pool_path = self._write_base_pool(tmp_path, ["semantic_scholar", "alpha", "bravo"])
+        original = run_e0_module.BASE_POOL_PATH
+        run_e0_module.BASE_POOL_PATH = pool_path
+        try:
+            result = _load_pool_server_ids(pool_size=None)
+        finally:
+            run_e0_module.BASE_POOL_PATH = original
+        assert result == ["semantic_scholar", "alpha", "bravo"]
+
+    def test_pool_size_returns_first_n(self, tmp_path: Path) -> None:
+        import run_e0 as run_e0_module
+
+        pool_path = self._write_base_pool(
+            tmp_path, ["semantic_scholar", "github", "alpha", "bravo"]
+        )
+        original = run_e0_module.BASE_POOL_PATH
+        run_e0_module.BASE_POOL_PATH = pool_path
+        try:
+            result = _load_pool_server_ids(pool_size=2)
+        finally:
+            run_e0_module.BASE_POOL_PATH = original
+        assert result == ["semantic_scholar", "github"]
 
     def test_pool_size_exceeding_total_returns_all(self, tmp_path: Path) -> None:
-        pool_path = self._write_pool(tmp_path, ["bravo", "alpha"])
-        result = _load_pool_server_ids(pool_path, pool_size=999)
-        assert result == ["alpha", "bravo"]
+        import run_e0 as run_e0_module
 
-    def test_file_not_found_raises(self) -> None:
-        with pytest.raises(FileNotFoundError):
-            _load_pool_server_ids(Path("/nonexistent/pool.jsonl"))
+        pool_path = self._write_base_pool(tmp_path, ["bravo", "alpha"])
+        original = run_e0_module.BASE_POOL_PATH
+        run_e0_module.BASE_POOL_PATH = pool_path
+        try:
+            result = _load_pool_server_ids(pool_size=999)
+        finally:
+            run_e0_module.BASE_POOL_PATH = original
+        assert result == ["bravo", "alpha"]
+
+    def test_file_not_found_raises(self, tmp_path: Path) -> None:
+        import run_e0 as run_e0_module
+
+        original = run_e0_module.BASE_POOL_PATH
+        run_e0_module.BASE_POOL_PATH = tmp_path / "nonexistent_base_pool.json"
+        try:
+            with pytest.raises(FileNotFoundError):
+                _load_pool_server_ids()
+        finally:
+            run_e0_module.BASE_POOL_PATH = original
 
 
 def _make_eval_result(name: str = "FlatStrategy") -> EvalResult:

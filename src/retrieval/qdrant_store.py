@@ -9,6 +9,7 @@ from qdrant_client.models import (
     Distance,
     FieldCondition,
     Filter,
+    MatchAny,
     MatchValue,
     PointStruct,
     VectorParams,
@@ -22,9 +23,21 @@ MCP_DISCOVERY_NAMESPACE = uuid.UUID("7f1b3d4e-2a5c-4b8f-9e6d-1c0a3f5b7d9e")
 class QdrantStore:
     """Qdrant Cloud wrapper for MCP tool vectors."""
 
-    def __init__(self, client: AsyncQdrantClient, collection_name: str = "mcp_tools") -> None:
+    def __init__(
+        self,
+        client: AsyncQdrantClient,
+        collection_name: str = "mcp_tools",
+        pool_server_ids: list[str] | None = None,
+    ) -> None:
         self.client = client
         self.collection_name = collection_name
+        # Optional pool filter: restricts all searches to these server IDs.
+        # Used for E5 pool-scale sweep — ensures Qdrant results respect the active pool.
+        self._pool_filter: Filter | None = (
+            Filter(must=[FieldCondition(key="server_id", match=MatchAny(any=pool_server_ids))])
+            if pool_server_ids
+            else None
+        )
 
     async def ensure_collection(self, dimension: int) -> None:
         try:
@@ -102,18 +115,33 @@ class QdrantStore:
         query_vector: np.ndarray,
         top_k: int = 10,
         server_id_filter: str | None = None,
+        query_filter: Filter | None = None,
     ) -> list[SearchResult]:
-        query_filter = None
+        """Search the collection for nearest neighbours.
+
+        Filter precedence (all must-clauses are ANDed by Qdrant):
+        - server_id_filter: restrict to a single server (used by SequentialStrategy Layer 2)
+        - query_filter: arbitrary additional filter (caller-supplied)
+        - _pool_filter: pool-level restriction set at construction time (E5 sweep)
+        """
+        must_conditions = []
         if server_id_filter:
-            query_filter = Filter(
-                must=[FieldCondition(key="server_id", match=MatchValue(value=server_id_filter))]
+            must_conditions.append(
+                FieldCondition(key="server_id", match=MatchValue(value=server_id_filter))
             )
+        # Merge explicit query_filter must-clauses
+        if query_filter is not None and query_filter.must:
+            must_conditions.extend(query_filter.must)
+        # Merge pool-level filter must-clauses
+        if self._pool_filter is not None and self._pool_filter.must:
+            must_conditions.extend(self._pool_filter.must)
+        combined_filter = Filter(must=must_conditions) if must_conditions else None
         try:
             response = await self.client.query_points(
                 collection_name=self.collection_name,
                 query=query_vector.tolist(),
                 limit=top_k,
-                query_filter=query_filter,
+                query_filter=combined_filter,
             )
         except Exception as e:
             logger.error(f"Qdrant search failed: {e}")

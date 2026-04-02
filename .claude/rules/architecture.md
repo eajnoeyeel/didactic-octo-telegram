@@ -54,7 +54,7 @@ src/
 data/
 ├── external/              # 외부 데이터셋 (Git-ignored, 별도 다운로드)
 │   ├── mcp-zero/          # MCP-Zero 308 servers (repo-local canonical input: servers.json)
-│   ├── mcp-atlas/         # MCP-Atlas GT 원본 (*.parquet, 36 servers, 307 tools)
+│   ├── mcp-atlas/         # MCP-Atlas GT 원본 (*.parquet, 40 servers, 307 tools)
 │   └── README.md          # 다운로드 방법, 라이선스
 src/
 ├── evaluation/
