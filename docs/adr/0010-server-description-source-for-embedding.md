@@ -1,7 +1,7 @@
 # ADR-0010: 서버 설명 텍스트 출처 — MCP instructions vs Smithery description
 
 **Date**: 2026-03-27
-**Status**: accepted (data source updated by ADR-0011, core concern remains)
+**Status**: accepted-deferred — E0 Arm 3 (enriched description) 미실행. TODO 항목 전체 pending. Post-E1으로 deferred.
 **Deciders**: E0 실험 설계 검토 과정에서 도출
 **ADR-0011 영향**: Tool Pool이 MCP-Zero(308 servers)로 전환됨. 그러나 본 ADR의 핵심 concern — "서버 설명 텍스트 품질이 E0 결과를 오염시키는 confound" — 은 미해결. MCP-Zero의 `server_description`/`server_summary`가 Smithery 마케팅 카피와 동일 수준이면 confound 여전히 존재. MCP-Zero 서버 설명 품질 확인 후 enriched description arm 필요 여부 결정.
 
@@ -157,6 +157,10 @@ Smithery 외에도 MCP 서버를 등록·소개하는 레지스트리가 다수 
 - enriched description도 완전한 해결이 아님 (MCP instructions와 여전히 다른 텍스트) → ADR에 한계 명시
 
 ## TODO
+
+> **E0 실행 결과 (2026-03-31)**: E0은 Arm 1 (Flat 1-Layer), Arm 2 (Sequential/Parallel with Smithery description)만 실행됨.
+> Arm 3 (2-Layer enriched description) 미구현/미실행.
+> 아래 TODO는 Post-E1 작업으로 deferred됨.
 
 - [ ] GitHub API로 36개 서버의 repo description, topics 수집하는 스크립트 작성
 - [ ] 외부 레지스트리(MCP Market, Glama, PulseMCP, mcp.so) 크로스 참조 수집 검토 (스크래핑 정책 확인 후 적용)

@@ -39,3 +39,14 @@ MCP 생태계에서 Tool은 반드시 특정 서버에 속하며, Tool 이름만
 
 ### Risks
 - E0 실험 결과 1-Layer가 더 나으면 아키텍처 재검토 필요
+
+## E0 Validation Result (2026-03-31)
+
+실행 결과: Flat=0.356, Sequential=0.325, Parallel=0.376
+
+- Sequential이 Flat 대비 +5%p 미충족 (오히려 -3.1%p) → Layer 1 hard gate 문제 확인
+- Parallel은 Flat 대비 +2.0%p → 약한 개선. RRF 융합이 Layer 1 miss를 부분 보완
+- 실험 세부 조건:
+  - 임베딩: text-embedding-3-large (3072D, MCP-Zero precomputed vectors)
+  - GT: 194개 covered entries (474개 총; base_pool.json GT-first 정렬)
+  - Qdrant 필터: 활성 pool 서버로 검색 제한

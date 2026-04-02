@@ -1,8 +1,10 @@
 # ADR-0008: 데이터 소스 전략 — 큐레이션 + Synthetic
 
 **Date**: 2026-03-24
-**Status**: accepted
+**Status**: superseded by ADR-0011 (MCP-Zero 외부 데이터) and ADR-0012 (per-step GT 분해)
 **Deciders**: 프로젝트 설계 단계
+
+> 현재 전략은 ADR-0011 및 ADR-0012를 참조할 것.
 
 ## Context
 
