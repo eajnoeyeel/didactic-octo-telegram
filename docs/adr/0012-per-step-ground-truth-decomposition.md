@@ -121,3 +121,21 @@ Rules:
 - `src/models.py`의 `GroundTruthEntry`: `correct_tool_ids` / `correct_server_ids` 제거, `origin_task_id` / `step_index` 추가
 - `docs/design/ground-truth-design.md`: Multi-label 섹션 → Per-step 분해 섹션으로 교체
 - `.claude/rules/eval-workflow.md`: Hit@K 참조 제거
+
+### Implementation Status (2026-04-02, ADR-0013 적용)
+
+**발견된 구현 누락**: `convert_mcp_atlas.py`에 "MCP-Zero에 존재하는 서버만 대상"
+선별 기준이 코드로 구현되지 않았음. ADR-0013에서 `--pool-file` 옵션으로 보완.
+
+**올바른 실행 명령** (ADR-0013 이후):
+```bash
+uv run python scripts/convert_mcp_atlas.py \
+  --pool-file data/raw/mcp_zero_servers.jsonl \
+  --max-tasks 80
+```
+
+기존 `data/ground_truth/mcp_atlas.jsonl` (394 entries)은 pool filter 없이 생성됨.
+재생성 시 `mcp_atlas.jsonl.bak-pre-filter`로 백업 후 위 명령 실행.
+
+**Risks 재평가**: "MCP-Zero pool과 MCP-Atlas 서버 간 overlap이 적으면" 위험이
+실제로 발생함 (40개 중 11개, 27.5%). ADR-0013으로 이 위험에 대한 blocking gate 추가.
