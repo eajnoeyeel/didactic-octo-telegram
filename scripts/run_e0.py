@@ -69,10 +69,22 @@ SWEEP_SIZES: list[int] = [5, 20, 50, 100, 200, 308]
 STRATEGY_CHOICES: list[str] = ["flat", "sequential", "parallel", "all"]
 
 
-def _load_pool_server_ids(pool_path: Path, pool_size: int | None = None) -> list[str]:
-    """Load server IDs from MCP-Zero pool JSONL, optionally taking first N (alphabetical)."""
+def _load_pool_server_ids(
+    pool_path: Path,
+    pool_size: int | None = None,
+    gt_paths: list[Path] | None = None,
+) -> list[str]:
+    """Load server IDs from MCP-Zero pool JSONL.
+
+    Ordering (ADR-0013):
+      - gt_paths provided: GT-covered servers first (alphabetical within group),
+        then remaining servers (alphabetical). Ensures pool subsets always include
+        evaluable GT entries regardless of pool_size.
+      - gt_paths=None: pure alphabetical (legacy behavior, backward-compatible).
+    """
     if not pool_path.exists():
         raise FileNotFoundError(f"Pool file not found: {pool_path}")
+
     server_ids: set[str] = set()
     for line in pool_path.read_text().splitlines():
         line = line.strip()
@@ -80,16 +92,40 @@ def _load_pool_server_ids(pool_path: Path, pool_size: int | None = None) -> list
             continue
         server_ids.add(json.loads(line)["server_id"])
 
-    sorted_ids = sorted(server_ids)
+    if gt_paths:
+        gt_servers: set[str] = set()
+        for gt_path in gt_paths:
+            if not gt_path.exists():
+                logger.warning(f"GT path not found, skipping: {gt_path}")
+                continue
+            for line in gt_path.read_text().splitlines():
+                line = line.strip()
+                if line:
+                    gt_servers.add(json.loads(line)["correct_server_id"])
+
+        gt_in_pool = sorted(s for s in server_ids if s in gt_servers)
+        rest = sorted(s for s in server_ids if s not in gt_servers)
+        ordered_ids = gt_in_pool + rest
+
+        if gt_in_pool:
+            preview = ", ".join(gt_in_pool[:5])
+            suffix = "..." if len(gt_in_pool) > 5 else ""
+            logger.info(
+                f"GT-first ordering: {len(gt_in_pool)} GT servers prioritized "
+                f"({preview}{suffix})"
+            )
+    else:
+        ordered_ids = sorted(server_ids)
+
     if pool_size is not None:
-        sorted_ids = sorted_ids[:pool_size]
+        ordered_ids = ordered_ids[:pool_size]
 
     logger.info(
-        f"Pool: {len(sorted_ids)} servers"
+        f"Pool: {len(ordered_ids)} servers"
         + (f" (subset of {len(server_ids)})" if pool_size is not None else "")
         + f" loaded from {pool_path}"
     )
-    return sorted_ids
+    return ordered_ids
 
 
 def _load_and_filter_gt(pool_server_ids: list[str]) -> list:
@@ -381,8 +417,12 @@ async def main(args: argparse.Namespace) -> None:
         for pool_size in pool_sizes:
             logger.info(f"\n{'=' * 40}\nPool size: {pool_size or 'ALL'}\n{'=' * 40}")
 
-            # Load pool (subset or all)
-            pool_server_ids = _load_pool_server_ids(POOL_PATH, pool_size=pool_size)
+            # Load pool (subset or all) with GT-first ordering (ADR-0013)
+            pool_server_ids = _load_pool_server_ids(
+                POOL_PATH,
+                pool_size=pool_size,
+                gt_paths=[GT_SEED_PATH, GT_ATLAS_PATH],
+            )
             actual_pool_size = len(pool_server_ids)
 
             # Load & filter GT

@@ -56,6 +56,57 @@ class TestLoadPoolServerIds:
             _load_pool_server_ids(Path("/nonexistent/pool.jsonl"))
 
 
+class TestLoadPoolServerIdsGtFirst:
+    """GT-first ordering tests (ADR-0013)."""
+
+    def _write_pool(self, tmp_path: Path, ids: list[str]) -> Path:
+        p = tmp_path / "pool.jsonl"
+        p.write_text("\n".join(json.dumps({"server_id": s, "name": s, "tools": []}) for s in ids))
+        return p
+
+    def _write_gt(self, tmp_path: Path, server_ids: list[str]) -> Path:
+        p = tmp_path / "gt.jsonl"
+        p.write_text(
+            "\n".join(
+                json.dumps({"correct_server_id": s, "query_id": f"q{i}"})
+                for i, s in enumerate(server_ids)
+            )
+        )
+        return p
+
+    def test_gt_servers_precede_non_gt_servers(self, tmp_path: Path) -> None:
+        pool = self._write_pool(tmp_path, ["alpha", "bravo", "charlie", "delta"])
+        gt = self._write_gt(tmp_path, ["charlie", "delta"])
+        result = _load_pool_server_ids(pool, gt_paths=[gt])
+        assert result.index("charlie") < result.index("alpha")
+        assert result.index("delta") < result.index("bravo")
+
+    def test_pool_size_with_gt_first_covers_gt_servers(self, tmp_path: Path) -> None:
+        # Without GT-first: pool[:2] = [alpha, bravo] (0 GT)
+        # With GT-first:    pool[:2] = [charlie, delta] (2 GT)
+        pool = self._write_pool(tmp_path, ["alpha", "bravo", "charlie", "delta"])
+        gt = self._write_gt(tmp_path, ["charlie", "delta"])
+        result = _load_pool_server_ids(pool, pool_size=2, gt_paths=[gt])
+        assert set(result) == {"charlie", "delta"}
+
+    def test_gt_servers_sorted_alphabetically_within_group(self, tmp_path: Path) -> None:
+        pool = self._write_pool(tmp_path, ["echo", "alpha", "delta", "bravo"])
+        gt = self._write_gt(tmp_path, ["delta", "alpha"])
+        result = _load_pool_server_ids(pool, gt_paths=[gt])
+        assert result == ["alpha", "delta", "bravo", "echo"]
+
+    def test_none_gt_paths_falls_back_to_alphabetical(self, tmp_path: Path) -> None:
+        pool = self._write_pool(tmp_path, ["charlie", "alpha", "bravo"])
+        result = _load_pool_server_ids(pool, gt_paths=None)
+        assert result == ["alpha", "bravo", "charlie"]
+
+    def test_missing_gt_file_skipped_gracefully(self, tmp_path: Path) -> None:
+        pool = self._write_pool(tmp_path, ["alpha", "bravo"])
+        missing = tmp_path / "nonexistent.jsonl"
+        result = _load_pool_server_ids(pool, gt_paths=[missing])
+        assert result == ["alpha", "bravo"]
+
+
 def _make_eval_result(name: str = "FlatStrategy") -> EvalResult:
     """Minimal EvalResult for testing."""
     return EvalResult(
