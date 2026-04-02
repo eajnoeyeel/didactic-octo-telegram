@@ -39,6 +39,7 @@ MCP Discovery Platform — a two-sided platform connecting LLM clients with MCP 
 | `docs/design/experiment-design.md` | E0-E7 실험 허브 |
 | `docs/design/experiment-details.md` | 실험 상세 스펙 (조건 테이블, CLI, 출력 형식) |
 | `docs/design/ground-truth-design.md` | GT 스키마, 생성 전략 |
+| `docs/design/mlp-product-decisions.md` | **MLP 제품 설계 결정** — PD1-PD8, 외부 리뷰 반영, 즉시 코드 반영 항목 |
 | `docs/design/code-structure.md` | 계획된 디렉토리/파일 구조 |
 | `docs/plan/implementation.md` | 구현 로드맵 (Phase 요약 + 상세 파일 포인터) |
 | `docs/plan/deferred.md` | 후순위 기능 + Phase 13 (Gated) |
@@ -116,7 +117,8 @@ All pluggable components use abstract base classes — business logic depends on
 
 - `MCPTool`: tool_id format is `server_id::tool_name` (TOOL_ID_SEPARATOR = "::", `/` ambiguous in Smithery qualifiedNames)
 - `MCPServer`: contains tools list
-- `SearchResult`: tool + score + rank + reason
+- `SearchResult`: tool + score + rank + reason + input_schema + score_breakdown (ScoreBreakdown) + is_boosted
+- `ScoreBreakdown`: relevance + quality (0.0 MLP) + boost (0.0 MLP)
 - `GroundTruth`: query + correct_server_id + correct_tool_id + difficulty + category
 
 ### Experiment System (E0-E7)

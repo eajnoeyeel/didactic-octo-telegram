@@ -22,9 +22,13 @@ Qdrant Vector Store   Cohere Rerank 3
 
 > 아래는 현재 구현 + 계획을 구분한 구조. [planned]는 미구현.
 
+Key models in `src/models.py`:
+- `SearchResult`: tool + score + rank + reason + input_schema + score_breakdown (ScoreBreakdown) + is_boosted
+- `ScoreBreakdown`: relevance + quality (0.0 MLP) + boost (0.0 MLP)
+
 ```
 src/
-├── models.py              # MCPTool, MCPServer, SearchResult, GroundTruthEntry
+├── models.py              # MCPTool, MCPServer, SearchResult, ScoreBreakdown, GroundTruthEntry
 ├── config.py              # pydantic-settings (BaseSettings)
 ├── pipeline/
 │   ├── strategy.py        # PipelineStrategy ABC + StrategyRegistry
