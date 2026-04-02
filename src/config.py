@@ -1,5 +1,6 @@
 """Application settings via pydantic-settings."""
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +31,11 @@ class Settings(BaseSettings):
 
     # External data (ADR-0011)
     external_data_dir: str = "data/external"
+
+    # Composite scoring weights (PD7). MLP: w2=w3=0 (relevance only).
+    score_weight_relevance: float = Field(1.0, description="Weight for relevance score")
+    score_weight_quality: float = Field(0.0, description="Weight for quality score (GEO)")
+    score_weight_boost: float = Field(0.0, description="Weight for boost score")
 
     # Langfuse
     langfuse_public_key: str | None = None

@@ -87,6 +87,18 @@ class MCPServer(BaseModel):
     tools: list[MCPTool] = []
 
 
+class ScoreBreakdown(BaseModel):
+    """Composite score decomposition for transparency (PD7).
+
+    MLP: quality=0.0, boost=0.0 (relevance-only).
+    Phase 2: quality and boost activated after data accumulation.
+    """
+
+    relevance: float = Field(..., description="Reranker relevance score")
+    quality: float = Field(0.0, description="Description quality score (GEO 6D)")
+    boost: float = Field(0.0, description="Provider boost score")
+
+
 class SearchResult(BaseModel):
     """A single search result from the pipeline."""
 
@@ -94,6 +106,11 @@ class SearchResult(BaseModel):
     score: float
     rank: int
     reason: str | None = None
+    # PD1: LLM clients need input_schema for parameterization
+    input_schema: dict | None = None
+    # PD7: Composite scoring transparency
+    score_breakdown: ScoreBreakdown | None = None
+    is_boosted: bool = False
 
 
 class FindBestToolRequest(BaseModel):

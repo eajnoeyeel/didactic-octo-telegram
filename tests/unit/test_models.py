@@ -317,3 +317,59 @@ class TestGroundTruthEntryFull:
     def test_invalid_source_rejected(self):
         with pytest.raises(ValueError):
             GroundTruthEntry(**self._base(source="unknown_source"))
+
+
+class TestScoreBreakdown:
+    def test_defaults_to_zero_quality_and_boost(self):
+        from models import ScoreBreakdown
+
+        sb = ScoreBreakdown(relevance=0.85)
+        assert sb.quality == 0.0
+        assert sb.boost == 0.0
+        assert sb.relevance == 0.85
+
+    def test_all_fields_accepted(self):
+        from models import ScoreBreakdown
+
+        sb = ScoreBreakdown(relevance=0.9, quality=0.7, boost=0.1)
+        assert sb.relevance == 0.9
+
+
+class TestSearchResultMLPFields:
+    """PD1 + PD7 mandatory fields from mlp-product-decisions.md."""
+
+    def _make_tool(self):
+        return MCPTool(
+            tool_id="github::search_issues",
+            server_id="github",
+            tool_name="search_issues",
+            description="Search GitHub issues",
+        )
+
+    def test_input_schema_defaults_none(self):
+        result = SearchResult(tool=self._make_tool(), score=0.9, rank=1)
+        assert result.input_schema is None
+
+    def test_input_schema_accepts_dict(self):
+        schema = {"type": "object", "properties": {"query": {"type": "string"}}}
+        result = SearchResult(tool=self._make_tool(), score=0.9, rank=1, input_schema=schema)
+        assert result.input_schema == schema
+
+    def test_score_breakdown_defaults_none(self):
+        result = SearchResult(tool=self._make_tool(), score=0.9, rank=1)
+        assert result.score_breakdown is None
+
+    def test_score_breakdown_accepts_breakdown(self):
+        from models import ScoreBreakdown
+
+        sb = ScoreBreakdown(relevance=0.9)
+        result = SearchResult(tool=self._make_tool(), score=0.9, rank=1, score_breakdown=sb)
+        assert result.score_breakdown.relevance == 0.9
+
+    def test_is_boosted_defaults_false(self):
+        result = SearchResult(tool=self._make_tool(), score=0.9, rank=1)
+        assert result.is_boosted is False
+
+    def test_is_boosted_can_be_set(self):
+        result = SearchResult(tool=self._make_tool(), score=0.9, rank=1, is_boosted=True)
+        assert result.is_boosted is True
