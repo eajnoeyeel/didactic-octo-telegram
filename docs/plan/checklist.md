@@ -109,6 +109,7 @@
 - [ ] Query 로거, 로그 집계, GEO Score, A/B 테스트, 유사도 히트맵, Confusion matrix
 - [ ] Provider REST endpoints
 - [ ] 단위 테스트
+- [ ] **`src/analytics/statistical.py` 구현** — X̄-R 관리도, McNemar, Spearman (task 9.4, _E4 전 필수_)
 
 ## Phase 10: 실험 러너 (Week 3)
 - [ ] `src/evaluation/experiment.py` + `scripts/run_experiments.py`
@@ -143,6 +144,7 @@
 - [x] E0-A/B/C 실행 (1-Layer=0.356, Sequential=0.325, Parallel=0.376, reranker=rerank-v3.5)
 - [x] 판정: Parallel +5.6%p → E0 Gate PASSED → E1 진행 가능. Sequential Layer 1 손실 별도 분석 예정
 - [ ] 결과 CTO 공유
+- [ ] **X̄-R 관리도 실행** (`statistical.compute_control_chart`): E0 Precision@1 반복 측정 안정성 확인 → 불안정 시 파이프라인 비결정성 원인 조사 후 E1 진행 (_experiment-design.md §통계적 검증 적용 계획_ 참조)
 
 ### E1: 전략 비교 (Week 2, E0 후)
 - [ ] Sequential (A), Parallel (B) 실행 + 결과 비교
@@ -156,9 +158,12 @@
 - [ ] Cohere Rerank 3, Cohere + LLM fallback (threshold sweep), LLM-as-Judge 비교
 
 ### E4: Description A/B — 테제 검증 (Week 4, 핵심)
-- [ ] Version A (Poor) vs Version B (Good) 평가
-- [ ] McNemar's test, Spearman, OLS Regression R²
-- [ ] Evidence Triangulation: 3개 중 2개 이상 통과 여부
+- [ ] **사전 조건**: `src/analytics/statistical.py` 구현 완료 확인 (Phase 9 task 9.4)
+- [ ] Version A (Poor) vs Version B (Good) 평가 (GEO 상위 3기법: Statistics Addition / Fluency Optimization / Cite Sources)
+- [ ] McNemar's test (`compute_mcnemar`): p < 0.05, lift > 30%
+- [ ] Spearman 상관 (`compute_spearman`): r_s > 0.6, p < 0.05
+- [ ] OLS Regression R²: > 0.4
+- [ ] Evidence Triangulation: 3개 중 2개 이상 통과 여부 확인 후 판정 (_metrics-rubric.md §Evidence Triangulation_ 기준)
 
 ### E5: Pool 스케일 (Week 4)
 - [ ] Pool 5/20/50/100/200/308에서 Precision@1, Latency, Confusion Rate 측정 (MCP-Zero 활용)

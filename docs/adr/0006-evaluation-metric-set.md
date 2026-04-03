@@ -40,3 +40,29 @@ Precision@1, Recall@K, Confusion Rate, ECE(Expected Calibration Error)를 핵심
 
 ### Risks
 - ECE calibration 데이터가 부족하면 신뢰할 수 없는 수치 → Ground Truth 설계 시 Confidence label 포함 필수
+
+---
+
+## 통계적 검증 체계 추가 (2026-03-26, CTO 멘토링 반영)
+
+**Status**: accepted (ADR-0006 보완)
+
+### Context
+
+CTO 피드백: 단순 Precision@1 수치 비교가 아니라 통계적 유의성과 변동성까지 증명해야 논문 수준 설득력을 갖춘다.
+
+### Decision
+
+메트릭 측정과 병행하여 아래 통계 검증 체계를 채택한다.
+
+| 검증 방법 | 적용 시점 | 이유 |
+|-----------|-----------|------|
+| **X̄-R 관리도** | E1 진행 전 (E0 후) | Precision@1 측정 자체의 반복 안정성 사전 확인. 불안정 시 실험 결과 신뢰 불가 |
+| **McNemar's test** | E4 (테제 검증) 필수 | paired binary outcome (정답/오답)에 적합. t-test나 proportion test보다 적절 |
+| **Spearman 상관** | E4, E7 | GEO Score ↔ selection_rate 상관. 순위 기반이므로 Pearson보다 robust (비선형 허용) |
+| **OLS Regression** | E4 보조 | quality 6차원 중 어느 요소가 selection_rate를 설명하는지 분해 |
+| **Mann-Whitney U** | E0, E2, E3 (권장) | 비모수 분포에서 두 조건 비교. 정규성 가정 불필요 |
+
+### Implementation
+- `src/analytics/statistical.py`: `compute_control_chart`, `compute_mcnemar`, `compute_spearman` 구현 (Phase 9 task 9.4)
+- E4 전 완료 필수. 상세 스펙: `docs/plan/phase-9-12.md §Phase 9 Task 9.4`

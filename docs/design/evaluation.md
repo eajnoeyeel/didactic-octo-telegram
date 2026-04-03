@@ -66,3 +66,36 @@ E7 (GEO 점수 방법 비교) ─ E4 selection data와 함께 해석
 | E5 | Pool 크기 (5/20/50/100/200/308) | Precision@1 degradation | Week 4 |
 | E6 | Pool 유사도 (Low/Base/High) | Confusion Rate | Week 4 |
 | E7 | GEO 점수 방법 (휴리스틱/LLM/Smells 4D) | Spearman + Human agreement | Week 5 |
+
+---
+
+## 실험 결과 해석 체크리스트 _(CTO 멘토링 2026-03-26 반영)_
+
+> "단순 평균 비교로 결론 내리지 않는다." — 변동성·유의성·상관성까지 확인한 후에만 실험 결론을 확정한다.
+
+### 모든 유의미한 실험 공통
+
+- [ ] **X̄-R 관리도 사전 확인**: E1 진행 전, `statistical.compute_control_chart`로 Precision@1 반복 측정 안정성 확인. 불안정(UCL/LCL 이탈) 시 원인 조사 후 실험 진행. (_구현: `src/analytics/statistical.py`_)
+- [ ] **단순 수치 차이로 결론 내리지 않기**: 차이가 10%p 미만이면 통계 검정으로 유의성 확인
+- [ ] **W&B에 결과 기록**: 실험 설정 + 메트릭 전체 로깅 (재현성 확보)
+
+### E4 전용 — 테제 검증 (3개 모두 필수)
+
+- [ ] **McNemar's test** (`compute_mcnemar`): p < 0.05이면 귀무가설 기각 (Description A/B 차이 유의)
+- [ ] **Spearman 상관** (`compute_spearman`): r_s > 0.6, p < 0.05 (GEO Score ↔ selection rate 상관)
+- [ ] **OLS Regression R²**: > 0.4, 최소 1개 계수 p < 0.05 (quality 하위 요소 기여도 분해)
+- [ ] **Evidence Triangulation 판정**: `metrics-rubric.md §Evidence Triangulation` 기준으로 최종 판정
+
+### E1 전략 비교
+
+- [ ] 차이 < 10%p: Cochran's Q + post-hoc McNemar으로 유의성 확인
+- [ ] 차이 ≥ 10%p: 수치 자체로 판단 가능 (통계 검정 선택적)
+
+### E4 결과 해석 기준 (Evidence Triangulation)
+
+| 통과 수 | 판정 |
+|---------|------|
+| 3개 모두 | 강한 증거 — 인과 주장 가능 |
+| Primary(McNemar) + 1개 | 보통 증거 — 방향은 확인 |
+| Primary만 | 약한 증거 — 범위 제한 |
+| Primary 미통과 | 테제 기각 — Provider 기능 가치 재검토 |

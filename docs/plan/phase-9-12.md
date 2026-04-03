@@ -58,14 +58,33 @@
    - `GET /{server_id}/confusion`: build_confusion_matrix > server 필터
 3. `src/api/main.py`에 `provider_router` 등록
 
+**Task 9.4: 통계 검증 유틸리티 — E4 전 필수 완료** _(CTO 멘토링 2026-03-26 반영)_
+
+> E4 실험에서 "단순 평균 비교"가 아닌 논문 수준 통계 증명을 위해 필수. `experiment-design.md §통계적 검증 적용 계획` 참조.
+
+1. 실패 테스트 (`tests/evaluation/test_statistical.py`):
+   - X̄-R 관리도: 분산 없는 안정 데이터 → `is_stable=True`, UCL 이탈 데이터 → `is_stable=False`
+   - McNemar: 불일치 쌍 구성 → chi2/p_value 정확 계산 확인
+   - Spearman: 단조 증가 → r_s ≈ 1.0, 역상관 → r_s ≈ -1.0, n < 3 → ValueError
+2. `src/analytics/statistical.py`:
+   - `ControlChartResult` dataclass: x_bar, r_bar, ucl_x, lcl_x, ucl_r, lcl_r, subgroup_means, subgroup_ranges, is_stable
+   - `compute_control_chart(measurements: list[float], subgroup_size: int = 5) -> ControlChartResult`
+     — A2/D3/D4 상수표 내장 (size 2-5), 서브그룹 분할 → X̄/R 계산 → UCL/LCL 판정
+   - `compute_mcnemar(results_a: list[bool], results_b: list[bool]) -> tuple[float, float]`
+     — (chi2, p_value). `scipy.stats` 또는 `statsmodels.stats.contingency_tables.mcnemar` 사용
+   - `compute_spearman(quality_scores: list[float], selection_rates: list[float]) -> tuple[float, float]`
+     — (r_s, p_value). `scipy.stats.spearmanr` 래핑. n < 3이면 ValueError
+
 ### 완료 기준
 - [ ] `uv run pytest tests/unit/test_analytics.py tests/unit/test_geo_score.py -v` PASS
 - [ ] `uv run pytest tests/integration/test_provider_api.py -v` PASS
+- [ ] `uv run pytest tests/evaluation/test_statistical.py -v` PASS
 - [ ] Provider API 3개 endpoint 동작
 
 ### 의존성
 - Phase 8 완료 필요 (FastAPI app)
 - Phase 5 완료 필요 (PrecisionAt1 for A/B test)
+- **E4 실험 전 Task 9.4 완료 필수** (E4 증명에 McNemar/Spearman 직접 사용)
 
 ---
 
@@ -101,7 +120,8 @@
 
 ### 의존성
 - Phase 5 완료 필요 (evaluation harness)
-- Phase 9 완료 필요 (GEO scorer)
+- Phase 9 완료 필요 (GEO scorer + statistical.py)
+- **E1 실험 전 X̄-R 관리도 실행 권장**: `statistical.compute_control_chart`로 E0 Precision@1 반복 측정값 안정성 확인 (불안정 시 파이프라인 비결정성 조사 우선)
 
 ---
 
