@@ -151,6 +151,50 @@ def extract_substantive_steps(tool_calls: list[dict]) -> list[dict]:
     return [tc for tc in tool_calls if not is_boilerplate(tc["name"])]
 
 
+def filter_steps_to_pool(steps: list[dict], pool: set[str]) -> list[dict]:
+    """Keep only steps whose server_id (via split_tool_name) is in pool."""
+    return [s for s in steps if split_tool_name(s["name"])[0] in pool]
+
+
+def score_task_pool_coverage(substantive_steps: list[dict], pool: set[str]) -> dict:
+    """Score a task's pool coverage.
+
+    Returns dict with keys:
+        pool_calls: int - number of steps with server in pool
+        total_calls: int - total substantive steps
+        pool_ratio: float - pool_calls / total_calls
+        pool_servers: set[str] - unique pool servers used
+    """
+    pool_steps = [s for s in substantive_steps if split_tool_name(s["name"])[0] in pool]
+    pool_servers = {split_tool_name(s["name"])[0] for s in pool_steps}
+    return {
+        "pool_calls": len(pool_steps),
+        "total_calls": len(substantive_steps),
+        "pool_ratio": len(pool_steps) / len(substantive_steps) if substantive_steps else 0.0,
+        "pool_servers": pool_servers,
+    }
+
+
+def select_tasks_by_pool_coverage(
+    tasks_with_scores: list[tuple[dict, dict]],
+    max_tasks: int,
+) -> list[tuple[dict, dict]]:
+    """Select tasks sorted by pool_ratio descending, excluding zero-pool tasks.
+
+    Args:
+        tasks_with_scores: list of (task_dict, score_dict) tuples
+        max_tasks: maximum number of tasks to select
+
+    Returns:
+        Selected tasks, sorted by pool_ratio desc then pool_calls desc.
+    """
+    # Filter out zero-pool tasks
+    candidates = [(t, s) for t, s in tasks_with_scores if s["pool_ratio"] > 0]
+    # Sort by pool_ratio desc, then pool_calls desc
+    candidates.sort(key=lambda x: (-x[1]["pool_ratio"], -x[1]["pool_calls"]))
+    return candidates[:max_tasks]
+
+
 def build_ground_truth_entry(
     task_id: str,
     task_index: int,
@@ -307,12 +351,14 @@ async def _process_tasks(
     max_tasks: int,
     dry_run: bool,
     allowed_servers: frozenset[str] | None = None,
+    max_per_server: int = 40,
 ) -> None:
     """Process MCP-Atlas tasks into per-step GT entries.
 
     Args:
         allowed_servers: If provided, only tool calls whose server_id is in this set
             are included (ADR-0012 pool filter). None = no filter (include all).
+        max_per_server: Maximum GT entries per server (prevents single-server dominance).
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -320,11 +366,53 @@ async def _process_tasks(
     skipped_tasks = 0
     skipped_boilerplate = 0
     skipped_not_in_pool = 0
+    skipped_server_cap = 0
     task_index = 0
 
     entries: list[dict] = []
 
-    for task in tasks[:max_tasks]:
+    # Phase 1: Pool-aware task selection
+    if allowed_servers is not None:
+        scored: list[tuple[dict, dict]] = []
+        for task in tasks:
+            trajectory_raw = task.get("TRAJECTORY") or task.get("trajectory")
+            if trajectory_raw is None:
+                continue
+            if isinstance(trajectory_raw, str):
+                try:
+                    trajectory = json.loads(trajectory_raw)
+                except json.JSONDecodeError:
+                    continue
+            else:
+                trajectory = trajectory_raw
+            if not isinstance(trajectory, list):
+                continue
+            all_calls = parse_trajectory(trajectory)
+            substantive = extract_substantive_steps(all_calls)
+            if not substantive:
+                continue
+            score = score_task_pool_coverage(substantive, allowed_servers)
+            scored.append((task, score))
+
+        selected = select_tasks_by_pool_coverage(scored, max_tasks)
+        tasks_to_process = [t for t, _ in selected]
+        if selected:
+            logger.info(
+                f"Pool-aware selection: {len(selected)} tasks from {len(scored)} candidates "
+                f"(pool_ratio range: {selected[-1][1]['pool_ratio']:.2f}"
+                f" - {selected[0][1]['pool_ratio']:.2f})"
+            )
+        else:
+            logger.info(
+                f"Pool-aware selection: 0 tasks from {len(scored)} candidates (no pool overlap)"
+            )
+    else:
+        tasks_to_process = tasks[:max_tasks]
+
+    # Phase 2: Process selected tasks
+    server_gt_counts: dict[str, int] = {}
+
+    for task in tasks_to_process:
         # MCP-Atlas stores trajectory as JSON string or list
         trajectory_raw = task.get("TRAJECTORY") or task.get("trajectory")
         if trajectory_raw is None:
@@ -368,6 +456,11 @@ async def _process_tasks(
         prompt = task.get("PROMPT") or task.get("prompt") or task.get("instruction") or ""
 
         for step_idx, tc in enumerate(substantive):
+            server_id = split_tool_name(tc["name"])[0]
+            if max_per_server and server_gt_counts.get(server_id, 0) >= max_per_server:
+                skipped_server_cap += 1
+                continue
+
             if dry_run:
                 query = f"[DRY-RUN] Step {step_idx} of task {task_id}: {tc['name']}"
             else:
@@ -394,6 +487,7 @@ async def _process_tasks(
                 prompt=prompt,
             )
             entries.append(entry)
+            server_gt_counts[server_id] = server_gt_counts.get(server_id, 0) + 1
             total_entries += 1
 
     # Write all entries
@@ -404,10 +498,11 @@ async def _process_tasks(
     pool_filter_msg = (
         f", {skipped_not_in_pool} steps not in pool" if allowed_servers is not None else ""
     )
+    server_cap_msg = f", {skipped_server_cap} capped" if skipped_server_cap else ""
     logger.info(
         f"Completed: {total_entries} GT entries from {task_index} tasks "
         f"(skipped {skipped_tasks} tasks, {skipped_boilerplate} boilerplate calls"
-        f"{pool_filter_msg})"
+        f"{pool_filter_msg}{server_cap_msg})"
     )
     logger.info(f"Output: {output_path}")
 
@@ -453,6 +548,12 @@ def main() -> None:
             "Implements ADR-0012 selection criterion. Default: no filter."
         ),
     )
+    parser.add_argument(
+        "--max-per-server",
+        type=int,
+        default=40,
+        help="Maximum GT entries per server (prevents single-server dominance). Default: 40.",
+    )
     args = parser.parse_args()
 
     if not args.input.exists():
@@ -476,9 +577,7 @@ def main() -> None:
             if line:
                 pool_ids.add(json.loads(line)["server_id"])
         allowed_servers = frozenset(pool_ids)
-        logger.info(
-            f"Pool filter: {len(allowed_servers)} allowed servers from {args.pool_file}"
-        )
+        logger.info(f"Pool filter: {len(allowed_servers)} allowed servers from {args.pool_file}")
 
     asyncio.run(
         _process_tasks(
@@ -487,6 +586,7 @@ def main() -> None:
             max_tasks=args.max_tasks,
             dry_run=args.dry_run,
             allowed_servers=allowed_servers,
+            max_per_server=args.max_per_server,
         )
     )
 

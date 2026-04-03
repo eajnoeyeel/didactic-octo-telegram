@@ -12,8 +12,11 @@ from convert_mcp_atlas import (
     BOILERPLATE_BLOCKLIST,
     build_ground_truth_entry,
     extract_substantive_steps,
+    filter_steps_to_pool,
     is_boilerplate,
     parse_trajectory,
+    score_task_pool_coverage,
+    select_tasks_by_pool_coverage,
     split_tool_name,
 )
 
@@ -334,3 +337,122 @@ class TestProcessTasksWithPoolFilter:
                 ids.add(json.loads(line)["server_id"])
         allowed = frozenset(ids)
         assert allowed == frozenset({"github", "arxiv"})
+
+
+# ===========================================================================
+# TestFilterStepsToPool
+# ===========================================================================
+
+
+class TestFilterStepsToPool:
+    """Tests for pool-based step filtering."""
+
+    def test_filters_to_pool_servers(self):
+        steps = [
+            {"name": "github_search_repositories", "arguments": "{}", "call_index": 0},
+            {"name": "brave-search_brave_web_search", "arguments": "{}", "call_index": 1},
+            {"name": "slack_post_message", "arguments": "{}", "call_index": 2},
+        ]
+        pool = {"github", "slack"}
+        result = filter_steps_to_pool(steps, pool)
+        assert len(result) == 2
+        assert result[0]["name"] == "github_search_repositories"
+        assert result[1]["name"] == "slack_post_message"
+
+    def test_empty_when_no_match(self):
+        steps = [{"name": "brave-search_brave_web_search", "arguments": "{}", "call_index": 0}]
+        assert filter_steps_to_pool(steps, {"github"}) == []
+
+    def test_empty_steps_returns_empty(self):
+        assert filter_steps_to_pool([], {"github"}) == []
+
+
+# ===========================================================================
+# TestScoreTaskPoolCoverage
+# ===========================================================================
+
+
+class TestScoreTaskPoolCoverage:
+    """Tests for task pool coverage scoring."""
+
+    def test_fully_covered(self):
+        steps = [
+            {"name": "github_search_repositories"},
+            {"name": "slack_post_message"},
+        ]
+        result = score_task_pool_coverage(steps, {"github", "slack"})
+        assert result["pool_ratio"] == 1.0
+        assert result["pool_calls"] == 2
+        assert result["total_calls"] == 2
+        assert result["pool_servers"] == {"github", "slack"}
+
+    def test_partially_covered(self):
+        steps = [
+            {"name": "github_search_repositories"},
+            {"name": "brave-search_brave_web_search"},
+        ]
+        result = score_task_pool_coverage(steps, {"github"})
+        assert result["pool_ratio"] == 0.5
+        assert result["pool_calls"] == 1
+
+    def test_no_coverage(self):
+        steps = [{"name": "brave-search_brave_web_search"}]
+        result = score_task_pool_coverage(steps, {"github"})
+        assert result["pool_ratio"] == 0.0
+
+    def test_empty_steps(self):
+        result = score_task_pool_coverage([], {"github"})
+        assert result["pool_ratio"] == 0.0
+
+
+# ===========================================================================
+# TestSelectTasksByPoolCoverage
+# ===========================================================================
+
+
+class TestSelectTasksByPoolCoverage:
+    """Tests for pool-aware task selection."""
+
+    def test_prefers_high_pool_ratio(self):
+        scored = [
+            (
+                {"id": "a"},
+                {"pool_ratio": 0.5, "pool_calls": 1, "total_calls": 2, "pool_servers": {"github"}},
+            ),
+            (
+                {"id": "b"},
+                {
+                    "pool_ratio": 1.0,
+                    "pool_calls": 3,
+                    "total_calls": 3,
+                    "pool_servers": {"github", "slack"},
+                },
+            ),
+            (
+                {"id": "c"},
+                {"pool_ratio": 0.0, "pool_calls": 0, "total_calls": 3, "pool_servers": set()},
+            ),
+        ]
+        selected = select_tasks_by_pool_coverage(scored, max_tasks=2)
+        assert len(selected) == 2
+        assert selected[0][0]["id"] == "b"  # highest ratio first
+        assert selected[1][0]["id"] == "a"
+
+    def test_excludes_zero_pool(self):
+        scored = [
+            (
+                {"id": "a"},
+                {"pool_ratio": 0.0, "pool_calls": 0, "total_calls": 3, "pool_servers": set()},
+            ),
+        ]
+        assert select_tasks_by_pool_coverage(scored, max_tasks=10) == []
+
+    def test_respects_max_tasks(self):
+        scored = [
+            (
+                {"id": f"t{i}"},
+                {"pool_ratio": 1.0, "pool_calls": 2, "total_calls": 2, "pool_servers": {"github"}},
+            )
+            for i in range(10)
+        ]
+        assert len(select_tasks_by_pool_coverage(scored, max_tasks=3)) == 3
