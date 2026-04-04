@@ -1,6 +1,6 @@
 # 진행 체크리스트
 
-> 최종 업데이트: 2026-03-30
+> 최종 업데이트: 2026-04-04
 > 상세 구현 스펙: `docs/plan/implementation.md`
 > 타임라인: 2026-03-20 ~ 2026-04-26 (5주)
 
@@ -9,6 +9,8 @@
 ## 해결된 사항
 
 - **OQ-1 (GEO 점수 산정)**: RESOLVED (2026-03-21, 2026-03-26 업데이트) — 5-dimension DQS → 6-dimension GEO Score 확장. 동등 가중치 1/6 x 6, E7 calibration. 상세: `docs/research/description-quality-scoring.md`, SOT: `docs/design/metrics-rubric.md`
+- **PR 정리 (2026-04-04)**: PR #4 merged, PR #5 closed (superseded), PR #9 cherry-picked + closed. 오픈 PR 0건.
+- **Description Optimizer (PR #8)**: Merged → Reverted (2026-04-01). 성능 회귀로 전량 롤백. 코드/데이터 삭제됨. 브랜치는 보존 (향후 재도입 가능성).
 
 ---
 
@@ -21,8 +23,10 @@
 - [x] `scripts/import_mcp_zero.py` 실행 → 308 servers, 2,797 tools 변환 완료
 - [x] `scripts/convert_mcp_atlas.py` ADR-0012 per-step 분해 완성 + 17 unit tests
 - [x] `scripts/convert_mcp_atlas.py` 실행 → 394 per-step GT entries (80 tasks, 35 servers)
+- [x] `scripts/convert_mcp_atlas.py` `--pool-file` 필터 추가 (ADR-0013, 2026-04-04)
 - [x] MCP-Atlas per-step GT + self seed 80 병합 검증 (194 covered, query_id 중복 없음)
 - [x] `scripts/run_e0.py` 업데이트 → MCP-Zero pool + 다중 GT 소스 지원
+- [x] Pool-GT alignment 검증 도구 (`scripts/validate_pool_gt_alignment.py`) + ADR-0013 (2026-04-04)
 - [ ] Description Smells 4D vs GEO Score 6D 매핑 테이블 작성 (E7 비교용)
 - [ ] 4종 Pool 정의 (Base, High Similarity, Low Similarity, Description Quality) — MCP-Zero 308 servers에서 선별
 - [ ] Smithery API rate limit 확인 (보조 소스)
@@ -33,9 +37,9 @@
 - [ ] 각 서버 x 2 description 버전 (Version A: Poor, Version B: Good)
 - [ ] 실제 `tools/list` 연결 검증
 
-### OQ-4: Sequential 2-Layer 버그 수정 — 부분 해결
+### OQ-4: Sequential 2-Layer 버그 수정 — ✅ 완료 (2026-03-31)
 - [x] `sequential.py`를 진짜 2-Layer로 수정 (서버 인덱스 → 필터 → 툴 검색)
-- [ ] Server Classification Error Rate 별도 로깅 추가 (→ `server_recall_at_k` 메트릭으로 추가 예정)
+- [x] `server_recall_at_k` 진단 메트릭 구현 (`src/evaluation/metrics.py`, 2026-03-31)
 
 ### OQ-5: 2-Layer 아키텍처 유효성 검증 (E0 선행) — ✅ 완료 (2026-03-31)
 - [x] 1-Layer 파이프라인 구현 (`src/pipeline/flat.py`)
@@ -48,7 +52,7 @@
 ## Phase 0: 프로젝트 기반 (Week 1) — ✅ 완료 (2026-03-25)
 - [x] `pyproject.toml` + `uv sync --extra dev`
 - [x] `src/config.py` — pydantic-settings
-- [x] `src/models.py` — MCPTool, MCPServer, SearchResult, GroundTruth 등
+- [x] `src/models.py` — MCPTool, MCPServer, SearchResult (+ ScoreBreakdown, input_schema, is_boosted PD1/PD7), GroundTruth 등
 - [x] `.env.example` + `git init` + 첫 커밋
 - [x] `tests/unit/test_config.py`, `tests/unit/test_models.py` 통과
 
@@ -97,7 +101,7 @@
 - [x] 단위 테스트 (reranker 통합 경로 8+2+2=12 tests 추가)
 
 ## Phase 7: Hybrid Search + Strategy B (Week 2) — ✅ 완료 (2026-03-31)
-- [ ] `src/retrieval/hybrid.py` — RRF fusion (ParallelStrategy 내부 구현, 별도 파일 분리 선택적)
+- [x] `src/retrieval/hybrid.py` — RRF fusion
 - [x] `src/pipeline/parallel.py` — Strategy B (RRF + reranker)
 - [x] 단위 테스트 (14 tests)
 
@@ -105,10 +109,14 @@
 - [ ] `src/api/main.py` + `src/api/routes/search.py`
 - [ ] 단위 테스트 + curl 수동 테스트
 
-## Phase 9: Provider Analytics (Week 2-3)
-- [ ] Query 로거, 로그 집계, GEO Score, A/B 테스트, 유사도 히트맵, Confusion matrix
-- [ ] Provider REST endpoints
-- [ ] 단위 테스트
+## Phase 9: Provider Analytics (Week 2-3) — 부분 완료 (2026-04-04)
+- [x] `src/analytics/logger.py` — QueryLogger (JSONL async writer/reader, daily rotation)
+- [x] `src/analytics/aggregator.py` — LogAggregator (per-tool ToolStats)
+- [x] `src/analytics/geo_score.py` — DescriptionGEOScorer (6-dimension rule-based)
+- [x] `src/analytics/confusion_matrix.py` — build_confusion_matrix
+- [x] 단위 테스트 45개 (test_analytics.py + test_geo_score.py)
+- [ ] Provider REST endpoints (Phase 8 이후)
+- [ ] A/B 테스트 러너, 유사도 히트맵
 - [ ] **`src/analytics/statistical.py` 구현** — X̄-R 관리도, McNemar, Spearman (task 9.4, _E4 전 필수_)
 
 ## Phase 10: 실험 러너 (Week 3)
@@ -132,8 +140,9 @@
 |---|------|-----------|---------|------|
 | ~~1~~ | ~~`openai_embedder.py` 통합 테스트 활성화 (skip 6개 → 0개)~~ | Phase 2 | ~~높음~~ | **완료** |
 | ~~2~~ | ~~Synthetic GT 생성 실행 (`scripts/generate_ground_truth.py`)~~ | Phase 4 | ~~높음~~ | **완료** |
-| 3 | 임베딩 인덱스 빌드 (`scripts/build_index.py`) | Phase 2 | 높음 | 대기 |
-| 4 | E0 실험: 1-Layer vs 2-Layer 검증 | Phase 5 | 중간 | 대기 |
+| ~~3~~ | ~~임베딩 인덱스 빌드 (`scripts/build_index.py`)~~ | Phase 2 | ~~높음~~ | **완료** (MCP-Zero 데이터로 실행됨) |
+| ~~4~~ | ~~E0 실험: 1-Layer vs 2-Layer 검증~~ | Phase 5 | ~~중간~~ | **완료** (2026-03-31) |
+| 5 | `mcp_atlas.jsonl` pool-aware 재빌드 (328 entries) | OQ-2 | 중간 | 대기 (ADR-0013 `--pool-file` 준비 완료) |
 
 ---
 
