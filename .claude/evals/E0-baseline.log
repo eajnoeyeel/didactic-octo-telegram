@@ -1,4 +1,6 @@
 
+## Run 1 (2026-04-02, pre-GT-rebuild, SUPERSEDED)
+
 ============================================================
 E0 EXPERIMENT RESULTS  (n=194, top_k=10)
 ============================================================
@@ -15,7 +17,53 @@ Latency p50 (ms)                    414.0               470.6               405.
 Latency mean (ms)                   526.3               558.0               464.3
 
 Pool: MCP-Zero (292 servers)
-GT sources: seed_set (data/ground_truth/seed_set.jsonl), mcp_atlas (data/ground_truth/mcp_atlas.jsonl)
+GT sources: seed_set + mcp_atlas (pre-rebuild, biased — airtable 34%)
 Embedding: text-embedding-3-large (3072-dim)
 Reranker: rerank-v3.5
-Entries used: 194 (covered by pool)
+Entries used: 194 (covered by pool, out of 394 total — 49% waste)
+
+> SUPERSEDED: GT had pool-GT misalignment (ADR-0013). 53% of entries
+> referenced servers not in pool. airtable over-represented at 34%.
+
+---
+
+## Run 2 (2026-04-04, post-GT-rebuild, CURRENT BASELINE)
+
+============================================================
+E0 EXPERIMENT RESULTS  (n=338, top_k=10, pool=292)
+============================================================
+Metric                       FlatStrategy  SequentialStrategy    ParallelStrategy
+-------------------- ------------------------------------------------------------
+Precision@1                         0.302               0.249               0.296
+Recall@K                            0.527               0.352               0.533
+Server Recall@K                     0.654               0.396               0.642
+MRR                                 0.376               0.284               0.378
+NDCG@5                              0.400               0.299               0.404
+Confusion Rate                      0.322               0.138               0.336
+ECE                                 0.102               0.085               0.104
+Latency p50 (ms)                   6007.8              6007.5              6006.0
+Latency mean (ms)                  5986.7              6001.1              6017.7
+
+Pool: MCP-Zero (292 servers, GT-first ordering)
+GT sources: seed_set (80) + mcp_atlas (328, rebuilt with ADR-0013 pool-aware selection)
+Embedding: text-embedding-3-large (3072-dim, MCP-Zero pre-computed)
+Reranker: rerank-v3.5 (10 RPM)
+Entries used: 338/408 (82.8% — 70 seed entries have non-pool servers)
+n_failed: 0 (all queries evaluated)
+
+GT rebuild changes:
+- Pool-aware task selection (pool_ratio >= 0.5, 200 tasks from 500)
+- Per-server cap: max 40 entries (airtable 12.2%, was 34%)
+- 11 servers balanced, 0 orphan entries
+- W&B run: https://wandb.ai/leeyj0304-42/mcp-discovery/runs/ej5ieqhb
+
+## E0 Gate Decision
+
+Sequential_P@1 (0.249) - Flat_P@1 (0.302) = -5.3%p → FAIL (requires +5%p)
+Parallel_P@1 (0.296) - Flat_P@1 (0.302) = -0.6%p → FAIL (requires +5%p)
+
+2-Layer does NOT improve over 1-Layer on this GT set.
+Sequential's server-level hard gate hurts recall significantly (0.352 vs 0.527).
+Parallel recovers via RRF fusion but doesn't beat Flat.
+
+Proceed to E1 for deeper strategy analysis.
