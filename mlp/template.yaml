@@ -37,6 +37,21 @@ Parameters:
     NoEcho: true
     Description: Supabase service role key (server-side only)
 
+  MlpApiKey:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+    Description: >
+      Static API key for Denial-of-Wallet protection.
+      All HTTP requests must include x-api-key header with this value.
+
+  AllowedOrigin:
+    Type: String
+    Default: "*"
+    Description: >
+      CORS allowed origin. Set to your Lovable domain in prod
+      (e.g., https://your-app.lovable.app). Default '*' for dev.
+
   StageName:
     Type: String
     Default: prod
@@ -83,15 +98,57 @@ Resources:
       Description: MCP Discovery MLP HTTP API
       CorsConfiguration:
         AllowOrigins:
-          - "*"
+          - !Ref AllowedOrigin
         AllowMethods:
-          - "*"
+          - GET
+          - POST
+          - OPTIONS
         AllowHeaders:
-          - "*"
+          - Content-Type
+          - Authorization
+          - x-api-key
+      # -----------------------------------------------------------------------
+      # Auth — Lambda authorizer for API key validation (I2: Denial-of-Wallet)
+      # HttpApi does NOT support native Usage Plans / API Keys.
+      # A lightweight Lambda authorizer checks the x-api-key header instead.
+      # CORS preflight (OPTIONS) is handled by API Gateway before the
+      # authorizer runs, so no Auth:NONE override is needed for OPTIONS.
+      # -----------------------------------------------------------------------
+      Auth:
+        DefaultAuthorizer: ApiKeyAuthorizer
+        Authorizers:
+          ApiKeyAuthorizer:
+            AuthorizerPayloadFormatVersion: "2.0"
+            EnableSimpleResponses: true
+            FunctionArn: !GetAtt ApiKeyAuthorizerFunction.Arn
+            EnableFunctionDefaultPermissions: true
+            Identity:
+              Headers:
+                - x-api-key
+              ReauthorizeEvery: 300  # Cache authorizer result for 5 minutes
       # Throttling protects downstream services (Qdrant, Cohere) from burst
       DefaultRouteSettings:
         ThrottlingBurstLimit: 50
         ThrottlingRateLimit: 100
+
+  # ---------------------------------------------------------------------------
+  # ApiKeyAuthorizerFunction — validates x-api-key header (I2: Denial-of-Wallet)
+  # Tiny footprint: 128 MB, 3s timeout, no external deps. Result cached 300s.
+  # ---------------------------------------------------------------------------
+  ApiKeyAuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "mcp-discovery-authorizer-${StageName}"
+      Handler: mlp.lambdas.authorizer.handler.lambda_handler
+      CodeUri: ../
+      Runtime: python3.12
+      MemorySize: 128  # Minimal — just string comparison
+      Timeout: 3
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          MLP_API_KEY: !Ref MlpApiKey
 
   # ---------------------------------------------------------------------------
   # SearchFunction — POST /api/search

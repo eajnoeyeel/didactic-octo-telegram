@@ -3,15 +3,23 @@
 import asyncio
 import json
 import os
+import sys
 
-import httpx
-from loguru import logger
-from qdrant_client import AsyncQdrantClient
+# ---------------------------------------------------------------------------
+# PYTHONPATH: import from src/ directly (no file copying)
+# ---------------------------------------------------------------------------
+_SRC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, os.path.abspath(_SRC_DIR))
 
-from config import Settings
-from embedding.openai_embedder import OpenAIEmbedder
-from models import MCPTool
-from retrieval.qdrant_store import QdrantStore
+import httpx  # noqa: E402
+from loguru import logger  # noqa: E402
+from qdrant_client import AsyncQdrantClient  # noqa: E402
+
+from config import Settings  # noqa: E402
+from embedding.openai_embedder import OpenAIEmbedder  # noqa: E402
+from models import MCPTool  # noqa: E402
+from retrieval.qdrant_store import QdrantStore  # noqa: E402
 
 # Global init (reused across warm Lambda invocations)
 settings = Settings()
@@ -126,4 +134,4 @@ async def _async_handler(event: dict, _context: object) -> dict:
 
 def lambda_handler(event: dict, context: object) -> dict:
     """AWS Lambda entry point."""
-    return asyncio.get_event_loop().run_until_complete(_async_handler(event, context))
+    return asyncio.run(_async_handler(event, context))

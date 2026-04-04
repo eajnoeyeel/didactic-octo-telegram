@@ -2,9 +2,10 @@
 -- MCP Discovery Platform — Initial Schema Migration
 -- ============================================================
 -- Creates the core tables for the MLP service layer:
---   mcp_servers  — registered MCP server metadata
---   mcp_tools    — individual tools belonging to servers
---   query_logs   — search query audit trail
+--   mcp_servers      — registered MCP server metadata
+--   mcp_tools        — individual tools belonging to servers
+--   query_logs       — search query audit trail
+--   execution_logs   — tool execution audit trail
 -- ============================================================
 
 -- ---------- Extensions ----------
@@ -67,6 +68,21 @@ CREATE TABLE query_logs (
 );
 
 -- ============================================================
+-- 3b. execution_logs — tool execution audit trail
+-- ============================================================
+
+CREATE TABLE execution_logs (
+    id           BIGSERIAL    PRIMARY KEY,
+    tool_id      TEXT         NOT NULL,
+    server_id    TEXT         NOT NULL,
+    success      BOOLEAN      DEFAULT true,
+    latency_ms   FLOAT,
+    error_message TEXT,
+    params       JSONB,
+    created_at   TIMESTAMPTZ  DEFAULT now()
+);
+
+-- ============================================================
 -- 4. Indexes
 -- ============================================================
 
@@ -82,8 +98,32 @@ CREATE INDEX idx_mcp_tools_index_status ON mcp_tools (index_status);
 -- Time-range queries on query logs
 CREATE INDEX idx_query_logs_created_at ON query_logs (created_at);
 
+-- Execution logs: time-range and per-tool queries
+CREATE INDEX idx_execution_logs_created_at ON execution_logs (created_at);
+CREATE INDEX idx_execution_logs_tool_id ON execution_logs (tool_id);
+
 -- ============================================================
--- 5. updated_at trigger for mcp_servers
+-- 5b. Full-text search RPC function
+-- ============================================================
+-- Called by Search Lambda lexical fallback: POST /rest/v1/rpc/search_tools_fts
+
+CREATE OR REPLACE FUNCTION search_tools_fts(
+    search_query TEXT,
+    result_limit INT DEFAULT 5,
+    status_filter TEXT DEFAULT 'pending'
+)
+RETURNS SETOF mcp_tools
+LANGUAGE sql STABLE
+AS $$
+    SELECT * FROM mcp_tools
+    WHERE index_status = status_filter
+      AND fts @@ plainto_tsquery('english', search_query)
+    ORDER BY ts_rank(fts, plainto_tsquery('english', search_query)) DESC
+    LIMIT result_limit;
+$$;
+
+-- ============================================================
+-- 5c. updated_at trigger for mcp_servers
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION update_updated_at()
@@ -139,6 +179,22 @@ CREATE POLICY "service_role_all_servers"
 
 CREATE POLICY "service_role_all_tools"
     ON mcp_tools FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
+-- RLS for query_logs (service_role only — contains sensitive query data)
+ALTER TABLE query_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "service_role_all_query_logs"
+    ON query_logs FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
+-- RLS for execution_logs (service_role only — contains execution params)
+ALTER TABLE execution_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "service_role_all_execution_logs"
+    ON execution_logs FOR ALL
     TO service_role
     USING (true)
     WITH CHECK (true);

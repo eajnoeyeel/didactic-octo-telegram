@@ -101,7 +101,7 @@ try:
             query: Natural language description of what you need
             top_k: Number of results to return (default 3)
         """
-        return asyncio.get_event_loop().run_until_complete(_find_best_tool(query, top_k))
+        return asyncio.run(_find_best_tool(query, top_k))
 
     @mcp.tool()
     def execute_tool(tool_id: str, params: str = "{}") -> dict:
@@ -112,7 +112,7 @@ try:
             params: JSON-encoded parameters to pass to the tool
         """
         parsed = json.loads(params) if isinstance(params, str) else params
-        return asyncio.get_event_loop().run_until_complete(_execute_tool(tool_id, parsed))
+        return asyncio.run(_execute_tool(tool_id, parsed))
 
     def lambda_handler(event: dict, context: Any) -> dict:
         """AWS Lambda entry-point (library path)."""
@@ -257,4 +257,4 @@ except ImportError:
 
     def lambda_handler(event: dict, context: Any) -> dict:
         """AWS Lambda entry-point (fallback JSON-RPC path)."""
-        return asyncio.get_event_loop().run_until_complete(_async_handler(event))
+        return asyncio.run(_async_handler(event))

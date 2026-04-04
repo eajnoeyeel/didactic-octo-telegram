@@ -3,10 +3,18 @@
 import asyncio
 import json
 import os
+import sys
 
-import boto3
-import httpx
-from loguru import logger
+# ---------------------------------------------------------------------------
+# PYTHONPATH: import from src/ directly (no file copying)
+# ---------------------------------------------------------------------------
+_SRC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, os.path.abspath(_SRC_DIR))
+
+import boto3  # noqa: E402
+import httpx  # noqa: E402
+from loguru import logger  # noqa: E402
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
@@ -45,13 +53,16 @@ def _response(status_code: int, body: dict) -> dict:
     }
 
 
-async def _supabase_insert(table: str, data: dict | list) -> list:
+async def _supabase_insert(table: str, data: dict | list, *, upsert: bool = False) -> list:
     url = f"{SUPABASE_URL}/rest/v1/{table}"
+    prefer_parts = ["return=representation"]
+    if upsert:
+        prefer_parts.append("resolution=merge-duplicates")
     headers = {
         "apikey": SUPABASE_SERVICE_KEY,
         "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
         "Content-Type": "application/json",
-        "Prefer": "return=representation",
+        "Prefer": ", ".join(prefer_parts),
     }
     async with httpx.AsyncClient() as client:
         resp = await client.post(url, json=data, headers=headers, timeout=10.0)
@@ -97,7 +108,7 @@ async def _async_handler(event: dict, _context: object) -> dict:
         "tags": tags,
     }
     try:
-        await _supabase_insert("mcp_servers", server_row)
+        await _supabase_insert("mcp_servers", server_row, upsert=True)
     except httpx.HTTPStatusError as e:
         logger.error(f"Supabase server insert failed: {e.response.status_code}")
         return _response(500, {"error": "Failed to register server"})
@@ -147,4 +158,4 @@ async def _async_handler(event: dict, _context: object) -> dict:
 
 def lambda_handler(event: dict, context: object) -> dict:
     """AWS Lambda entry point."""
-    return asyncio.get_event_loop().run_until_complete(_async_handler(event, context))
+    return asyncio.run(_async_handler(event, context))

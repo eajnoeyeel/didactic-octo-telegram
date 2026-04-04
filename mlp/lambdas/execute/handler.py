@@ -213,4 +213,4 @@ async def _async_handler(event: dict) -> dict[str, Any]:
 
 def lambda_handler(event: dict, context: Any) -> dict:
     """AWS Lambda entry-point."""
-    return asyncio.get_event_loop().run_until_complete(_async_handler(event))
+    return asyncio.run(_async_handler(event))

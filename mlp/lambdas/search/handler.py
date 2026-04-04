@@ -3,20 +3,28 @@
 import asyncio
 import json
 import os
+import sys
 import time
 from typing import Any
 
-import httpx
-from loguru import logger
-from qdrant_client import AsyncQdrantClient
+# ---------------------------------------------------------------------------
+# PYTHONPATH: import from src/ directly (no file copying)
+# ---------------------------------------------------------------------------
+_SRC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, os.path.abspath(_SRC_DIR))
 
-from config import Settings
-from embedding.openai_embedder import OpenAIEmbedder
-from models import FindBestToolRequest, FindBestToolResponse, MCPTool, SearchResult
-from pipeline.confidence import compute_confidence
-from pipeline.sequential import SequentialStrategy
-from reranking.cohere_reranker import CohereReranker
-from retrieval.qdrant_store import QdrantStore
+import httpx  # noqa: E402
+from loguru import logger  # noqa: E402
+from qdrant_client import AsyncQdrantClient  # noqa: E402
+
+from config import Settings  # noqa: E402
+from embedding.openai_embedder import OpenAIEmbedder  # noqa: E402
+from models import FindBestToolRequest, FindBestToolResponse, MCPTool, SearchResult  # noqa: E402
+from pipeline.confidence import compute_confidence  # noqa: E402
+from pipeline.sequential import SequentialStrategy  # noqa: E402
+from reranking.cohere_reranker import CohereReranker  # noqa: E402
+from retrieval.qdrant_store import QdrantStore  # noqa: E402
 
 settings = Settings()
 embedder = OpenAIEmbedder(
@@ -42,6 +50,7 @@ _SB_HEADERS: dict[str, str] = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer
 
 _cache: dict[str, tuple[float, FindBestToolResponse]] = {}
 CACHE_TTL = 300
+MAX_CACHE_SIZE = 200
 
 
 def _get_cached(query: str) -> FindBestToolResponse | None:
@@ -54,7 +63,7 @@ def _get_cached(query: str) -> FindBestToolResponse | None:
 
 
 async def _supabase_fallback(query: str, limit: int = 5) -> list[SearchResult]:
-    """Full-text search against Supabase for degraded / pending-tool mode."""
+    """Full-text search against Supabase for degraded mode (pending tools only)."""
     if not SUPABASE_URL or not SUPABASE_KEY:
         return []
     try:
@@ -62,7 +71,7 @@ async def _supabase_fallback(query: str, limit: int = 5) -> list[SearchResult]:
             resp = await c.post(
                 f"{SUPABASE_URL}/rest/v1/rpc/search_tools_fts",
                 headers={**_SB_HEADERS, "Content-Type": "application/json"},
-                json={"search_query": query, "result_limit": limit},
+                json={"search_query": query, "result_limit": limit, "status_filter": "pending"},
             )
             resp.raise_for_status()
             rows = resp.json()
@@ -114,7 +123,7 @@ async def _warming_handler() -> dict[str, Any]:
 
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """AWS Lambda entry point."""
-    return asyncio.get_event_loop().run_until_complete(_async_handler(event, context))
+    return asyncio.run(_async_handler(event, context))
 
 
 async def _async_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -122,6 +131,16 @@ async def _async_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     if event.get("source") == "warming":
         return await _warming_handler()
     t_start = time.time()
+
+    # Dynamic timeout budget from Lambda remaining time
+    remaining_ms = getattr(context, "get_remaining_time_in_millis", lambda: 30_000)()
+    remaining_s = remaining_ms / 1000
+    qdrant_timeout = max(1.0, min(5.0, remaining_s - 7.0))
+    cohere_timeout = max(1.0, min(5.0, remaining_s - 2.0))
+    logger.debug(
+        f"[{request_id}] timeout budget: remaining={remaining_s:.1f}s "
+        f"qdrant={qdrant_timeout:.1f}s cohere={cohere_timeout:.1f}s"
+    )
 
     try:
         body = json.loads(event.get("body", "{}")) if isinstance(event.get("body"), str) else event
@@ -139,17 +158,27 @@ async def _async_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
     t_search, results, degraded = time.time(), [], False
     try:
-        results = await strategy.search(req.query, req.top_k)
+        results = await asyncio.wait_for(
+            strategy.search(req.query, req.top_k), timeout=qdrant_timeout + cohere_timeout
+        )
+    except asyncio.TimeoutError:
+        total_budget = qdrant_timeout + cohere_timeout
+        logger.warning(f"[{request_id}] Pipeline timed out after {total_budget:.1f}s")
+        degraded = True
     except Exception as e:
         logger.warning(f"[{request_id}] Qdrant failed, fallback: {e}")
         degraded = True
     search_ms = (time.time() - t_search) * 1000
 
-    t_fb = time.time()
-    fb = await _supabase_fallback(req.query, limit=req.top_k)
-    fb_ms = (time.time() - t_fb) * 1000
-    if fb:
-        results = _deduplicate(results + fb, req.top_k)
+    # Only invoke lexical fallback when in degraded mode (Qdrant failed)
+    # In normal mode, Qdrant already has all indexed tools
+    fb_ms = 0.0
+    if degraded:
+        t_fb = time.time()
+        fb = await _supabase_fallback(req.query, limit=req.top_k)
+        fb_ms = (time.time() - t_fb) * 1000
+        if fb:
+            results = _deduplicate(results + fb, req.top_k)
 
     confidence, disambiguation_needed = compute_confidence(
         results, gap_threshold=settings.confidence_gap_threshold
@@ -165,6 +194,9 @@ async def _async_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         latency_ms=round(total_ms, 1),
     )
     _cache[req.query] = (time.time(), response)
+    if len(_cache) > MAX_CACHE_SIZE:
+        oldest_key = min(_cache, key=lambda k: _cache[k][0])
+        del _cache[oldest_key]
 
     logger.info(
         json.dumps(
