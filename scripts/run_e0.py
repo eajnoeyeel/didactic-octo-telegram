@@ -111,8 +111,7 @@ def _load_pool_server_ids(
             preview = ", ".join(gt_in_pool[:5])
             suffix = "..." if len(gt_in_pool) > 5 else ""
             logger.info(
-                f"GT-first ordering: {len(gt_in_pool)} GT servers prioritized "
-                f"({preview}{suffix})"
+                f"GT-first ordering: {len(gt_in_pool)} GT servers prioritized ({preview}{suffix})"
             )
     else:
         ordered_ids = sorted(server_ids)
@@ -290,9 +289,7 @@ async def _run_strategies(
 
     for name in strategy_names:
         if name == "flat":
-            strategy = FlatStrategy(
-                embedder=embedder, tool_store=tool_store, reranker=reranker
-            )
+            strategy = FlatStrategy(embedder=embedder, tool_store=tool_store, reranker=reranker)
         elif name == "sequential":
             strategy = SequentialStrategy(
                 embedder=embedder,
@@ -398,8 +395,7 @@ async def main(args: argparse.Namespace) -> None:
             max_rpm=args.cohere_rpm,
         )
         logger.info(
-            f"Reranker enabled: {settings.cohere_rerank_model} "
-            f"(rate limit: {args.cohere_rpm} rpm)"
+            f"Reranker enabled: {settings.cohere_rerank_model} (rate limit: {args.cohere_rpm} rpm)"
         )
     elif args.no_rerank:
         logger.info("Reranker disabled via --no-rerank flag")
@@ -461,7 +457,12 @@ async def main(args: argparse.Namespace) -> None:
 
             # Run evaluation
             eval_results = await _run_strategies(
-                strategy_names, embedder, tool_store, server_store, entries, args.top_k,
+                strategy_names,
+                embedder,
+                tool_store,
+                server_store,
+                entries,
+                args.top_k,
                 reranker,
             )
 
