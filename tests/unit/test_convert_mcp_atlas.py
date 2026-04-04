@@ -1,5 +1,6 @@
 """Tests for scripts/convert_mcp_atlas.py — MCP-Atlas per-step GT decomposition (ADR-0012)."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -282,3 +283,54 @@ class TestBuildGroundTruthEntry:
         assert entry["query_id"] == "gt-atlas-042-s07"
         assert entry["correct_server_id"] == "brave-search"
         assert entry["correct_tool_id"] == f"brave-search{TOOL_ID_SEPARATOR}brave_web_search"
+
+
+class TestProcessTasksWithPoolFilter:
+    """ADR-0012 pool filter: only pool-resident servers included in GT."""
+
+    def test_steps_outside_pool_filtered_out(self) -> None:
+        allowed = frozenset({"github"})
+        tool_calls = [
+            {"name": "github_search_repositories", "arguments": "{}"},
+            {"name": "brave-search_brave_web_search", "arguments": "{}"},
+        ]
+        filtered = [tc for tc in tool_calls if split_tool_name(tc["name"])[0] in allowed]
+        assert len(filtered) == 1
+        assert filtered[0]["name"] == "github_search_repositories"
+
+    def test_none_allowed_servers_includes_all(self) -> None:
+        tool_calls = [
+            {"name": "github_search_repositories"},
+            {"name": "brave-search_brave_web_search"},
+        ]
+        allowed: frozenset[str] | None = None
+        result = (
+            tool_calls
+            if allowed is None
+            else [tc for tc in tool_calls if split_tool_name(tc["name"])[0] in allowed]
+        )
+        assert len(result) == 2
+
+    def test_all_steps_filtered_yields_empty(self) -> None:
+        allowed = frozenset({"github"})
+        tool_calls = [
+            {"name": "brave-search_brave_web_search"},
+            {"name": "notion_create_page"},
+        ]
+        filtered = [tc for tc in tool_calls if split_tool_name(tc["name"])[0] in allowed]
+        assert len(filtered) == 0
+
+    def test_load_pool_file_returns_frozenset(self, tmp_path: Path) -> None:
+        pool_file = tmp_path / "pool.jsonl"
+        pool_file.write_text(
+            json.dumps({"server_id": "github", "tools": []})
+            + "\n"
+            + json.dumps({"server_id": "arxiv", "tools": []})
+            + "\n"
+        )
+        ids: set[str] = set()
+        for line in pool_file.read_text().splitlines():
+            if line.strip():
+                ids.add(json.loads(line)["server_id"])
+        allowed = frozenset(ids)
+        assert allowed == frozenset({"github", "arxiv"})

@@ -306,13 +306,20 @@ async def _process_tasks(
     output_path: Path,
     max_tasks: int,
     dry_run: bool,
+    allowed_servers: frozenset[str] | None = None,
 ) -> None:
-    """Process MCP-Atlas tasks into per-step GT entries."""
+    """Process MCP-Atlas tasks into per-step GT entries.
+
+    Args:
+        allowed_servers: If provided, only tool calls whose server_id is in this set
+            are included (ADR-0012 pool filter). None = no filter (include all).
+    """
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     total_entries = 0
     skipped_tasks = 0
     skipped_boilerplate = 0
+    skipped_not_in_pool = 0
     task_index = 0
 
     entries: list[dict] = []
@@ -343,6 +350,14 @@ async def _process_tasks(
         all_calls = parse_trajectory(trajectory)
         substantive = extract_substantive_steps(all_calls)
         skipped_boilerplate += len(all_calls) - len(substantive)
+
+        # ADR-0012 pool filter: only include steps whose server is in the pool
+        if allowed_servers is not None:
+            filtered = [
+                tc for tc in substantive if split_tool_name(tc["name"])[0] in allowed_servers
+            ]
+            skipped_not_in_pool += len(substantive) - len(filtered)
+            substantive = filtered
 
         if not substantive:
             skipped_tasks += 1
@@ -386,9 +401,13 @@ async def _process_tasks(
         for entry in entries:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
+    pool_filter_msg = (
+        f", {skipped_not_in_pool} steps not in pool" if allowed_servers is not None else ""
+    )
     logger.info(
         f"Completed: {total_entries} GT entries from {task_index} tasks "
-        f"(skipped {skipped_tasks} tasks, {skipped_boilerplate} boilerplate calls)"
+        f"(skipped {skipped_tasks} tasks, {skipped_boilerplate} boilerplate calls"
+        f"{pool_filter_msg})"
     )
     logger.info(f"Output: {output_path}")
 
@@ -425,6 +444,15 @@ def main() -> None:
         action="store_true",
         help="Skip LLM query generation, use placeholder queries",
     )
+    parser.add_argument(
+        "--pool-file",
+        type=Path,
+        default=None,
+        help=(
+            "MCP-Zero pool JSONL. Only servers in this pool are included. "
+            "Implements ADR-0012 selection criterion. Default: no filter."
+        ),
+    )
     args = parser.parse_args()
 
     if not args.input.exists():
@@ -437,12 +465,28 @@ def main() -> None:
         logger.error("No tasks loaded. Check parquet file format.")
         return
 
+    allowed_servers: frozenset[str] | None = None
+    if args.pool_file:
+        if not args.pool_file.exists():
+            logger.error(f"Pool file not found: {args.pool_file}")
+            return
+        pool_ids: set[str] = set()
+        for line in args.pool_file.read_text().splitlines():
+            line = line.strip()
+            if line:
+                pool_ids.add(json.loads(line)["server_id"])
+        allowed_servers = frozenset(pool_ids)
+        logger.info(
+            f"Pool filter: {len(allowed_servers)} allowed servers from {args.pool_file}"
+        )
+
     asyncio.run(
         _process_tasks(
             tasks=tasks,
             output_path=args.output,
             max_tasks=args.max_tasks,
             dry_run=args.dry_run,
+            allowed_servers=allowed_servers,
         )
     )
 
