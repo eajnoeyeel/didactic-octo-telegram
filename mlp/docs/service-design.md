@@ -345,9 +345,11 @@ shared/                ← src/에서 core 모듈 추출 (기존 검증 코드)
     ├── aggregator.py  로그 → 도구별 통계 (입력 소스 Supabase로 교체)
     └── logger.py      QueryLogEntry 모델 재사용 (저장소 Supabase로 변경)
 
-# NOTE: description_optimizer/는 merge 후 revert됨 (성능 회귀, 2026-04-01).
-# GEO Score는 src/analytics/geo_score.py를 canonical로 사용.
-# LLM 기반 description 최적화 (개선 제안 생성)는 Phase 2에서 재설계.
+# NOTE: Description 제어는 2단계로 분리됨 (docs/design/description-optimizer.md 참조).
+# ① Description Optimizer (embedding 전): search_description 생성, P@1 극대화 목적. GEO 무관. 백로그.
+# ② GEO Presenter (LLM Client 전달 전): GEO Score 기반 display_description. Phase 2.
+# GEO Score 진단/Provider Dashboard는 src/analytics/geo_score.py를 canonical로 사용.
+# description_optimizer/는 merge 후 revert됨 (성능 회귀, 2026-04-01). 재설계 후 재구현 예정.
 
 lambdas/               ← 신규 Lambda handlers
 ├── search/            query → shared.pipeline.search() → response
